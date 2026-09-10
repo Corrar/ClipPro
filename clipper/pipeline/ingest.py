@@ -354,6 +354,11 @@ def _baixar(
         "format": _formato_ytdl(altura_max),
         "merge_output_format": "mp4",
         "progress_hooks": [_hook_progresso(log)],
+        # 'quiet' NAO desliga a barra de progresso do yt-dlp -- so 'noprogress'
+        # faz isso. Sem ela, o clipper.log recebe milhares de linhas com
+        # carriage return ("[download] 12.3% of 984MiB at ...") e fica
+        # impossivel de ler. Nosso proprio progresso sai pelo progress_hooks.
+        "noprogress": True,
         # Sem isto o yt-dlp procura o ffmpeg SO no PATH. No Windows, logo apos
         # 'winget install Gyan.FFmpeg' o PATH do shell atual ainda nao tem o
         # binario, e o yt-dlp entao baixa video e audio em arquivos separados,

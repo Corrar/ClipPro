@@ -54,6 +54,11 @@ _TAMANHOS_MODELO: dict[str, str] = {
 }
 
 _MAX_PICOS = 200
+
+# Menor duracao que uma palavra pode ter na transcricao final, em segundos.
+# 60 ms = 6 centissegundos, a unidade do \k do ASS: da para o olho ver o
+# realce acender.
+_DURACAO_MINIMA_PALAVRA = 0.06
 _PISO_DBFS = -80.0
 _RMS_MINIMO = 1e-4  # 20*log10(1e-4) == -80 dBFS
 _BLOCO_SEGUNDOS = 60.0  # leitura do wav em pedacos, para nao carregar 1h de uma vez
@@ -303,6 +308,70 @@ def _carregar_modelo(modelo: str, device: str, compute_type: str, cpu_threads: i
         ) from None
 
 
+def _garantir_duracao_minima(
+    planas: list[dict[str, Any]],
+    segmentos: list[dict[str, Any]],
+    duracao_audio: float,
+) -> int:
+    """Tira as palavras de duracao zero que o faster-whisper devolve.
+
+    Na primeira palavra depois de um corte do VAD o modelo costuma entregar
+    start == end. Palavra de duracao zero vira 0 centissegundos no \\k do ASS:
+    a legenda karaoke da F3 simplesmente NUNCA acende aquela palavra, e no
+    corte da F2 ela e uma fronteira de largura nula. Damos a ela o menor tempo
+    visivel que caiba antes da palavra seguinte, sem furar a ordem.
+
+    Mexe nas duas copias (lista plana e palavras de cada segmento), que andam
+    na mesma ordem, para os dois artefatos nao divergirem.
+    """
+    referencias = [w for s in segmentos for w in s["palavras"]]
+    total = len(planas)
+    ajustadas = 0
+    for k, palavra in enumerate(planas):
+        if palavra["fim"] > palavra["inicio"]:
+            continue
+        if k + 1 < total:
+            limite = planas[k + 1]["inicio"]
+        else:
+            limite = max(duracao_audio, palavra["inicio"])
+        novo_fim = min(palavra["inicio"] + _DURACAO_MINIMA_PALAVRA, limite)
+        if novo_fim <= palavra["inicio"] and k + 1 < total:
+            # A proxima palavra comeca no mesmo instante: nao ha folga a tomar.
+            # Em vez de sobrepor as duas (o que faria o karaoke da F3 contar o
+            # mesmo tempo duas vezes), pegamos emprestado do inicio da proxima,
+            # desde que ela continue com duracao propria.
+            proxima = planas[k + 1]
+            folga = proxima["fim"] - proxima["inicio"]
+            # Dividir a folga ao meio em vez de exigir que a proxima palavra
+            # fique com o minimo inteiro: quando ela propria dura so o minimo
+            # (60 ms), exigir isso zeraria o emprestimo e a unica saida seria
+            # sobrepor. Meio a meio da 30 ms a cada uma -- visivel nas duas.
+            emprestimo = min(_DURACAO_MINIMA_PALAVRA, folga / 2.0)
+            if emprestimo >= 0.01:
+                novo_fim = round(palavra["inicio"] + emprestimo, 3)
+                proxima["inicio"] = novo_fim
+                if k + 1 < len(referencias):
+                    referencias[k + 1]["inicio"] = novo_fim
+        if novo_fim <= palavra["inicio"]:
+            # Ultimo recurso (proxima palavra tambem e curtissima): 10 ms de
+            # sobreposicao ainda e melhor que uma palavra que nunca acende.
+            novo_fim = palavra["inicio"] + 0.01
+        novo_fim = round(novo_fim, 3)
+        palavra["fim"] = novo_fim
+        if k < len(referencias):
+            referencias[k]["fim"] = novo_fim
+        # Se o ultimo recurso invadiu a proxima palavra (acontece quando ela
+        # tambem veio zerada, no mesmo instante), empurra o inicio dela. Como
+        # o laco anda em ordem, ela sera consertada na propria iteracao caso
+        # isso a deixe sem duracao.
+        if k + 1 < total and planas[k + 1]["inicio"] < novo_fim:
+            planas[k + 1]["inicio"] = novo_fim
+            if k + 1 < len(referencias):
+                referencias[k + 1]["inicio"] = novo_fim
+        ajustadas += 1
+    return ajustadas
+
+
 def transcrever(
     saida: Saida,
     estado: Estado,
@@ -473,6 +542,13 @@ def transcrever(
 
     segundos = progresso.concluir(duracao if duracao > 0 else posicao)
     segundos = max(segundos, time.perf_counter() - t0)
+
+    duracao_zerada = _garantir_duracao_minima(palavras_planas, segmentos, duracao)
+    if duracao_zerada:
+        log.debug(
+            f"{duracao_zerada} palavra(s) vieram com duracao zero e ganharam o "
+            "minimo visivel."
+        )
 
     if correcoes:
         log.debug(f"monotonicidade: {correcoes} palavra(s) tiveram o início ajustado.")
