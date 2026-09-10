@@ -1,0 +1,227 @@
+"""Legenda ASS karaoke palavra a palavra.
+
+Por que ASS e nao SRT: o SRT nao sabe acender uma palavra por vez. O efeito
+karaoke do ASS (`\\k`) troca a cor de cada silaba no instante certo, e como a
+F1 grava a lista PLANA de palavras com timestamp, cada palavra vira uma silaba.
+
+Duas armadilhas que este modulo resolve de proposito:
+
+1. Palavra de duracao zero. O faster-whisper devolve fim == inicio na primeira
+   palavra depois de um corte do VAD (118 casos no video de teste, 2,2%).
+   `\\k0` significa "nao acende": a palavra ficaria apagada a legenda inteira.
+   A F1 ja da a toda palavra um minimo de 60 ms, e aqui o piso e reforcado --
+   `_centis()` nunca devolve menos de 1 centissegundo.
+
+2. Sincronia com o audio. O valor de `\\k` de uma palavra nao e a duracao dela,
+   e a distancia ate o INICIO da proxima. Usar a duracao deixaria o realce
+   adiantado, porque os silencios entre palavras somem. Com a distancia, a
+   soma dos `\\k` fecha exatamente com a duracao da linha.
+"""
+
+from __future__ import annotations
+
+import unicodedata
+from dataclasses import dataclass
+from typing import Any, Iterable, Sequence
+
+# Quanto a linha fica na tela depois da ultima palavra, em segundos. Sem isso
+# a legenda pisca fora no instante em que a fala acaba.
+_SEGURAR_S = 0.35
+
+# Piso absoluto de um \k. 1 centissegundo e o menor valor que ainda acende.
+_MINIMO_CENTIS = 1
+
+
+@dataclass(frozen=True)
+class Preset:
+    """Aparencia da legenda. Carregado de clipper/presets/<nome>.json."""
+
+    nome: str
+    descricao: str
+    fonte: str
+    tamanho: int
+    negrito: bool
+    maiusculas: bool
+    cor_falada: str
+    cor_por_falar: str
+    cor_contorno: str
+    cor_sombra: str
+    contorno: float
+    sombra: float
+    espacamento: float
+    margem_lateral: int
+    margem_inferior: int
+    max_palavras_linha: int
+    max_caracteres_linha: int
+
+    @classmethod
+    def de_dict(cls, dados: dict[str, Any]) -> "Preset":
+        campos = {f: dados[f] for f in cls.__dataclass_fields__ if f in dados}
+        return cls(**campos)
+
+
+def _centis(segundos: float) -> int:
+    """Converte para centissegundos com piso de 1: \\k0 nunca acende."""
+    return max(_MINIMO_CENTIS, int(round(float(segundos) * 100.0)))
+
+
+def _tempo_ass(segundos: float) -> str:
+    """Formato de tempo do ASS: H:MM:SS.cc (centissegundos, dois digitos)."""
+    segundos = max(0.0, float(segundos))
+    centis = int(round(segundos * 100.0))
+    h, resto = divmod(centis, 360000)
+    m, resto = divmod(resto, 6000)
+    s, cc = divmod(resto, 100)
+    return f"{h}:{m:02d}:{s:02d}.{cc:02d}"
+
+
+def _escapar(texto: str) -> str:
+    """Neutraliza o que o parser do ASS trataria como marcacao."""
+    return (
+        texto.replace("\\", "\\\\")
+        .replace("{", "\\{")
+        .replace("}", "\\}")
+        .replace("\n", " ")
+        .replace("\r", " ")
+    )
+
+
+def _largura_visual(texto: str) -> int:
+    """Conta caracteres ignorando acentos combinantes (NFD nao infla a conta)."""
+    return sum(1 for c in unicodedata.normalize("NFC", texto) if not unicodedata.combining(c))
+
+
+def _termina_frase(texto: str) -> bool:
+    limpo = texto.rstrip("\"'»)]}")
+    return bool(limpo) and limpo[-1] in ".!?…"
+
+
+def agrupar_linhas(
+    palavras: Sequence[dict[str, Any]],
+    *,
+    max_palavras: int,
+    max_caracteres: int,
+) -> list[list[dict[str, Any]]]:
+    """Quebra a sequencia de palavras em linhas curtas de legenda.
+
+    Regras, na ordem: fecha a linha no fim de frase (ponto final e uma pausa
+    natural, quebrar ali le melhor), ao atingir o numero maximo de palavras, ou
+    ao estourar a largura. Linhas curtas sao de proposito -- em video vertical
+    o leitor tem fracoes de segundo, e uma linha longa ainda esbarraria na
+    coluna de botoes do TikTok.
+    """
+    linhas: list[list[dict[str, Any]]] = []
+    atual: list[dict[str, Any]] = []
+    largura = 0
+
+    for palavra in palavras:
+        texto = str(palavra.get("texto") or "")
+        if not texto:
+            continue
+        custo = _largura_visual(texto) + (1 if atual else 0)
+        estoura = atual and (
+            len(atual) >= max_palavras or largura + custo > max_caracteres
+        )
+        if estoura:
+            linhas.append(atual)
+            atual, largura = [], 0
+            custo = _largura_visual(texto)
+        atual.append(palavra)
+        largura += custo
+        if _termina_frase(texto):
+            linhas.append(atual)
+            atual, largura = [], 0
+
+    if atual:
+        linhas.append(atual)
+    return linhas
+
+
+def _cabecalho(preset: Preset, largura: int, altura: int) -> str:
+    negrito = -1 if preset.negrito else 0
+    return f"""\
+[Script Info]
+; Gerado pelo ClipPro -- legenda karaoke palavra a palavra.
+ScriptType: v4.00+
+PlayResX: {largura}
+PlayResY: {altura}
+WrapStyle: 2
+ScaledBorderAndShadow: yes
+YCbCr Matrix: TV.709
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Clip,{preset.fonte},{preset.tamanho},{preset.cor_falada},{preset.cor_por_falar},{preset.cor_contorno},{preset.cor_sombra},{negrito},0,0,0,100,100,{preset.espacamento},0,1,{preset.contorno},{preset.sombra},2,{preset.margem_lateral},{preset.margem_lateral},{preset.margem_inferior},1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
+
+
+def montar_ass(
+    palavras: Iterable[dict[str, Any]],
+    *,
+    preset: Preset,
+    inicio: float,
+    fim: float,
+    largura: int = 1080,
+    altura: int = 1920,
+) -> tuple[str, dict[str, Any]]:
+    """Monta o texto ASS de um clipe e um resumo do que foi gerado.
+
+    'palavras' vem com tempos ABSOLUTOS (os de transcricao.json); aqui eles
+    viram tempos relativos ao inicio do clipe, que e onde o corte comeca.
+    """
+    lista = [p for p in palavras if str(p.get("texto") or "").strip()]
+    duracao = max(0.0, float(fim) - float(inicio))
+    linhas = agrupar_linhas(
+        lista,
+        max_palavras=preset.max_palavras_linha,
+        max_caracteres=preset.max_caracteres_linha,
+    )
+
+    eventos: list[str] = []
+    menor_k = None
+    total_palavras = 0
+
+    for i, linha in enumerate(linhas):
+        ini_linha = max(0.0, float(linha[0]["inicio"]) - inicio)
+        fim_fala = max(ini_linha, float(linha[-1]["fim"]) - inicio)
+
+        # Segura a linha um pouco alem da fala, sem invadir a proxima nem
+        # passar do fim do clipe.
+        limite = duracao
+        if i + 1 < len(linhas):
+            limite = min(limite, max(0.0, float(linhas[i + 1][0]["inicio"]) - inicio))
+        fim_linha = min(fim_fala + _SEGURAR_S, limite)
+        if fim_linha <= ini_linha:
+            fim_linha = min(ini_linha + 0.10, duracao)
+
+        pedacos: list[str] = []
+        for j, palavra in enumerate(linha):
+            comeca = max(0.0, float(palavra["inicio"]) - inicio)
+            if j + 1 < len(linha):
+                proxima = max(0.0, float(linha[j + 1]["inicio"]) - inicio)
+            else:
+                proxima = fim_linha
+            k = _centis(proxima - comeca)
+            if menor_k is None or k < menor_k:
+                menor_k = k
+            texto = str(palavra["texto"]).strip()
+            if preset.maiusculas:
+                texto = texto.upper()
+            pedacos.append("{\\k" + str(k) + "}" + _escapar(texto))
+            total_palavras += 1
+
+        eventos.append(
+            f"Dialogue: 0,{_tempo_ass(ini_linha)},{_tempo_ass(fim_linha)},Clip,,0,0,0,,"
+            + " ".join(pedacos)
+        )
+
+    resumo = {
+        "linhas": len(linhas),
+        "palavras": total_palavras,
+        "menor_k_centis": menor_k or 0,
+        "preset": preset.nome,
+    }
+    return _cabecalho(preset, largura, altura) + "\n".join(eventos) + "\n", resumo

@@ -37,12 +37,17 @@ MODELOS_WHISPER = ("tiny", "base", "small", "medium", "large-v3")
 # segundos. O clipe final e 1080x1920, entao 1080p de origem paga a conta.
 ALTURA_MAX_PADRAO = 1080
 
-# Estagios que ainda nao existem (F3). Este conjunto e o unico lugar que
-# decide se um 'clipper run' para com elegancia (codigo 0) ao esbarrar neles.
-# Quando a fase entrar, tire o nome daqui e o erro volta a ser erro de verdade.
-# A selecao saiu daqui na F2: ela existe, roda, e quando pede a ida e volta
-# manual isso NAO e uma falha -- ver _Parada e _bloco_proximos_passos.
-ESTAGIOS_PENDENTES: frozenset[str] = frozenset({"render"})
+# Estagios que ainda nao existem. Este conjunto e o unico lugar que decide se
+# um 'clipper run' para com elegancia (codigo 0) ao esbarrar neles.
+# HOJE ELE ESTA VAZIO: a selecao saiu na F2 e o render saiu na F3, entao todo
+# estagio da fila e real e uma falha dele volta a ser falha de verdade (codigo
+# 1, mensagem de erro). O conjunto vazio e um estado NORMAL e suportado --
+# _rodar_estagios simplesmente nunca entra no ramo "nao_existe".
+# O maquinario de parada elegante continua de pe porque ele serve a OUTRA
+# parada, que nao tem nada de provisoria: a selecao em modo manual devolve
+# {"pendente": True} e o pipeline termina em 0 esperando o usuario -- ver
+# Parada, _rodar_estagios e _bloco_proximos_passos.
+ESTAGIOS_PENDENTES: frozenset[str] = frozenset()
 
 # Ordem canonica dos estagios e quais rodam em cada subcomando.
 ESTAGIOS_POR_COMANDO: dict[str, tuple[str, ...]] = {
@@ -79,12 +84,18 @@ exemplos:
   clipper select aula.mp4 --resposta "resposta.json"
   clipper select aula.mp4 --api --modelo sonnet
   clipper render aula.mp4 --preset bold-amarelo
+  clipper render aula.mp4 --preset clean-branco --clipe 2 --clipe 4
+  clipper render "aula-de-fisica-qp3uNTpf" --preset clean-branco
   clipper info aula.mp4
 
 observações:
   - todo artefato fica em out/<slug>/; rodar de novo reaproveita o que já existe.
   - --force refaz apenas o estágio que dá nome ao subcomando (transcribe refaz a
     transcrição, select refaz a seleção); só o run refaz tudo.
+  - o render escreve os .mp4 em out/<slug>/clips/; para refazer só alguns deles,
+    repita --clipe com o id que aparece na seleção (--clipe 2 --clipe 4).
+  - render e info só leem out/<slug>/: aceitam o nome da pasta no lugar do vídeo
+    e funcionam offline, mesmo que o arquivo original já tenha sido apagado.
   - a seleção vem em MODO MANUAL: o clipper grava out/<slug>/prompt_selecao.txt,
     você cola esse texto num chat com um modelo, salva o array JSON que ele
     devolver e volta com --resposta. Quem tem ANTHROPIC_API_KEY pode usar --api
@@ -249,6 +260,36 @@ def _pai_selecao() -> argparse.ArgumentParser:
     return p
 
 
+def _presets_disponiveis() -> tuple[str, ...]:
+    """Nomes dos presets que existem de verdade em clipper/presets/*.json.
+
+    O --help lista o que esta no disco em vez de citar nomes fixos: preset
+    novo aparece sozinho, preset apagado some. Pasta ilegivel nao pode
+    derrubar o 'clipper --help', entao o erro vira lista vazia e o help cai
+    no texto curto.
+    """
+    try:
+        nomes = sorted(p.stem for p in config.DIR_PRESETS.glob("*.json"))
+    except OSError:
+        return ()
+    return tuple(n for n in nomes if n)
+
+
+def _ajuda_preset() -> str:
+    """Texto do --preset, com os presets reais quando da para le-los."""
+    nomes = _presets_disponiveis()
+    if not nomes:
+        return (
+            f"preset visual da legenda (padrão: {PRESET_PADRAO}); nenhum arquivo "
+            f"de preset encontrado em {config.DIR_PRESETS}"
+        )
+    return (
+        "preset visual da legenda: "
+        + "/".join(nomes)
+        + f" (padrão: {PRESET_PADRAO})"
+    )
+
+
 def _pai_render() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(add_help=False)
     g = p.add_argument_group("opções de render")
@@ -256,7 +297,18 @@ def _pai_render() -> argparse.ArgumentParser:
         "--preset",
         default=PRESET_PADRAO,
         metavar="NOME",
-        help=f"preset visual da legenda (padrão: {PRESET_PADRAO})",
+        help=_ajuda_preset(),
+    )
+    g.add_argument(
+        "--clipe",
+        action="append",
+        type=int,
+        metavar="N",
+        dest="clipe",
+        help=(
+            "renderiza apenas o(s) clipe(s) com este id da seleção (pode repetir: "
+            "--clipe 2 --clipe 4). Por padrão renderiza todos."
+        ),
     )
     return p
 
@@ -325,7 +377,11 @@ def construir_parser() -> argparse.ArgumentParser:
         parents=[entrada, geral, render],
         help="renderiza os clipes a partir de uma seleção pronta",
         description=(
-            "Exige um selecao.json já pronto em out/<slug>/ e renderiza os clipes."
+            "Exige um selecao.json já pronto em out/<slug>/ e renderiza os clipes "
+            "verticais 1080x1920 com legenda queimada em out/<slug>/clips/. "
+            "Use --clipe para renderizar só alguns deles. Como só lê o que já "
+            "está gravado, aceita também o NOME DA PASTA em out/ como entrada e "
+            "não precisa de rede nem do vídeo original ainda no disco."
         ),
     )
     subs.add_parser(
@@ -359,6 +415,8 @@ class Opcoes:
     altura_max: int | None
     resposta: Path | None
     usar_api: bool
+    # None = renderiza a selecao inteira. Lista = so estes ids.
+    clipes: list[int] | None
 
     @classmethod
     def de_args(cls, args: argparse.Namespace) -> "Opcoes":
@@ -380,6 +438,12 @@ class Opcoes:
             altura_max=getattr(args, "altura_max", ALTURA_MAX_PADRAO),
             resposta=getattr(args, "resposta", None),
             usar_api=bool(getattr(args, "api", False)),
+            # argparse com action="append" devolve None quando a flag nao veio.
+            # Lista vazia recebe o mesmo tratamento de None: "renderize tudo" e
+            # o padrao, e uma lista vazia significaria "nao renderize nada".
+            clipes=(
+                [int(c) for c in getattr(args, "clipe", None) or ()] or None
+            ),
         )
 
 
@@ -388,13 +452,33 @@ class Opcoes:
 # --------------------------------------------------------------------------
 @dataclass(frozen=True)
 class Estagio:
-    """Um passo do pipeline: como chamar, como rotular e o que ele produz."""
+    """Um passo do pipeline: como chamar, como rotular e o que ele produz.
+
+    'padrao' so importa quando o artefato e uma PASTA: e o glob dos arquivos
+    que contam como resultado do estagio. O render grava .mp4 em clips/, e e o
+    tamanho somado deles que o resumo mostra -- nao o de qualquer arquivo que
+    tenha ido parar la.
+    """
 
     nome: str
     rotulo: str
     artefato: Path
     executar: Callable[[], Any]
     pendente: bool = False
+    padrao: str | None = None
+
+
+def _rotulo_render(opcoes: Opcoes) -> str:
+    """Rotulo do estagio de render, dizendo tambem se ele foi restringido.
+
+    O render de 5 clipes leva minutos: quando o usuario pediu --clipe, a tela
+    precisa deixar claro que o resto da selecao NAO esta sendo refeito.
+    """
+    rotulo = f"Render dos clipes (preset {opcoes.preset})"
+    if opcoes.clipes:
+        ids = ", ".join(str(c) for c in opcoes.clipes)
+        rotulo += f", apenas o(s) clipe(s) {ids}"
+    return rotulo
 
 
 def _montar_estagios(
@@ -418,13 +502,20 @@ def _montar_estagios(
     def _forcar(nome: str) -> bool:
         return nome in forcados
 
-    def _fazer(nome: str, rotulo: str, artefato: Path, alvo: Callable[[], Any]) -> Estagio:
+    def _fazer(
+        nome: str,
+        rotulo: str,
+        artefato: Path,
+        alvo: Callable[[], Any],
+        padrao: str | None = None,
+    ) -> Estagio:
         return Estagio(
             nome=nome,
             rotulo=rotulo,
             artefato=artefato,
             executar=alvo,
             pendente=nome in ESTAGIOS_PENDENTES,
+            padrao=padrao,
         )
 
     estagios = [
@@ -487,11 +578,16 @@ def _montar_estagios(
         ),
         _fazer(
             "render",
-            f"Render dos clipes (preset {opcoes.preset})",
+            _rotulo_render(opcoes),
             saida.clips_dir,
             lambda: render.renderizar(
-                saida, estado, preset=opcoes.preset, forcar=_forcar("render")
+                saida,
+                estado,
+                preset=opcoes.preset,
+                forcar=_forcar("render"),
+                clipes=opcoes.clipes,
             ),
+            padrao="*.mp4",
         ),
     ]
     return {e.nome: e for e in estagios}
@@ -503,11 +599,15 @@ class Parada:
 
     Sao dois motivos, e eles nao se parecem:
 
-      "nao_existe"  -- o estagio ainda nao foi implementado (F3). O pipeline
-                       para porque o clipper acaba ali.
+      "nao_existe"  -- o estagio ainda nao foi implementado. O pipeline para
+                       porque o clipper acaba ali. Com ESTAGIOS_PENDENTES
+                       vazio (o caso de hoje) este motivo nunca acontece; o
+                       ramo fica de pe para a proxima fase que entrar meio
+                       pronta.
       "aguardando"  -- o estagio rodou, fez o que tinha que fazer e devolveu
                        {"pendente": True}: falta uma acao do usuario. Hoje so
-                       a selecao em modo manual faz isso.
+                       a selecao em modo manual faz isso -- e ela nao e
+                       provisoria, e o funcionamento normal do modo manual.
     """
 
     estagio: Estagio
@@ -528,6 +628,11 @@ def _rodar_estagios(
     e o chamador aceitou parar ali (tolerar_pendentes=True, usado so pelo
     'run'), ou um estagio que devolveu {"pendente": True} porque a bola agora
     esta com o usuario.
+
+    Com ESTAGIOS_PENDENTES vazio, est.pendente e sempre False: o except
+    reergue a excecao como qualquer outra falha e so a parada "aguardando"
+    (selecao em modo manual) continua acontecendo. Nada aqui depende de o
+    conjunto ter algum nome dentro.
     """
     log = registro.obter()
     for est in estagios:
@@ -556,13 +661,19 @@ def _rodar_estagios(
 _TAMANHOS_VAZIOS = ("não gerado", "vazio", "ilegível")
 
 
-def _descrever_artefato(caminho: Path, base: Path) -> tuple[str, str]:
+def _descrever_artefato(
+    caminho: Path, base: Path, padrao: str | None = None
+) -> tuple[str, str]:
     """Devolve (nome relativo a out/<slug>/, tamanho legivel).
 
     Tamanho zero vira "vazio", nunca "0 B": arquivo de 0 byte e o que sobra de
     um ffmpeg que morreu no meio, e Estado.concluido() tambem o trata como nao
     concluido. Se aparecesse como "0 B" o info diria 'pronto' para um artefato
     que o resto do pipeline considera inexistente.
+
+    Quando o artefato e uma pasta, 'padrao' e o glob do que conta como
+    resultado: o render passa "*.mp4" para o resumo somar os clipes gerados, e
+    nao um .ass ou um .txt que alguem tenha deixado em clips/.
     """
     try:
         rel = caminho.relative_to(base).as_posix()
@@ -570,7 +681,8 @@ def _descrever_artefato(caminho: Path, base: Path) -> tuple[str, str]:
         rel = str(caminho)
     try:
         if caminho.is_dir():
-            arquivos = [p for p in caminho.iterdir() if p.is_file()]
+            itens = caminho.glob(padrao) if padrao else caminho.iterdir()
+            arquivos = [p for p in itens if p.is_file()]
             if not arquivos:
                 return f"{rel}/", "vazio"
             total = sum(p.stat().st_size for p in arquivos)
@@ -641,7 +753,7 @@ def _resumo(
         if est is None:
             linhas.append((nome, tempo, "—", "—"))
             continue
-        artefato, tamanho = _descrever_artefato(est.artefato, saida.base)
+        artefato, tamanho = _descrever_artefato(est.artefato, saida.base, est.padrao)
         linhas.append((nome, tempo, artefato, tamanho))
 
     _imprimir_tabela("RESUMO", ("estágio", "tempo", "artefato", "tamanho"), linhas)
@@ -753,6 +865,11 @@ def _flags_repetidas(comando: str, opcoes: Opcoes) -> list[str]:
     # recusaria a linha que o proprio clipper mandou o usuario colar.
     if comando in ("run", "render") and opcoes.preset != PRESET_PADRAO:
         partes.append(f'--preset "{opcoes.preset}"')
+    # --clipe mora no mesmo grupo de --preset: so existe em 'run' e 'render'.
+    # Perder essa flag na volta faria o clipper renderizar a selecao inteira
+    # quando o usuario tinha pedido dois clipes -- minutos de encode a mais.
+    if comando in ("run", "render") and opcoes.clipes:
+        partes.extend(f"--clipe {c}" for c in opcoes.clipes)
     if opcoes.out is not None:
         partes.append(f'--out "{opcoes.out}"')
     return partes
@@ -849,7 +966,7 @@ def _comando_info(
     prontos = 0
     for nome in ESTAGIOS_POR_COMANDO["info"]:
         est = estagios[nome]
-        artefato, tamanho = _descrever_artefato(est.artefato, saida.base)
+        artefato, tamanho = _descrever_artefato(est.artefato, saida.base, est.padrao)
         pronto = tamanho not in _TAMANHOS_VAZIOS
         prontos += int(pronto)
         segundos = duracoes.get(nome)
@@ -1100,12 +1217,18 @@ def _achar_saida_gravada(raiz: Path, entrada: str) -> Path | None:
     return None
 
 
-def _origem_para_info(entrada: str, raiz: Path) -> tuple[Any, str | None]:
-    """Origem do 'info': sem rede e sem exigir que o arquivo ainda exista.
+def _origem_pelo_disco(
+    entrada: str, raiz: Path, *, comando: str = "info", flags: str = ""
+) -> tuple[Any, str | None]:
+    """Origem sem rede e sem exigir que o arquivo de origem ainda exista.
 
+    Serve aos comandos que so LEEM out/<slug>/ -- hoje 'info' e 'render'.
     Devolve (origem, aviso). Ordem de tentativa: arquivo local presente ->
     pasta ja gravada em out/ (le o fonte.json) -> consulta a URL, so como
     ultimo recurso -> slug deduzido do nome, so para dizer que nada foi feito.
+
+    'comando' e 'flags' entram apenas nas mensagens: a sugestao precisa ser um
+    comando que funciona de verdade (o mesmo subcomando, com o --out em uso).
     """
     from clipper.pipeline import ingest
 
@@ -1131,12 +1254,12 @@ def _origem_para_info(entrada: str, raiz: Path) -> tuple[Any, str | None]:
         elif Path(alvo).name == alvo and pasta.name in (alvo, config.slugificar(alvo)):
             aviso = (
                 f"'{alvo}' não é um arquivo no disco; tratei como nome de pasta "
-                f"e relato o que existe em {pasta}."
+                f"e usei o que já está gravado em {pasta}."
             )
         else:
             aviso = (
-                f"a origem '{alvo}' não está acessível agora; abaixo está só o "
-                f"que já existe em {pasta}."
+                f"a origem '{alvo}' não está acessível agora; usei só o que já "
+                f"está gravado em {pasta}."
             )
         return origem, aviso
 
@@ -1152,10 +1275,10 @@ def _origem_para_info(entrada: str, raiz: Path) -> tuple[Any, str | None]:
                 "não consegui consultar a URL agora.",
                 detalhe=f"{exc.mensagem} {exc.detalhe or ''}".strip(),
                 sugestao=(
-                    "se o vídeo já foi processado, chame o info pelo nome da "
-                    f'pasta em vez da URL:  clipper info "{exemplo}"   '
-                    f"(pastas em {raiz}: {listagem}). Se ainda não foi "
-                    "processado, é preciso rede para ler o título do vídeo."
+                    f"se o vídeo já foi processado, chame o {comando} pelo nome "
+                    f'da pasta em vez da URL:  clipper {comando} "{exemplo}"'
+                    f"{flags}   (pastas em {raiz}: {listagem}). Se ainda não "
+                    "foi processado, é preciso rede para ler o título do vídeo."
                 ),
             ) from None
 
@@ -1173,6 +1296,73 @@ def _origem_para_info(entrada: str, raiz: Path) -> tuple[Any, str | None]:
     return origem, aviso
 
 
+def _sufixo_out(opcoes: Opcoes) -> str:
+    """' --out "<dir>"' quando o usuario passou --out, senao string vazia.
+
+    Toda sugestao que monta uma linha de comando precisa carregar o --out em
+    uso: sem ele o comando sugerido olharia para a pasta padrao.
+    """
+    return f' --out "{opcoes.out}"' if opcoes.out is not None else ""
+
+
+def _sufixo_render(opcoes: Opcoes) -> str:
+    """Flags do 'render' que o usuario passou, prontas para colar na sugestao.
+
+    Reaproveita _flags_repetidas: --preset, --clipe e --out. Perder o --preset
+    na volta renderizaria com outro visual o que a pessoa pediu.
+    """
+    partes = _flags_repetidas("render", opcoes)
+    return (" " + " ".join(partes)) if partes else ""
+
+
+def _conferir_pasta_do_render(
+    raiz: Path, slug: str, entrada: str, opcoes: Opcoes
+) -> None:
+    """Antes de criar qualquer coisa: existe out/<slug>/ para o render ler?
+
+    O render nao produz projeto novo, ele so relê um que ja existe. Se nem a
+    pasta esta la, criar out/<slug>/ vazia para depois falhar na selecao seria
+    lixo no disco e uma mensagem confusa. Aqui a resposta e direta e lista as
+    pastas que existem de verdade.
+    """
+    if (raiz / slug).is_dir():
+        return
+    # A segunda sugestao ('rode antes o run') so pode citar a entrada do
+    # usuario quando ela e mesmo um video: repetir um nome de pasta que nao
+    # existe daria um comando que falha na ingestao.
+    alvo = _limpar_entrada(entrada)
+    try:
+        e_video = _e_url(alvo) or Path(alvo).is_file()
+    except OSError:
+        e_video = False
+    video = alvo if e_video else "C:/caminho/do/video.mp4"
+    nomes = _pastas_processadas(raiz)
+    # Sem nenhuma pasta em out/ nao ha o que reaproveitar: a unica saida e
+    # processar o video, e a sugestao nao pode fingir que existe uma pasta.
+    if not nomes:
+        sugestao = (
+            "o render só relê um projeto que já está gravado, e não há nenhum "
+            f"em {raiz}. Processe o vídeo primeiro:  "
+            f'clipper run "{video}"{_sufixo_out(opcoes)}'
+        )
+    else:
+        listagem = ", ".join(nomes[:5])
+        if len(nomes) > 5:
+            listagem += f", ... (+{len(nomes) - 5})"
+        sugestao = (
+            "o render só relê um projeto que já está gravado. Chame-o pelo nome "
+            f'da pasta:  clipper render "{nomes[0]}"{_sufixo_render(opcoes)}   '
+            f"(pastas em {raiz}: {listagem}). Se este vídeo ainda não foi "
+            f'processado, rode antes:  clipper run "{video}"'
+            f"{_sufixo_out(opcoes)}"
+        )
+    raise ErroRender(
+        f"não encontrei nada processado para '{alvo}' em {raiz}: a pasta "
+        f"{raiz / slug} não existe.",
+        sugestao=sugestao,
+    )
+
+
 def _executar(comando: str, entrada: str, opcoes: Opcoes) -> int:
     """Corpo do comando. Erros sobem para o main, que sabe formatar."""
     from clipper.pipeline import ingest
@@ -1182,7 +1372,9 @@ def _executar(comando: str, entrada: str, opcoes: Opcoes) -> int:
     # para depois relatar que nao ha nada la.
     if comando == "info":
         raiz = _raiz_saida(opcoes)
-        origem, aviso = _origem_para_info(entrada, raiz)
+        origem, aviso = _origem_pelo_disco(
+            entrada, raiz, comando="info", flags=_sufixo_out(opcoes)
+        )
         saida = Saida.para(origem.slug, opcoes.out)
         estado = Estado(saida.estado_json)
         _cabecalho(comando, entrada, origem, saida)
@@ -1191,12 +1383,29 @@ def _executar(comando: str, entrada: str, opcoes: Opcoes) -> int:
         estagios = _montar_estagios(opcoes, origem, saida, estado)
         return _comando_info(saida, estado, estagios, entrada)
 
-    origem = ingest.resolver_origem(entrada)
+    # O 'render' le APENAS out/<slug>/ (fonte.mp4, transcricao.json,
+    # selecao.json): exigir que o video original ainda esteja no disco -- ou ir
+    # a rede so para descobrir o slug de uma URL -- torna impossivel
+    # re-renderizar um projeto que ja esta inteiro gravado. Ele usa a mesma
+    # cadeia do 'info': disco primeiro, nome da pasta aceito como entrada,
+    # fonte.json lido no lugar do yt-dlp, e rede so se nada foi encontrado.
+    aviso = None
+    if comando == "render":
+        raiz = _raiz_saida(opcoes)
+        origem, aviso = _origem_pelo_disco(
+            entrada, raiz, comando="render", flags=_sufixo_render(opcoes)
+        )
+        _conferir_pasta_do_render(raiz, origem.slug, entrada, opcoes)
+    else:
+        origem = ingest.resolver_origem(entrada)
+
     saida = _preparar_saida(origem.slug, comando, entrada, opcoes)
     estado = Estado(saida.estado_json)
 
     log = _configurar_log(saida, comando, entrada, opcoes)
     _cabecalho(comando, entrada, origem, saida)
+    if aviso:
+        log.info(f"  aviso:  {aviso}")
 
     alvos = ESTAGIOS_POR_COMANDO[comando]
     # O --force refaz SO o estagio que da nome ao subcomando (mais a energia,
@@ -1236,7 +1445,12 @@ def _executar(comando: str, entrada: str, opcoes: Opcoes) -> int:
                 "gasto). Rode sem --resposta para a seleção sair da API."
             )
     if comando == "render":
-        _conferir_selecao_pronta(saida, entrada)
+        # A sugestao aponta para a ORIGEM registrada no fonte.json (o video ou
+        # a URL), nao para o que o usuario digitou: 'clipper select "<nome-da-
+        # pasta>"' nao funcionaria, porque a selecao precisa do video.
+        _conferir_selecao_pronta(
+            saida, str(getattr(origem, "valor", "") or entrada), opcoes
+        )
 
     # A limpeza vem DEPOIS das checagens (comando que aborta nao pode destruir
     # estado) e alcanca SO o estagio-alvo do --force: o que estiver a jusante
@@ -1347,14 +1561,17 @@ def _conferir_resposta_manual(caminho: Path) -> None:
         )
 
 
-def _conferir_selecao_pronta(saida: Saida, entrada: str) -> None:
+def _conferir_selecao_pronta(
+    saida: Saida, entrada: str, opcoes: Opcoes | None = None
+) -> None:
+    sufixo = _sufixo_out(opcoes) if opcoes is not None else ""
     alvo = saida.selecao_json
     if not alvo.is_file() or alvo.stat().st_size == 0:
         raise ErroRender(
             f"não encontrei uma seleção pronta em {alvo}.",
             sugestao=(
                 "gere a seleção antes de renderizar:  "
-                f'clipper select "{entrada}"   (ou rode tudo de uma vez com '
-                f'clipper run "{entrada}")'
+                f'clipper select "{entrada}"{sufixo}   (ou rode tudo de uma vez '
+                f'com clipper run "{entrada}"{sufixo})'
             ),
         )

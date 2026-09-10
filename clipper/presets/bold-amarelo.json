@@ -1,0 +1,19 @@
+{
+  "nome": "bold-amarelo",
+  "descricao": "Impact pesado, palavra falada acende em amarelo sobre branco. Contorno grosso para ler em qualquer fundo. O visual classico de clipe viral.",
+  "fonte": "Impact",
+  "tamanho": 96,
+  "negrito": false,
+  "maiusculas": true,
+  "cor_falada": "&H0000E5FF&",
+  "cor_por_falar": "&H00FFFFFF&",
+  "cor_contorno": "&H00000000&",
+  "cor_sombra": "&HB4000000&",
+  "contorno": 7,
+  "sombra": 4,
+  "espacamento": 1,
+  "margem_lateral": 110,
+  "margem_inferior": 520,
+  "max_palavras_linha": 4,
+  "max_caracteres_linha": 22
+}

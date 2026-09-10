@@ -1,0 +1,19 @@
+{
+  "nome": "clean-branco",
+  "descricao": "Segoe UI em negrito, palavra falada acende em branco sobre cinza. Contorno fino e sombra discreta. Para quando o clipe ja tem muita informacao na tela.",
+  "fonte": "Segoe UI",
+  "tamanho": 82,
+  "negrito": true,
+  "maiusculas": false,
+  "cor_falada": "&H00FFFFFF&",
+  "cor_por_falar": "&H00A8A8A8&",
+  "cor_contorno": "&H00141414&",
+  "cor_sombra": "&H96000000&",
+  "contorno": 4,
+  "sombra": 2,
+  "espacamento": 0,
+  "margem_lateral": 120,
+  "margem_inferior": 500,
+  "max_palavras_linha": 5,
+  "max_caracteres_linha": 28
+}
