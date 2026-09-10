@@ -94,6 +94,18 @@ CONFIANCA_ROSTO = 0.3
 
 PRESET_PADRAO = "bold-amarelo"
 
+# --- letterbox da fonte ----------------------------------------------------
+# Video entregue em 16:9 mas FILMADO mais largo vem com tarja preta em cima e
+# embaixo. Se o recorte 9:16 pegar a altura inteira, essas tarjas viajam para
+# o clipe: no video de teste sao 80px de preto em cima e embaixo de um quadro
+# de 1080, que viram ~142px no 1920 final -- 15% da tela apagada, justo num
+# formato cujo objetivo e preencher o celular.
+# So consideramos letterbox quando a tarja e grossa o bastante para nao ser
+# uma cena escura passageira.
+_MIN_TARJA_FRACAO = 0.02
+_SEGUNDOS_CROPDETECT = 4.0
+_LIMITE_CROPDETECT = 24
+
 # --- modelo de deteccao de rosto ------------------------------------------
 # O mediapipe 1.x nao traz mais a API legada 'mediapipe.solutions': o
 # FaceDetector novo exige um .tflite no disco. Sao 224 KB, baixados uma vez.
@@ -337,6 +349,74 @@ def _par(valor: float) -> int:
     return n - (n % 2)
 
 
+def detectar_conteudo(
+    fonte: Path, inicio: float, duracao: float, largura_fonte: int, altura_fonte: int
+) -> dict[str, Any]:
+    """Acha o retangulo com imagem de verdade, descontando tarja preta.
+
+    Usa o filtro cropdetect do proprio ffmpeg sobre alguns segundos do trecho e
+    fica com o retangulo mais frequente. Devolve o quadro inteiro quando nao ha
+    tarja, quando ela e fina demais para ser levada a serio, ou quando o
+    cropdetect nao responde -- em duvida, nunca cortar imagem do usuario.
+    """
+    log = obter()
+    largura_fonte, altura_fonte = int(largura_fonte), int(altura_fonte)
+    inteiro = {
+        "x": 0, "y": 0,
+        "largura": largura_fonte, "altura": altura_fonte,
+        "letterbox": False,
+    }
+    amostra = max(1.0, min(_SEGUNDOS_CROPDETECT, float(duracao)))
+    try:
+        saida = ffmpeg_utils.rodar(
+            [
+                # ffmpeg_utils.rodar ja prefixa "-loglevel error", e o cropdetect
+                # publica o resultado em nivel INFO: sem repetir a opcao aqui
+                # (a ultima ocorrencia vence) a saida vem vazia e a tarja passa
+                # despercebida.
+                "-loglevel", "info",
+                "-ss", f"{float(inicio):.3f}",
+                "-i", str(fonte),
+                "-t", f"{amostra:.3f}",
+                "-vf", f"cropdetect=limit={_LIMITE_CROPDETECT}:round=2",
+                "-f", "null", "-",
+            ],
+            descricao="detecção de tarja preta",
+            timeout=120.0,
+        )
+    except ErroClipper:
+        return inteiro
+
+    contagem: dict[tuple[int, int, int, int], int] = {}
+    for achado in re.findall(r"crop=(\d+):(\d+):(\d+):(\d+)", saida):
+        chave = tuple(int(v) for v in achado)  # type: ignore[assignment]
+        contagem[chave] = contagem.get(chave, 0) + 1
+    if not contagem:
+        return inteiro
+
+    largura, altura, x, y = max(contagem.items(), key=lambda par: par[1])[0]
+    if largura <= 0 or altura <= 0:
+        return inteiro
+    if x < 0 or y < 0 or x + largura > largura_fonte or y + altura > altura_fonte:
+        return inteiro
+
+    corta_altura = (altura_fonte - altura) / altura_fonte
+    corta_largura = (largura_fonte - largura) / largura_fonte
+    if max(corta_altura, corta_largura) < _MIN_TARJA_FRACAO:
+        return inteiro
+
+    log.info(
+        f"      tarja preta na fonte: a imagem real é {largura}×{altura} "
+        f"(+{x}+{y}) dentro de {largura_fonte}×{altura_fonte} — recortando dela, "
+        "para o clipe não sair com faixa preta."
+    )
+    return {
+        "x": _par(x), "y": _par(y),
+        "largura": _par(largura), "altura": _par(altura),
+        "letterbox": True,
+    }
+
+
 def _geometria(centro: float, largura_fonte: int, altura_fonte: int) -> dict[str, Any]:
     """Traduz um centro normalizado no retangulo de crop, em pixels reais.
 
@@ -437,23 +517,30 @@ def calcular_reframe(
     # Fonte ja vertical (ou exatamente 9:16): o corte e em cima/embaixo e o
     # centro horizontal do rosto nao influencia nada. Amostrar e detectar
     # rosto aqui seria minuto de CPU para chegar no mesmo retangulo.
-    geo_vertical = _geometria(0.5, int(largura_fonte), int(altura_fonte))
+    # A tarja preta da fonte nao e imagem: o recorte 9:16 e calculado DENTRO do
+    # retangulo com conteudo, senao o preto viaja para o clipe.
+    conteudo = detectar_conteudo(
+        fonte, inicio, duracao, int(largura_fonte), int(altura_fonte)
+    )
+
+    geo_vertical = _geometria(0.5, conteudo["largura"], conteudo["altura"])
     if geo_vertical["corte"] == "vertical":
         log.info(
-            f"      a fonte já é vertical ({int(largura_fonte)}×{int(altura_fonte)}): o "
+            f"      a imagem é vertical ({conteudo['largura']}×{conteudo['altura']}): o "
             "recorte tira faixas em cima e embaixo, mantendo a largura inteira — não há "
             "coluna a escolher, então a detecção de rosto é dispensada."
         )
         return {
             "modo": "vertical",
-            "x": geo_vertical["x"],
-            "y": geo_vertical["y"],
+            "x": geo_vertical["x"] + conteudo["x"],
+            "y": geo_vertical["y"] + conteudo["y"],
             "largura": geo_vertical["largura"],
             "altura": geo_vertical["altura"],
             "amostras": 0,
             "com_rosto": 0,
             "fracao": 0.0,
             "mediana_x_norm": 0.5,
+            "conteudo": conteudo,
         }
 
     amostras: list[Path] = []
@@ -515,17 +602,26 @@ def calcular_reframe(
             "não é confiável, então o recorte fica no meio do quadro."
         )
 
-    geo = _geometria(centro_final, int(largura_fonte), int(altura_fonte))
+    # O centro do rosto foi medido no quadro INTEIRO; dentro do retangulo de
+    # conteudo ele ocupa outra fracao. Sem essa conversao, uma tarja lateral
+    # deslocaria o recorte.
+    centro_conteudo = centro_final
+    if conteudo["letterbox"] and conteudo["largura"] > 0:
+        centro_px = centro_final * int(largura_fonte) - conteudo["x"]
+        centro_conteudo = min(1.0, max(0.0, centro_px / conteudo["largura"]))
+
+    geo = _geometria(centro_conteudo, conteudo["largura"], conteudo["altura"])
     return {
         "modo": modo,
-        "x": geo["x"],
-        "y": geo["y"],
+        "x": geo["x"] + conteudo["x"],
+        "y": geo["y"] + conteudo["y"],
         "largura": geo["largura"],
         "altura": geo["altura"],
         "amostras": total,
         "com_rosto": len(centros),
         "fracao": round(fracao, 3),
         "mediana_x_norm": round(centro_final, 3),
+        "conteudo": conteudo,
     }
 
 
