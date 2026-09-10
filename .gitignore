@@ -1,0 +1,17 @@
+# ambiente
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# artefatos de execucao (video/audio/clipes sao grandes)
+out/
+_teste/
+
+# nunca versionar segredos
+.env
+*.key
+
+# modelos baixados
+models/

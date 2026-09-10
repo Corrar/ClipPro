@@ -1,0 +1,21 @@
+# ClipPro — dependencias diretas, pinadas.
+# Ambiente alvo: Windows x64, Python 3.13.12, CPU-only (sem CUDA).
+# O lockfile completo (transitivas incluidas) fica em requirements.lock.txt.
+
+# --- Transcricao ---
+faster-whisper==1.2.1        # whisper via CTranslate2
+ctranslate2==4.8.2           # backend int8 CPU
+onnxruntime==1.29.0          # VAD (Silero) do faster-whisper
+av==18.1.0                   # decode de audio do faster-whisper
+
+# --- Numerico / analise de audio ---
+numpy==2.5.3
+
+# --- Ingestao ---
+yt-dlp==2026.8.19            # download de video PROPRIO do usuario
+
+# --- Selecao (opcional: so usado se ANTHROPIC_API_KEY existir) ---
+anthropic==1.4.0
+
+# --- Reframe 9:16 (deteccao de rosto) ---
+mediapipe==1.0.1
