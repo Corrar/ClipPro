@@ -9,6 +9,10 @@ __pycache__/
 out/
 _teste/
 
+# resposta colada do modelo no modo manual: e entrada de UM video,
+# fica na raiz e seria sobrescrita pelo proximo. Vive junto do out/.
+resposta*.json
+
 # nunca versionar segredos
 .env
 *.key
