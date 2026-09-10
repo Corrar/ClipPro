@@ -37,10 +37,12 @@ MODELOS_WHISPER = ("tiny", "base", "small", "medium", "large-v3")
 # segundos. O clipe final e 1080x1920, entao 1080p de origem paga a conta.
 ALTURA_MAX_PADRAO = 1080
 
-# Estagios que ainda nao existem (F2/F3). Este conjunto e o unico lugar que
+# Estagios que ainda nao existem (F3). Este conjunto e o unico lugar que
 # decide se um 'clipper run' para com elegancia (codigo 0) ao esbarrar neles.
 # Quando a fase entrar, tire o nome daqui e o erro volta a ser erro de verdade.
-ESTAGIOS_PENDENTES: frozenset[str] = frozenset({"selecao", "render"})
+# A selecao saiu daqui na F2: ela existe, roda, e quando pede a ida e volta
+# manual isso NAO e uma falha -- ver _Parada e _bloco_proximos_passos.
+ESTAGIOS_PENDENTES: frozenset[str] = frozenset({"render"})
 
 # Ordem canonica dos estagios e quais rodam em cada subcomando.
 ESTAGIOS_POR_COMANDO: dict[str, tuple[str, ...]] = {
@@ -52,19 +54,41 @@ ESTAGIOS_POR_COMANDO: dict[str, tuple[str, ...]] = {
     "info": ("ingestao", "transcricao", "energia", "selecao", "render"),
 }
 
+# O que cada subcomando REFAZ quando o usuario passa --force. Nao confundir com
+# ESTAGIOS_POR_COMANDO, que lista o que o subcomando EXECUTA: 'select' executa
+# ingestao/transcricao/energia porque precisa delas prontas, mas quem pede
+# 'select --force' quer refazer a SELECAO (0,1 s) -- nao rebaixar 1 GB de video
+# e rodar 20 minutos de whisper por cima do artefato de que o prompt saiu.
+# Os estagios de fora deste conjunto continuam decidindo pela propria
+# assinatura: mudou parametro deles, refazem sozinhos.
+ESTAGIOS_ALVO_DO_FORCE: dict[str, tuple[str, ...]] = {
+    "run": ("ingestao", "transcricao", "energia", "selecao", "render"),
+    "ingest": ("ingestao",),
+    "transcribe": ("transcricao", "energia"),
+    "select": ("selecao",),
+    "render": ("render",),
+    "info": (),
+}
+
 _EPILOGO = """\
 exemplos:
   clipper run aula.mp4
   clipper run "https://youtu.be/XXXXXXXXXXX" --n 8 --preset bold-amarelo
   clipper transcribe aula.mp4 --modelo-whisper small --threads 8
-  clipper select aula.mp4 --estrategia "ganchos e punchlines" --modelo sonnet
+  clipper select aula.mp4 --estrategia "ganchos e punchlines"
+  clipper select aula.mp4 --resposta "resposta.json"
+  clipper select aula.mp4 --api --modelo sonnet
   clipper render aula.mp4 --preset bold-amarelo
   clipper info aula.mp4
 
-observacoes:
-  - todo artefato fica em out/<slug>/; rodar de novo reaproveita o que ja existe.
-  - use --force para reprocessar do zero.
-  - a selecao usa a API da Anthropic: exporte ANTHROPIC_API_KEY antes.
+observações:
+  - todo artefato fica em out/<slug>/; rodar de novo reaproveita o que já existe.
+  - --force refaz apenas o estágio que dá nome ao subcomando (transcribe refaz a
+    transcrição, select refaz a seleção); só o run refaz tudo.
+  - a seleção vem em MODO MANUAL: o clipper grava out/<slug>/prompt_selecao.txt,
+    você cola esse texto num chat com um modelo, salva o array JSON que ele
+    devolver e volta com --resposta. Quem tem ANTHROPIC_API_KEY pode usar --api
+    e pular essa ida e volta.
 """
 
 
@@ -103,7 +127,11 @@ def _pai_global() -> argparse.ArgumentParser:
     g.add_argument(
         "--force",
         action="store_true",
-        help="reprocessa tudo, ignorando os artefatos já existentes",
+        help=(
+            "refaz do zero o estágio que dá nome a este subcomando, ignorando "
+            "o artefato que já existe (em 'run', o pipeline inteiro). Os "
+            "estágios anteriores continuam sendo reaproveitados"
+        ),
     )
     g.add_argument(
         "-v",
@@ -192,7 +220,31 @@ def _pai_selecao() -> argparse.ArgumentParser:
         "--modelo",
         default=MODELO_PADRAO,
         choices=MODELOS_API,
-        help=f"modelo da API usado na seleção (padrão: {MODELO_PADRAO})",
+        help=(
+            "modelo da API usado na seleção, só faz efeito junto de --api "
+            f"(padrão: {MODELO_PADRAO})"
+        ),
+    )
+    g.add_argument(
+        "--resposta",
+        type=Path,
+        default=None,
+        metavar="ARQUIVO",
+        help=(
+            "modo manual (o padrão): arquivo com a resposta do modelo — o array "
+            "JSON que você colou de um chat depois de levar o prompt_selecao.txt "
+            "até lá. É este arquivo que vira selecao.json"
+        ),
+    )
+    g.add_argument(
+        "--api",
+        action="store_true",
+        help=(
+            "usa a API da Anthropic para escolher os clipes (exige "
+            "ANTHROPIC_API_KEY). Por padrão o clipper trabalha em MODO MANUAL: "
+            "gera prompt_selecao.txt para você levar a um chat e volta com "
+            "--resposta."
+        ),
     )
     return p
 
@@ -257,23 +309,15 @@ def construir_parser() -> argparse.ArgumentParser:
             "gera a curva de energia do áudio."
         ),
     )
-    p_select = subs.add_parser(
+    subs.add_parser(
         "select",
         parents=[entrada, geral, ingestao, transcricao, selecao],
-        help="escolhe os melhores trechos (usa a API da Anthropic)",
+        help="escolhe os melhores trechos (modo manual por padrão; --api opcional)",
         description=(
             "Roda o que faltar de ingestão/transcrição e então escolhe os trechos, "
-            "gravando selecao.json."
-        ),
-    )
-    p_select.add_argument(
-        "--resposta",
-        type=Path,
-        default=None,
-        metavar="ARQUIVO",
-        help=(
-            "modo manual: usa este resposta.json (colado à mão) em vez de "
-            "chamar a API"
+            "gravando selecao.json. Sem --api e sem --resposta, grava "
+            "prompt_selecao.txt e para aí: leve o prompt a um chat, salve o array "
+            "JSON da resposta e volte com --resposta."
         ),
     )
     subs.add_parser(
@@ -314,6 +358,7 @@ class Opcoes:
     reencodar: bool
     altura_max: int | None
     resposta: Path | None
+    usar_api: bool
 
     @classmethod
     def de_args(cls, args: argparse.Namespace) -> "Opcoes":
@@ -334,6 +379,7 @@ class Opcoes:
             reencodar=bool(getattr(args, "reencodar_fonte", False)),
             altura_max=getattr(args, "altura_max", ALTURA_MAX_PADRAO),
             resposta=getattr(args, "resposta", None),
+            usar_api=bool(getattr(args, "api", False)),
         )
 
 
@@ -356,11 +402,21 @@ def _montar_estagios(
     origem: Any,
     saida: Saida,
     estado: Estado,
+    forcados: frozenset[str] = frozenset(),
 ) -> dict[str, Estagio]:
-    """Amarra cada estagio aos seus argumentos, sem executar nada ainda."""
+    """Amarra cada estagio aos seus argumentos, sem executar nada ainda.
+
+    'forcados' e o conjunto de estagios que o --force deste subcomando refaz
+    (ver ESTAGIOS_ALVO_DO_FORCE). Quem esta fora dele recebe forcar=False e
+    continua reaproveitando o que ja existe -- e o que impede um
+    'select --force' de disparar download e whisper de novo.
+    """
     # Import tardio: 'clipper --help' e 'clipper info' nao precisam pagar o
     # custo de carregar faster-whisper/ctranslate2.
     from clipper.pipeline import ingest, render, select, transcribe
+
+    def _forcar(nome: str) -> bool:
+        return nome in forcados
 
     def _fazer(nome: str, rotulo: str, artefato: Path, alvo: Callable[[], Any]) -> Estagio:
         return Estagio(
@@ -380,7 +436,7 @@ def _montar_estagios(
                 origem,
                 saida,
                 estado,
-                forcar=opcoes.forcar,
+                forcar=_forcar("ingestao"),
                 reencodar=opcoes.reencodar,
                 altura_max=opcoes.altura_max,
             ),
@@ -394,7 +450,7 @@ def _montar_estagios(
                 estado,
                 modelo=opcoes.modelo_whisper,
                 idioma=opcoes.idioma,
-                forcar=opcoes.forcar,
+                forcar=_forcar("transcricao"),
                 threads=opcoes.threads,
                 vad=opcoes.vad,
             ),
@@ -403,11 +459,20 @@ def _montar_estagios(
             "energia",
             "Curva de energia do áudio",
             saida.energia_json,
-            lambda: transcribe.calcular_energia(saida, estado, forcar=opcoes.forcar),
+            lambda: transcribe.calcular_energia(
+                saida, estado, forcar=_forcar("energia")
+            ),
         ),
         _fazer(
             "selecao",
-            f"Seleção dos clipes (modelo {opcoes.modelo})",
+            # O rotulo segue a MESMA regra de prioridade do select.py: com
+            # --resposta o arquivo local vence, mesmo que --api esteja junto.
+            # A tela nao pode anunciar 'API' enquanto le um arquivo do disco.
+            (
+                f"Seleção dos clipes (API {opcoes.modelo})"
+                if opcoes.usar_api and opcoes.resposta is None
+                else "Seleção dos clipes (modo manual)"
+            ),
             saida.selecao_json,
             lambda: select.selecionar(
                 saida,
@@ -415,8 +480,9 @@ def _montar_estagios(
                 estrategia=opcoes.estrategia,
                 n=opcoes.n,
                 modelo=opcoes.modelo,
-                forcar=opcoes.forcar,
+                forcar=_forcar("selecao"),
                 resposta_manual=str(opcoes.resposta) if opcoes.resposta else None,
+                usar_api=opcoes.usar_api,
             ),
         ),
         _fazer(
@@ -424,11 +490,29 @@ def _montar_estagios(
             f"Render dos clipes (preset {opcoes.preset})",
             saida.clips_dir,
             lambda: render.renderizar(
-                saida, estado, preset=opcoes.preset, forcar=opcoes.forcar
+                saida, estado, preset=opcoes.preset, forcar=_forcar("render")
             ),
         ),
     ]
     return {e.nome: e for e in estagios}
+
+
+@dataclass(frozen=True)
+class Parada:
+    """Motivo pelo qual a fila de estagios terminou antes do fim, sem erro.
+
+    Sao dois motivos, e eles nao se parecem:
+
+      "nao_existe"  -- o estagio ainda nao foi implementado (F3). O pipeline
+                       para porque o clipper acaba ali.
+      "aguardando"  -- o estagio rodou, fez o que tinha que fazer e devolveu
+                       {"pendente": True}: falta uma acao do usuario. Hoje so
+                       a selecao em modo manual faz isso.
+    """
+
+    estagio: Estagio
+    motivo: str
+    resultado: dict[str, Any]
 
 
 def _rodar_estagios(
@@ -436,18 +520,20 @@ def _rodar_estagios(
     medidos: dict[str, float],
     *,
     tolerar_pendentes: bool,
-) -> Estagio | None:
+) -> Parada | None:
     """Roda os estagios em ordem.
 
-    Devolve None se todos rodaram; devolve o estagio que interrompeu quando ele
-    e um estagio ainda nao implementado e o chamador aceitou parar ali
-    (tolerar_pendentes=True, usado so pelo 'run').
+    Devolve None se todos rodaram ate o fim. Devolve uma Parada quando a fila
+    foi interrompida sem que isso seja erro: um estagio ainda nao implementado
+    e o chamador aceitou parar ali (tolerar_pendentes=True, usado so pelo
+    'run'), ou um estagio que devolveu {"pendente": True} porque a bola agora
+    esta com o usuario.
     """
     log = registro.obter()
     for est in estagios:
         try:
             with registro.etapa(est.rotulo) as crono:
-                est.executar()
+                resultado = est.executar()
             medidos[est.nome] = crono.segundos
         except (ErroSelecao, ErroRender) as exc:
             if not (tolerar_pendentes and est.pendente):
@@ -456,7 +542,9 @@ def _rodar_estagios(
             log.info(f"   {exc.mensagem}")
             if exc.sugestao:
                 log.info(f"   -> {exc.sugestao}")
-            return est
+            return Parada(est, "nao_existe", {})
+        if isinstance(resultado, dict) and resultado.get("pendente"):
+            return Parada(est, "aguardando", resultado)
     return None
 
 
@@ -560,6 +648,182 @@ def _resumo(
     log.info(f"  total: {humanizar_tempo(total)}")
     log.info(f"  saída: {saida.base}")
     log.info(f"  log:   {saida.log}")
+
+
+# --------------------------------------------------------------------------
+# Selecao em modo manual: o bloco de proximos passos
+# --------------------------------------------------------------------------
+# Nome sugerido ao usuario para o arquivo onde ele vai colar a resposta do
+# modelo. Aparece na instrucao e no comando de continuar: um so lugar, para as
+# duas linhas nunca discordarem.
+_NOME_RESPOSTA_SUGERIDO = "resposta.json"
+
+
+def _milhar(n: int) -> str:
+    """1234567 -> '1.234.567' (separador de milhar do PT-BR)."""
+    return f"{int(n):,}".replace(",", ".")
+
+
+def _inteiro_de(dados: dict[str, Any], chaves: tuple[str, ...]) -> int | None:
+    """Primeiro valor inteiro util entre `chaves`, ou None se nao houver."""
+    for chave in chaves:
+        valor = dados.get(chave)
+        if valor is None or isinstance(valor, bool):
+            continue
+        try:
+            return int(valor)
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def _caminho_do_prompt(saida: Saida, resultado: dict[str, Any]) -> Path:
+    """Onde o prompt de selecao foi gravado.
+
+    O lugar canonico e config.Saida.prompt_selecao_txt. O dicionario devolvido
+    pelo estagio so tem preferencia se apontar para um arquivo que existe de
+    verdade -- assim o CLI nunca imprime um caminho que o usuario nao consegue
+    abrir.
+    """
+    for chave in ("prompt", "prompt_txt", "caminho", "arquivo"):
+        valor = resultado.get(chave)
+        if valor:
+            candidato = Path(str(valor))
+            if candidato.is_file():
+                return candidato
+    return saida.prompt_selecao_txt
+
+
+def _medidas_do_prompt(caminho: Path, resultado: dict[str, Any]) -> tuple[int, int]:
+    """(caracteres, blocos) do prompt, para o usuario saber o que vai colar.
+
+    Prefere o que o estagio informou; o que faltar sai da leitura do arquivo.
+    Um bloco e uma linha "[mm:ss→mm:ss] texto", o formato que
+    fronteiras.blocos_para_prompt produz.
+    """
+    caracteres = _inteiro_de(resultado, ("caracteres", "n_caracteres", "chars", "tamanho"))
+    blocos = _inteiro_de(resultado, ("blocos", "n_blocos", "frases", "n_frases"))
+    if caracteres is not None and blocos is not None:
+        return caracteres, blocos
+    try:
+        texto = caminho.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return caracteres or 0, blocos or 0
+    if caracteres is None:
+        caracteres = len(texto)
+    if blocos is None:
+        blocos = sum(1 for l in texto.splitlines() if l.startswith("[") and "→" in l)
+    return caracteres, blocos
+
+
+def _flags_repetidas(comando: str, opcoes: Opcoes) -> list[str]:
+    """Toda flag cujo valor difere do padrao, ja no formato de linha de comando.
+
+    Nao sao so as flags de selecao. Uma flag de ingestao ou de transcricao que
+    some na volta muda a assinatura do estagio A MONTANTE: o clipper deixa de
+    reconhecer o que ja existe e refaz o download ou roda o whisper de novo --
+    por cima do artefato de que saiu o prompt que o usuario acabou de colar.
+    A comparacao e sempre contra a constante de padrao do proprio CLI.
+    """
+    partes: list[str] = []
+    # Selecao
+    if opcoes.n != N_PADRAO:
+        partes.append(f"--n {opcoes.n}")
+    if opcoes.estrategia != config.ESTRATEGIA_PADRAO:
+        partes.append(f'--estrategia "{opcoes.estrategia}"')
+    # --modelo so existe onde ha selecao. Vale repetir mesmo no modo manual:
+    # se a pessoa trocar --resposta por --api depois, a escolha continua de pe.
+    if comando in ("run", "select") and opcoes.modelo != MODELO_PADRAO:
+        partes.append(f"--modelo {opcoes.modelo}")
+    # Transcricao
+    if opcoes.modelo_whisper != config.MODELO_WHISPER_PADRAO:
+        partes.append(f"--modelo-whisper {opcoes.modelo_whisper}")
+    if opcoes.idioma != IDIOMA_PADRAO:
+        partes.append(f"--idioma {opcoes.idioma}")
+    if opcoes.threads is not None:
+        partes.append(f"--threads {opcoes.threads}")
+    if not opcoes.vad:
+        partes.append("--sem-vad")
+    # Ingestao
+    if opcoes.reencodar:
+        partes.append("--reencodar-fonte")
+    if opcoes.altura_max is not None and opcoes.altura_max != ALTURA_MAX_PADRAO:
+        partes.append(f"--altura-max {opcoes.altura_max}")
+    # Render: --preset so existe em 'run' e 'render'; num 'select' o parser
+    # recusaria a linha que o proprio clipper mandou o usuario colar.
+    if comando in ("run", "render") and opcoes.preset != PRESET_PADRAO:
+        partes.append(f'--preset "{opcoes.preset}"')
+    if opcoes.out is not None:
+        partes.append(f'--out "{opcoes.out}"')
+    return partes
+
+
+def _comando_para_continuar(
+    comando: str, entrada: str, opcoes: Opcoes, *, com_api: bool
+) -> str:
+    """A linha exata para colar no terminal do Windows (aspas incluidas).
+
+    Mantem o subcomando em curso: quem pediu 'run' volta com 'run --resposta',
+    que valida a resposta E segue para o render; mandar essa pessoa de volta
+    para 'select' terminaria de novo sem clipe nenhum.
+
+    Repete todas as flags que o usuario passou, inclusive as de ingestao e
+    transcricao: se elas sumissem, a proxima chamada teria outra assinatura e o
+    clipper refaria estagios ja prontos em vez de aproveitar a resposta que ele
+    acabou de colar.
+    """
+    partes = [f"clipper {comando}", f'"{entrada}"']
+    if com_api:
+        partes.append("--api")  # o --modelo sai junto com as demais flags
+    else:
+        partes.append(f'--resposta "{_NOME_RESPOSTA_SUGERIDO}"')
+    partes.extend(_flags_repetidas(comando, opcoes))
+    return " ".join(partes)
+
+
+def _bloco_proximos_passos(
+    comando: str,
+    saida: Saida,
+    entrada: str,
+    opcoes: Opcoes,
+    resultado: dict[str, Any],
+) -> None:
+    """Fim de linha do modo manual: o clipper fez a parte dele, agora e o usuario.
+
+    Isto NAO e um erro e nao vai para o stderr: o estagio rodou, gravou o
+    prompt e devolveu {"pendente": True}. O que falta e uma acao humana, entao
+    a tela termina com ela escrita por extenso.
+    """
+    log = registro.obter()
+    prompt = _caminho_do_prompt(saida, resultado)
+    caracteres, blocos = _medidas_do_prompt(prompt, resultado)
+
+    log.info("")
+    log.info("PRÓXIMO PASSO — a seleção está em MODO MANUAL (o padrão)")
+    log.info("")
+    log.info("  1. O prompt de seleção foi gravado em:")
+    log.info(f"       {prompt}")
+    log.info(
+        f"     São {_milhar(caracteres)} caracteres e {_milhar(blocos)} blocos "
+        "de transcrição."
+    )
+    log.info("")
+    log.info("  2. Abra esse arquivo, copie TODO o conteúdo e cole num chat com um")
+    log.info("     modelo (Claude, ChatGPT, Gemini — tanto faz).")
+    log.info("")
+    log.info("  3. Salve a resposta dele — só o array JSON, nada antes e nada depois")
+    log.info(f"     — num arquivo, por exemplo {_NOME_RESPOSTA_SUGERIDO}.")
+    log.info("")
+    log.info("  4. Volte aqui e rode:")
+    log.info(
+        f"       {_comando_para_continuar(comando, entrada, opcoes, com_api=False)}"
+    )
+    log.info("")
+    log.info("  Tem ANTHROPIC_API_KEY exportada? Então use --api e pule essa ida e")
+    log.info("  volta — o clipper conversa com o modelo sozinho:")
+    log.info(
+        f"       {_comando_para_continuar(comando, entrada, opcoes, com_api=True)}"
+    )
 
 
 def _comando_info(
@@ -934,53 +1198,151 @@ def _executar(comando: str, entrada: str, opcoes: Opcoes) -> int:
     log = _configurar_log(saida, comando, entrada, opcoes)
     _cabecalho(comando, entrada, origem, saida)
 
-    estagios = _montar_estagios(opcoes, origem, saida, estado)
     alvos = ESTAGIOS_POR_COMANDO[comando]
+    # O --force refaz SO o estagio que da nome ao subcomando (mais a energia,
+    # que sai junto da transcricao). Os outros estagios da fila continuam
+    # decidindo pela propria assinatura: 'select --force' custa 0,1 s, nao um
+    # download de 1 GB e 20 minutos de whisper.
+    forcados: frozenset[str] = frozenset(
+        ESTAGIOS_ALVO_DO_FORCE.get(comando, ()) if opcoes.forcar else ()
+    )
 
-    if comando == "select" and opcoes.resposta is not None:
+    # A selecao nao e uma funcao so dos parametros: ela depende da resposta do
+    # modelo. Sem --resposta e sem --api nao existe o que refazer, e limpar o
+    # registro aqui deixaria o selecao.json orfao no disco -- o estado diria
+    # "nao selecionado" enquanto 'clipper render' continuaria achando o arquivo
+    # antigo e renderizando justamente a selecao que o usuario mandou refazer.
+    # Entao o --force poupa a selecao nesse caso, e diz por que.
+    sem_fonte_de_resposta = (
+        getattr(opcoes, "resposta", None) is None
+        and not getattr(opcoes, "usar_api", False)
+    )
+    selecao_poupada = "selecao" in forcados and sem_fonte_de_resposta
+    if selecao_poupada:
+        forcados = forcados - {"selecao"}
+
+    estagios = _montar_estagios(opcoes, origem, saida, estado, forcados)
+
+    # Vale para 'select' e 'run': os dois aceitam --resposta. Nos demais
+    # subcomandos a flag nem existe, entao opcoes.resposta e None.
+    if opcoes.resposta is not None:
         _conferir_resposta_manual(opcoes.resposta)
+        # --resposta vence --api (e o select.py faz exatamente isso). Quem
+        # passou as duas precisa saber que nao vai gastar token nenhum.
+        if opcoes.usar_api:
+            log.info(
+                "  aviso:  --resposta tem prioridade: vou validar o arquivo "
+                f"'{opcoes.resposta}' e IGNORAR --api (nenhum token será "
+                "gasto). Rode sem --resposta para a seleção sair da API."
+            )
     if comando == "render":
         _conferir_selecao_pronta(saida, entrada)
 
     # A limpeza vem DEPOIS das checagens (comando que aborta nao pode destruir
-    # estado) e alcanca SO os estagios deste subcomando: o que estiver a jusante
+    # estado) e alcanca SO o estagio-alvo do --force: o que estiver a jusante
     # se invalida sozinho pela assinatura (audio novo derruba transcricao e
     # energia), sem o CLI apagar registro de estagio que ele nem vai refazer.
     if opcoes.forcar:
-        estado.limpar(alvos)
-        recado = "  --force: vou refazer do zero " + ", ".join(alvos) + "."
-        if set(alvos) != set(ESTAGIOS_POR_COMANDO["run"]):
-            recado += " Os demais estágios mantêm o que já foi feito."
-        log.info(recado)
+        estado.limpar(forcados)
+        refeitos = [n for n in alvos if n in forcados] or list(forcados)
+        if refeitos:
+            recado = "  --force: vou refazer do zero " + ", ".join(refeitos) + "."
+            mantidos = [n for n in alvos if n not in forcados]
+            if mantidos:
+                recado += (
+                    " Os demais estágios (" + ", ".join(mantidos) + ") mantêm o "
+                    "que já foi feito."
+                )
+            log.info(recado)
+        if selecao_poupada:
+            log.info(
+                "  aviso:  --force não tem o que refazer na seleção sem uma "
+                "resposta nova: ela é a resposta do modelo, não um cálculo. "
+                "Para trocá-la, rode com  --resposta <arquivo>  (ou --api). "
+                "A seleção atual foi mantida."
+            )
 
     medidos: dict[str, float] = {}
     escolhidos = [estagios[n] for n in alvos]
-    parou_em = _rodar_estagios(
+    parada = _rodar_estagios(
         escolhidos, medidos, tolerar_pendentes=(comando == "run")
     )
 
-    if parou_em is not None:
+    if parada is not None and parada.motivo == "nao_existe":
         log.info("")
         log.info(
             "Pipeline concluído até onde esta versão do clipper vai hoje: o "
-            f"estágio '{parou_em.nome}' ainda não existe. Isso não é erro seu."
+            f"estágio '{parada.estagio.nome}' ainda não existe. Isso não é erro seu."
         )
         log.info("Artefatos já produzidos:")
+
     _resumo(comando, saida, estado, estagios, medidos)
-    if parou_em is None:
+
+    # A parada "aguardando" serve 'select' e 'run' pela mesma porta: o render
+    # nao foi tentado (a fila parou no estagio que devolveu pendente) e o
+    # codigo de saida e 0, porque nada falhou.
+    if parada is None:
         log.info("")
         log.info("Pronto.")
+    elif parada.motivo == "aguardando":
+        _bloco_proximos_passos(comando, saida, entrada, opcoes, parada.resultado)
     return 0
 
 
+# Fecho comum das tres mensagens do --resposta: como voltar ao passo 1.
+_SEM_RESPOSTA_AINDA = (
+    "Se você ainda não tem essa resposta, rode sem --resposta: o clipper "
+    "gera o prompt_selecao.txt e explica o passo a passo."
+)
+
+
 def _conferir_resposta_manual(caminho: Path) -> None:
-    if not caminho.is_file() or caminho.stat().st_size == 0:
+    """Tres defeitos possiveis no --resposta, tres mensagens diferentes.
+
+    Pasta, arquivo inexistente e arquivo vazio pedem remediacoes distintas:
+    colapsar os tres em "nao existe ou esta vazio" manda o usuario conferir um
+    caminho que ele ja sabe que existe.
+    """
+    try:
+        e_dir = caminho.is_dir()
+        existe = caminho.exists()
+        tamanho = caminho.stat().st_size if existe and not e_dir else 0
+    except OSError as exc:
         raise ErroSelecao(
-            f"o arquivo de resposta manual '{caminho}' não existe ou está vazio.",
+            f"não consegui ler o arquivo de resposta manual '{caminho}'.",
+            detalhe=f"{type(exc).__name__}: {exc}",
             sugestao=(
-                "confira o caminho; ele deve apontar para o .json com a resposta "
-                "do modelo colada à mão. Sem --resposta, o clipper chama a API "
-                "sozinho."
+                "confira se o caminho existe e se você tem permissão de leitura "
+                f"nele. {_SEM_RESPOSTA_AINDA}"
+            ),
+        ) from None
+
+    if e_dir:
+        exemplo = caminho / _NOME_RESPOSTA_SUGERIDO
+        raise ErroSelecao(
+            f"o --resposta recebeu uma PASTA ('{caminho}'), não um arquivo.",
+            sugestao=(
+                "o --resposta precisa apontar para o ARQUIVO onde você colou o "
+                f'array JSON, por exemplo:  --resposta "{exemplo}"'
+            ),
+        )
+    if not existe:
+        raise ErroSelecao(
+            f"o arquivo de resposta manual '{caminho}' não existe.",
+            sugestao=(
+                "confira o caminho (e o nome, com a extensão): ele deve apontar "
+                "para o arquivo onde você colou o array JSON que o modelo "
+                f"devolveu a partir do prompt_selecao.txt. {_SEM_RESPOSTA_AINDA}"
+            ),
+        )
+    if tamanho == 0:
+        raise ErroSelecao(
+            f"o arquivo de resposta manual '{caminho}' existe, mas está vazio "
+            "(0 byte).",
+            sugestao=(
+                f'abra-o (notepad "{caminho}"), cole nele APENAS o array JSON '
+                "que o modelo devolveu — nada antes, nada depois —, salve e "
+                "repita o mesmo comando."
             ),
         )
 
