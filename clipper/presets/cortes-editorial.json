@@ -1,0 +1,113 @@
+{
+  "nome": "cortes-editorial",
+  "descricao": "Composição editorial: o mesmo cartão sobre fundo borrado, mas com acabamento contido — tarja de título em Bahnschrift caixa alta, âmbar no lugar do amarelo, legenda Segoe UI Black caixa mista com contorno fino sobre degradê. O contraste vem de escala e luminância, não de saturação.",
+  "fonte": "Segoe UI Black",
+  "tamanho": 84,
+  "negrito": false,
+  "maiusculas": false,
+  "cor_falada": "&H00E3EDF2&",
+  "cor_por_falar": "&H007C888E&",
+  "cor_destaque": "&H004AC2FF&",
+  "cor_contorno": "&H00090B0D&",
+  "cor_sombra": "&H8C000000&",
+  "contorno": 2,
+  "sombra": 3,
+  "espacamento": 0,
+  "margem_lateral": 171,
+  "margem_inferior": 450,
+  "max_palavras_linha": 3,
+  "max_caracteres_linha": 15,
+  "pop_escala": 112,
+  "pop_subida_ms": 90,
+  "pop_descida_ms": 120,
+  "pop_volta_ms": 90,
+  "largura_por_medida": true,
+  "arquivo_fonte": "seguibl.ttf",
+  "composicao": {
+    "ativo": true,
+    "fade_s": 0.3,
+    "cartao": {
+      "fracao_altura": 0.75,
+      "raio": 32,
+      "traco_largura": 2,
+      "traco_cor": "#FFFFFF",
+      "traco_opacidade": 0.16,
+      "sombra": {
+        "dx": 0,
+        "dy": 24,
+        "sigma": 38,
+        "opacidade": 0.65,
+        "expansao": 10,
+        "cor": "#000000"
+      }
+    },
+    "fundo": {
+      "proxy_largura": 180,
+      "sigma": 14,
+      "escurecer": 0.36,
+      "saturacao": 0.72,
+      "vinheta": 0.18
+    },
+    "titulo": {
+      "ativo": true,
+      "fonte": "Bahnschrift",
+      "arquivo": "bahnschrift.ttf",
+      "tamanho": 42,
+      "tamanho_minimo": 32,
+      "maiusculas": true,
+      "cor": "#F4EFE6",
+      "pilula_cor": "#14110E",
+      "pilula_opacidade": 0.88,
+      "altura": 100,
+      "raio": 28,
+      "padding_h": 40,
+      "largura_maxima": 810,
+      "alinhamento": "esquerda",
+      "x": 135,
+      "y": 88,
+      "deslize_s": 0.5,
+      "fade_s": 0.5,
+      "acento": "circulo",
+      "acento_cor": "#FFC24A",
+      "acento_largura": 12,
+      "acento_altura": 12,
+      "acento_gap": 18
+    },
+    "progresso": {
+      "ativo": true,
+      "altura": 8,
+      "recuo": 40,
+      "trilho_cor": "#FFFFFF",
+      "trilho_opacidade": 0.3,
+      "cor": "#FFC24A",
+      "opacidade": 1.0,
+      "contorno": 2,
+      "contorno_cor": "#000000",
+      "contorno_opacidade": 0.4
+    },
+    "scrim": {
+      "ativo": true,
+      "y_inicio": 1080,
+      "y_fim": 1330,
+      "opacidade": 0.45,
+      "cor": "#000000"
+    },
+    "movimento": {
+      "kenburns_ate": 1.06,
+      "prescale": 2.0,
+      "punch_ganho": 0.08,
+      "punch_duracao": 0.4,
+      "punch_maximo": 3,
+      "punch_inicio_minimo": 2.0,
+      "punch_espacamento": 1.5,
+      "punch_antecipar": 0.2
+    },
+    "audio": {
+      "eq": "highpass=f=80:poles=2,equalizer=f=250:t=q:w=1.0:g=-2.5,equalizer=f=3000:t=q:w=0.9:g=2",
+      "i": -14,
+      "tp": -1.5,
+      "lra": 11,
+      "pitch_razao": 1.005
+    }
+  }
+}

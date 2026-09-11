@@ -83,7 +83,8 @@ exemplos:
   clipper select aula.mp4 --estrategia "ganchos e punchlines"
   clipper select aula.mp4 --resposta "resposta.json"
   clipper select aula.mp4 --api --modelo sonnet
-  clipper render aula.mp4 --preset bold-amarelo
+  clipper render aula.mp4 --preset cortes-feed
+  clipper render aula.mp4 --preset cortes-editorial --clipe 1 --clipe 2
   clipper render aula.mp4 --preset clean-branco --clipe 2 --clipe 4
   clipper render "aula-de-fisica-qp3uNTpf" --preset clean-branco
   clipper info aula.mp4
@@ -96,6 +97,11 @@ observações:
     repita --clipe com o id que aparece na seleção (--clipe 2 --clipe 4).
   - render e info só leem out/<slug>/: aceitam o nome da pasta no lugar do vídeo
     e funcionam offline, mesmo que o arquivo original já tenha sido apagado.
+  - os presets se dividem em dois tipos. bold-amarelo e clean-branco entregam o
+    recorte 9:16 cheio com a legenda por cima. cortes-feed e cortes-editorial
+    montam a composição anti-duplicata: fundo borrado, cartão arredondado com
+    zoom, barra de título, barra de progresso e áudio normalizado — o clipe sai
+    visualmente distinto do vídeo de origem, ao custo de ~1x a duração em CPU.
   - a seleção vem em MODO MANUAL: o clipper grava out/<slug>/prompt_selecao.txt,
     você cola esse texto num chat com um modelo, salva o array JSON que ele
     devolver e volta com --resposta. Quem tem ANTHROPIC_API_KEY pode usar --api
@@ -310,6 +316,15 @@ def _pai_render() -> argparse.ArgumentParser:
             "--clipe 2 --clipe 4). Por padrão renderiza todos."
         ),
     )
+    g.add_argument(
+        "--pitch",
+        action="store_true",
+        help=(
+            "sobe o tom do áudio em 0,5%% sem mudar a duração (desligado por padrão). "
+            "É mais uma diferença contra o original, ao custo de um timbre levemente "
+            "diferente do da pessoa que fala."
+        ),
+    )
     return p
 
 
@@ -417,6 +432,7 @@ class Opcoes:
     usar_api: bool
     # None = renderiza a selecao inteira. Lista = so estes ids.
     clipes: list[int] | None
+    pitch: bool
 
     @classmethod
     def de_args(cls, args: argparse.Namespace) -> "Opcoes":
@@ -444,6 +460,7 @@ class Opcoes:
             clipes=(
                 [int(c) for c in getattr(args, "clipe", None) or ()] or None
             ),
+            pitch=bool(getattr(args, "pitch", False)),
         )
 
 
@@ -586,6 +603,7 @@ def _montar_estagios(
                 preset=opcoes.preset,
                 forcar=_forcar("render"),
                 clipes=opcoes.clipes,
+                pitch=opcoes.pitch,
             ),
             padrao="*.mp4",
         ),
@@ -870,6 +888,10 @@ def _flags_repetidas(comando: str, opcoes: Opcoes) -> list[str]:
     # quando o usuario tinha pedido dois clipes -- minutos de encode a mais.
     if comando in ("run", "render") and opcoes.clipes:
         partes.extend(f"--clipe {c}" for c in opcoes.clipes)
+    # --pitch muda a assinatura do render: perder a flag na volta reencodaria
+    # os cinco clipes so para tirar meio por cento de tom do audio.
+    if comando in ("run", "render") and opcoes.pitch:
+        partes.append("--pitch")
     if opcoes.out is not None:
         partes.append(f'--out "{opcoes.out}"')
     return partes

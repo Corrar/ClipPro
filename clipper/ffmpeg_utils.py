@@ -79,6 +79,12 @@ class InfoMidia:
     largura: int
     altura: int
     fps: float
+    # A fracao CRUA do ffprobe ("60000/1001"), nao o arredondamento. O filtro
+    # zoompan exige a taxa exata: com "59.94" ele grava time_base 1/11988 e uma
+    # taxa que nao e a da fonte; sem taxa nenhuma ele assume 25 e a duracao do
+    # clipe sai 2,4x maior -- com a contagem de frames certa, entao so a
+    # duracao denuncia.
+    fps_fracao: str
     tem_audio: bool
     codec_video: str
     codec_audio: str
@@ -100,6 +106,26 @@ def _fracao(texto: str) -> float:
         return float(texto)
     except (ValueError, ZeroDivisionError):
         return 0.0
+
+
+def _fracao_crua(*candidatos: str | None) -> str:
+    """A primeira taxa "num/den" utilizavel, como o ffprobe escreveu.
+
+    '0/0' e '0/1' aparecem em arquivo sem video ou com cabecalho torto: nesses
+    casos devolve "" e quem chama decide o que fazer -- passar isso adiante
+    para um filtro daria uma divisao por zero dentro do ffmpeg.
+    """
+    for texto in candidatos:
+        bruto = str(texto or "").strip()
+        if "/" not in bruto:
+            continue
+        num, _, den = bruto.partition("/")
+        try:
+            if int(num) > 0 and int(den) > 0:
+                return bruto
+        except ValueError:
+            continue
+    return ""
 
 
 def sondar(caminho: Path) -> InfoMidia:
@@ -163,6 +189,7 @@ def sondar(caminho: Path) -> InfoMidia:
         largura=int(v.get("width") or 0),
         altura=int(v.get("height") or 0),
         fps=_fracao(v.get("avg_frame_rate") or v.get("r_frame_rate") or "0"),
+        fps_fracao=_fracao_crua(v.get("avg_frame_rate"), v.get("r_frame_rate")),
         tem_audio=bool(a),
         codec_video=str(v.get("codec_name") or ""),
         codec_audio=str(a.get("codec_name") or ""),

@@ -17,5 +17,10 @@ yt-dlp==2026.8.19            # download de video PROPRIO do usuario
 # --- Selecao (opcional: so usado se ANTHROPIC_API_KEY existir) ---
 anthropic==1.4.0
 
+# --- Composicao do preset "cortes" (mascara, sombra, barra de titulo) ---
+# Ja vinha junto do mediapipe; passa a ser dependencia DIRETA porque o render
+# desenha os PNG do cartao e da pilula com ela.
+pillow==12.3.0
+
 # --- Reframe 9:16 (deteccao de rosto) ---
 mediapipe==1.0.1

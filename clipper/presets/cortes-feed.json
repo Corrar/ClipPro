@@ -1,0 +1,113 @@
+{
+  "nome": "cortes-feed",
+  "descricao": "Composição nativa de feed: fundo do próprio vídeo borrado e escurecido, vídeo num cartão arredondado de 75% da altura, pílula de título em Segoe UI Black com barra amarela, progresso na base do cartão e karaokê Impact com uma palavra acesa por vez. O visual que o feed brasileiro reconhece.",
+  "fonte": "Impact",
+  "tamanho": 92,
+  "negrito": false,
+  "maiusculas": true,
+  "cor_falada": "&H00BFBFBF&",
+  "cor_por_falar": "&H00FFFFFF&",
+  "cor_destaque": "&H0000E5FF&",
+  "cor_contorno": "&H00000000&",
+  "cor_sombra": "&HB4000000&",
+  "contorno": 6,
+  "sombra": 4,
+  "espacamento": 1,
+  "margem_lateral": 175,
+  "margem_inferior": 520,
+  "max_palavras_linha": 3,
+  "max_caracteres_linha": 18,
+  "pop_escala": 112,
+  "pop_subida_ms": 90,
+  "pop_descida_ms": 120,
+  "pop_volta_ms": 90,
+  "largura_por_medida": true,
+  "arquivo_fonte": "impact.ttf",
+  "composicao": {
+    "ativo": true,
+    "fade_s": 0.3,
+    "cartao": {
+      "fracao_altura": 0.75,
+      "raio": 36,
+      "traco_largura": 2,
+      "traco_cor": "#FFFFFF",
+      "traco_opacidade": 0.14,
+      "sombra": {
+        "dx": 0,
+        "dy": 20,
+        "sigma": 30,
+        "opacidade": 0.6,
+        "expansao": 8,
+        "cor": "#000000"
+      }
+    },
+    "fundo": {
+      "proxy_largura": 180,
+      "sigma": 12,
+      "escurecer": 0.4,
+      "saturacao": 1.05,
+      "vinheta": 0.0
+    },
+    "titulo": {
+      "ativo": true,
+      "fonte": "Segoe UI Black",
+      "arquivo": "seguibl.ttf",
+      "tamanho": 44,
+      "tamanho_minimo": 34,
+      "maiusculas": true,
+      "cor": "#FFFFFF",
+      "pilula_cor": "#101317",
+      "pilula_opacidade": 0.84,
+      "altura": 108,
+      "raio": 54,
+      "padding_h": 36,
+      "largura_maxima": 810,
+      "alinhamento": "esquerda",
+      "x": 135,
+      "y": 64,
+      "deslize_s": 0.5,
+      "fade_s": 0.5,
+      "acento": "barra",
+      "acento_cor": "#FFE500",
+      "acento_largura": 8,
+      "acento_altura": 44,
+      "acento_gap": 22
+    },
+    "progresso": {
+      "ativo": true,
+      "altura": 10,
+      "recuo": 40,
+      "trilho_cor": "#FFFFFF",
+      "trilho_opacidade": 0.35,
+      "cor": "#FFE500",
+      "opacidade": 1.0,
+      "contorno": 2,
+      "contorno_cor": "#000000",
+      "contorno_opacidade": 0.45
+    },
+    "scrim": {
+      "ativo": true,
+      "y_inicio": 1000,
+      "y_fim": 1260,
+      "opacidade": 0.28,
+      "cor": "#000000"
+    },
+    "movimento": {
+      "kenburns_ate": 1.06,
+      "prescale": 2.0,
+      "punch_ganho": 0.08,
+      "punch_duracao": 0.4,
+      "punch_maximo": 3,
+      "punch_inicio_minimo": 2.0,
+      "punch_espacamento": 1.5,
+      "punch_antecipar": 0.2
+    },
+    "audio": {
+      "eq": "highpass=f=80:poles=2,equalizer=f=250:t=q:w=1.0:g=-2.5,equalizer=f=3000:t=q:w=0.9:g=2",
+      "i": -14,
+      "tp": -1.5,
+      "lra": 11,
+      "pitch_razao": 1.005
+    }
+  }
+}

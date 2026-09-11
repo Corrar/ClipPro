@@ -1,9 +1,19 @@
-"""Estagio 4: render dos clipes verticais 9:16 com legenda karaoke (F3).
+"""Estagio 4: render dos clipes verticais 9:16 com legenda karaoke.
 
 O que este modulo faz, em uma frase: pega os trechos ja validados em
 selecao.json, decide para ONDE olhar em cada um (reframe), queima a legenda
 karaoke do preset escolhido e produz um mp4 1080x1920 por clipe, mais
 metadados.json e relatorio.md.
+
+DOIS CAMINHOS DE RENDER, e o preset escolhe qual (F4a). Um preset sem bloco
+"composicao" -- bold-amarelo, clean-branco -- renderiza como na F3: recorte
+9:16 cheio, legenda por cima, '-vf' de uma linha. Um preset COM esse bloco --
+cortes-feed, cortes-editorial -- vai para clipper/composicao.py, que monta um
+'-filter_complex' com fundo borrado, cartao arredondado, movimento de camera,
+barra de titulo, barra de progresso e cadeia de audio. O objetivo desse
+segundo caminho e o clipe nao ser lido como copia 1:1 do video de origem;
+medido nos clipes de teste, o SSIM contra o mesmo trecho da fonte cai para
+0,41-0,49 (1,00 seria identico).
 
 Tres decisoes que valem a explicacao:
 
@@ -48,6 +58,7 @@ mensagens dirigidas ao usuario em PT-BR com acentuacao correta.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -58,7 +69,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
-from clipper import ffmpeg_utils, legendas
+from clipper import composicao, ffmpeg_utils, legendas
 from clipper.config import (
     DIR_PRESETS,
     RAIZ,
@@ -70,7 +81,7 @@ from clipper.config import (
     ler_json,
     slugificar,
 )
-from clipper.erros import ErroClipper, ErroRender
+from clipper.erros import ErroClipper, ErroFFmpeg, ErroRender
 from clipper.fronteiras import Fronteiras, mmss
 from clipper.legendas import Preset
 from clipper.registro import Cronometro, obter
@@ -150,8 +161,8 @@ def _presets_disponiveis() -> list[str]:
         return []
 
 
-def carregar_preset(nome: str) -> Preset:
-    """Le clipper/presets/<nome>.json e devolve o Preset da legenda.
+def _ler_preset(nome: str) -> dict[str, Any]:
+    """O JSON cru do preset, com as mensagens de erro que o usuario precisa.
 
     Nome inexistente nao vira KeyError: vira uma mensagem que LISTA os presets
     que existem, porque o usuario nao tem como adivinhar os nomes.
@@ -190,13 +201,28 @@ def carregar_preset(nome: str) -> Preset:
         )
 
     dados.setdefault("nome", nome)
+    return dados
+
+
+def carregar_preset(nome: str) -> Preset:
+    """Le clipper/presets/<nome>.json e devolve o Preset da legenda."""
+    dados = _ler_preset(nome)
     try:
-        return Preset.de_dict(dados)
+        preset_obj = Preset.de_dict(dados)
     except TypeError as exc:
         # de_dict so repassa os campos conhecidos: TypeError aqui significa
-        # que FALTA campo obrigatorio no json.
-        esperados = set(Preset.__dataclass_fields__)
-        faltando = sorted(esperados - set(dados))
+        # que FALTA campo obrigatorio no json. Os campos da v2 (pop, cor de
+        # destaque) tem padrao e nao entram nesta lista -- senao um preset
+        # perfeitamente valido da F3 seria acusado de incompleto.
+        import dataclasses
+
+        obrigatorios = {
+            f.name
+            for f in dataclasses.fields(Preset)
+            if f.default is dataclasses.MISSING
+            and f.default_factory is dataclasses.MISSING  # type: ignore[misc]
+        }
+        faltando = sorted(obrigatorios - set(dados))
         raise ErroRender(
             f"o preset '{nome}' está incompleto: falta(m) "
             f"{', '.join(faltando) if faltando else 'campo(s) obrigatório(s)'}.",
@@ -206,6 +232,60 @@ def carregar_preset(nome: str) -> Preset:
                 "tamanhos a partir dele: assim nenhum campo fica de fora."
             ),
         ) from exc
+
+    _conferir_cores(preset_obj, nome)
+    return preset_obj
+
+
+_PADRAO_COR_ASS = re.compile(r"^&H[0-9a-fA-F]{6,8}&$")
+
+# Os campos de cor da legenda, que vao CRUS para dentro do ASS.
+_CORES_DA_LEGENDA = (
+    "cor_falada",
+    "cor_por_falar",
+    "cor_destaque",
+    "cor_contorno",
+    "cor_sombra",
+)
+
+
+def _conferir_cores(preset_obj: Preset, nome: str) -> None:
+    """Cor de legenda fora do formato do ASS vira erro aqui, nao pixel preto.
+
+    O mesmo arquivo de preset usa '#RRGGBB' nas cores da composicao e
+    '&HBBGGRR&' nas da legenda -- trocar as duas notacoes e a confusao mais
+    natural do mundo. E o libass nao reclama: ele ignora a tag e desenha a
+    palavra em PRETO, sobre um contorno preto. Sem esta checagem, o defeito so
+    aparece assistindo ao clipe, depois do encode inteiro.
+    """
+    tortas = [
+        f"{campo}={getattr(preset_obj, campo)!r}"
+        for campo in _CORES_DA_LEGENDA
+        if str(getattr(preset_obj, campo, "") or "")
+        and not _PADRAO_COR_ASS.match(str(getattr(preset_obj, campo)))
+    ]
+    if not tortas:
+        return
+    raise ErroRender(
+        f"o preset '{nome}' tem cor(es) de legenda fora do formato do ASS: "
+        + ", ".join(tortas)
+        + ".",
+        sugestao=(
+            "as cores da LEGENDA são &HBBGGRR& (azul, verde, vermelho — nesta ordem, "
+            "ao contrário do HTML); as do bloco 'composicao' são #RRGGBB. Exemplo: "
+            "amarelo é &H0000E5FF& na legenda e #FFE500 na composição."
+        ),
+    )
+
+
+def carregar_composicao(nome: str) -> composicao.Composicao | None:
+    """O bloco de composicao do preset, ou None se ele nao tiver um.
+
+    Preset sem "composicao" e um preset da F3: recorte 9:16 cheio, legenda
+    queimada por cima e mais nada. Os dois caminhos convivem de proposito --
+    o visual aprovado na F3 continua disponivel exatamente como estava.
+    """
+    return composicao.de_preset(_ler_preset(nome), nome)
 
 
 # ==========================================================================
@@ -786,6 +866,29 @@ def _filtrar_clipes(
     return [c for i, c in enumerate(lista) if _id_seguro(c.get("id", i + 1)) in querido]
 
 
+def _impressao_transcricao(saida: Saida) -> dict[str, Any]:
+    """Identidade de transcricao.json, para entrar na assinatura do estagio.
+
+    E a transcricao que vira a legenda QUEIMADA no video. Sem ela aqui, trocar
+    o modelo do whisper e rodar 'clipper transcribe --force' nao fazia o render
+    perceber nada: os clipes continuavam com a legenda antiga para sempre.
+    """
+    try:
+        st = saida.transcricao_json.stat()
+    except OSError:
+        return {}
+    return {"transcricao_bytes": int(st.st_size), "transcricao_mtime": int(st.st_mtime)}
+
+
+def _impressao_energia(saida: Saida) -> dict[str, Any]:
+    """Identidade de energia.json: e dela que saem os instantes de punch-in."""
+    try:
+        st = saida.energia_json.stat()
+    except OSError:
+        return {}
+    return {"energia_bytes": int(st.st_size), "energia_mtime": int(st.st_mtime)}
+
+
 def _impressao_selecao(saida: Saida) -> dict[str, Any]:
     """Identidade de selecao.json, para entrar na assinatura de idempotencia.
 
@@ -886,6 +989,7 @@ def _item_metadado(
     legenda: dict[str, Any],
     segundos_encode: float,
     fronteiras: Fronteiras,
+    estilo: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """A entrada de metadados.json de um clipe -- encodado agora ou reaproveitado.
 
@@ -913,6 +1017,7 @@ def _item_metadado(
         "texto": str(clipe.get("texto") or fronteiras.texto_entre(inicio, fim)),
         "reframe": reframe,
         "legenda": legenda,
+        "estilo": estilo or {},
         "render": {
             "largura": int(info.largura),
             "altura": int(info.altura),
@@ -923,6 +1028,58 @@ def _item_metadado(
     }
 
 
+def impressao_legenda(preset_obj: Preset) -> str:
+    """Identidade da METADE de legenda do preset (fonte, cores, margens, pop).
+
+    A impressao da composicao cobre so o bloco "composicao". Sem esta aqui,
+    editar a cor de destaque do karaoke -- que e a edicao mais provavel, e
+    justamente o item que o dono do projeto aprova olhando -- nao refazia clipe
+    nenhum: o nome do preset continuava o mesmo e era so isso que a assinatura
+    guardava.
+    """
+    import dataclasses
+
+    corpo = json.dumps(
+        dataclasses.asdict(preset_obj), sort_keys=True, ensure_ascii=False
+    )
+    return hashlib.sha256(corpo.encode("utf-8")).hexdigest()[:16]
+
+
+def _mesmo_estilo(
+    anterior: dict[str, Any],
+    impressao: str | None,
+    *,
+    legenda: str | None = None,
+    punches: Sequence[float] | None = None,
+) -> bool:
+    """O mp4 pronto foi feito com ESTE estilo, ESTA legenda e ESTES punch-ins?
+
+    Sem esta pergunta, editar o preset (outra cor, outro raio, outro zoom) e
+    repetir o comando devolveria o clipe antigo: o nome do arquivo, o trecho e
+    o tamanho em bytes continuam os mesmos, e e so isso que o resto do
+    reaproveitamento olha.
+
+    Os tres campos sao comparados SO QUANDO o metadado anterior ja os traz.
+    Assim um clipe gravado por uma versao anterior do clipper continua sendo
+    reaproveitado ate a primeira edicao de verdade, em vez de todo mundo ter
+    que reencodar por causa de um campo novo.
+    """
+    estilo = anterior.get("estilo")
+    estilo = estilo if isinstance(estilo, dict) else {}
+    if (estilo.get("impressao") or None) != (impressao or None):
+        return False
+    if legenda is not None and estilo.get("legenda_impressao"):
+        if str(estilo["legenda_impressao"]) != legenda:
+            return False
+    if punches is not None and "punch_em" in estilo:
+        anteriores = estilo.get("punch_em")
+        if not isinstance(anteriores, list):
+            return False
+        if [round(float(p), 3) for p in anteriores] != [round(float(p), 3) for p in punches]:
+            return False
+    return True
+
+
 def _clipe_reaproveitavel(
     destino: Path,
     duracao: float,
@@ -930,6 +1087,9 @@ def _clipe_reaproveitavel(
     inicio: float,
     fim: float,
     anterior: dict[str, Any] | None,
+    impressao_estilo: str | None = None,
+    impressao_legenda_atual: str | None = None,
+    punches: Sequence[float] | None = None,
 ) -> Any:
     """InfoMidia do mp4 que ja esta pronto e valido, ou None se precisa encodar.
 
@@ -963,6 +1123,14 @@ def _clipe_reaproveitavel(
         return None
 
     if not _mesmo_trecho(anterior, inicio, fim):
+        return None
+
+    if not _mesmo_estilo(
+        anterior,
+        impressao_estilo,
+        legenda=impressao_legenda_atual,
+        punches=punches,
+    ):
         return None
 
     render_antigo = anterior.get("render")
@@ -1014,6 +1182,39 @@ def _mesmo_trecho(anterior: dict[str, Any], inicio: float, fim: float) -> bool:
         return False
 
 
+def _erro_do_ffmpeg(exc: ErroFFmpeg, preset_nome: str) -> ErroRender:
+    """Re-etiqueta a falha do ffmpeg com a sugestao que a saida real pede.
+
+    Antes, TODA falha de render saia sugerindo instalar fonte -- porque a
+    sugestao era passada de cima e 'rodar()' usa 'sugestao or <padrao>'. Quem
+    ficasse sem espaco em disco lia um conselho sobre fontconfig.
+    """
+    detalhe = str(exc.detalhe or "")
+    baixo = detalhe.lower()
+    if "fontconfig" in baixo or "font" in baixo:
+        sugestao = (
+            f"o preset '{preset_nome}' pede uma fonte que não está instalada nesta "
+            "máquina: escolha outro preset (clipper render <entrada> --preset "
+            "clean-branco) ou instale a fonte."
+        )
+    elif "no space" in baixo or "disk full" in baixo or "errno 28" in baixo:
+        sugestao = (
+            "faltou espaço em disco no meio do encode. Libere espaço e repita o mesmo "
+            "comando — os clipes que já ficaram prontos são reaproveitados."
+        )
+    elif "permission" in baixo or "access is denied" in baixo:
+        sugestao = (
+            "algum arquivo desta pasta está aberto em outro programa. Feche-o e repita "
+            "o mesmo comando."
+        )
+    else:
+        sugestao = (
+            "leia a saída do ffmpeg acima: ela costuma dizer exatamente o que faltou. "
+            "O comando completo ficou registrado no clipper.log desta pasta."
+        )
+    return ErroRender(exc.mensagem, detalhe=detalhe, sugestao=sugestao)
+
+
 def _renderizar_clipe(
     *,
     saida: Saida,
@@ -1027,6 +1228,11 @@ def _renderizar_clipe(
     altura_fonte: int,
     forcar: bool = False,
     anterior: dict[str, Any] | None = None,
+    comp: composicao.Composicao | None = None,
+    picos: Sequence[Any] = (),
+    fps_fracao: str = "",
+    pitch: bool = False,
+    tem_audio: bool = True,
 ) -> dict[str, Any]:
     """Reframe -> ASS -> ffmpeg -> sondagem do resultado. Devolve o metadado.
 
@@ -1044,11 +1250,27 @@ def _renderizar_clipe(
     destino = (saida.clips_dir / _nome_arquivo(id_clipe, titulo, preset_nome)).resolve()
     destino.parent.mkdir(parents=True, exist_ok=True)
 
+    impressao_estilo = comp.impressao(pitch=pitch) if comp is not None else None
+    marca_legenda = impressao_legenda(preset_obj)
+    # Os punch-ins saem de energia.json, que nao entra em assinatura nenhuma:
+    # escolher a lista ANTES de decidir o reaproveitamento e o que faz um clipe
+    # rendido sem energia legivel voltar a ganhar punch quando a energia
+    # aparece. E python puro sobre a lista de picos -- custa microssegundos.
+    punches = (
+        composicao.escolher_punches(picos, inicio, fim, comp) if comp is not None else []
+    )
     pronto = (
         None
         if forcar
         else _clipe_reaproveitavel(
-            destino, duracao, inicio=inicio, fim=fim, anterior=anterior
+            destino,
+            duracao,
+            inicio=inicio,
+            fim=fim,
+            anterior=anterior,
+            impressao_estilo=impressao_estilo,
+            impressao_legenda_atual=marca_legenda,
+            punches=punches if comp is not None else None,
         )
     )
     if pronto is not None and anterior:
@@ -1082,6 +1304,9 @@ def _renderizar_clipe(
             ),
             segundos_encode=segundos_antes,
             fronteiras=fronteiras,
+            estilo=(
+                anterior["estilo"] if isinstance(anterior.get("estilo"), dict) else {}
+            ),
         )
 
     reframe = calcular_reframe(
@@ -1106,28 +1331,104 @@ def _renderizar_clipe(
     arquivo_ass = saida.trabalho_dir / f"legenda_{id_clipe}_{preset_nome}.ass"
     _gravar_ass(arquivo_ass, texto_ass)
 
-    # setsar=1 no fim da cadeia geometrica, sempre. Um recorte de 1920x1080 sai
-    # 608x1080 (o ideal, 607,5, nao e inteiro), e o scale empurra essa sobra
-    # para o sample aspect ratio: sem o setsar o mp4 anuncia 1080x1920 mas
-    # grava SAR 1216:1215 / DAR 76:135, e todo player que honra o SAR reamostra.
-    recorte = (
-        f"crop={reframe['largura']}:{reframe['altura']}:{reframe['x']}:{reframe['y']},"
-        f"scale={LARGURA_SAIDA}:{ALTURA_SAIDA}:flags=lanczos,setsar=1"
-    )
-    cwd: Path | None = None
-    if int(resumo["palavras"]) > 0:
-        filtro_sub, cwd = ffmpeg_utils.opcao_subtitles(arquivo_ass)
-        vf = recorte + "," + filtro_sub
+    tem_legenda = int(resumo["palavras"]) > 0
+    if tem_legenda:
+        detalhe_pop = (
+            f", pop {resumo['pop']}%" if int(resumo.get("pop") or 0) else ""
+        )
         log.info(
             f"      legenda: {resumo['linhas']} linha(s), {resumo['palavras']} "
-            f"palavra(s), preset {preset_nome}."
+            f"palavra(s), preset {preset_nome}{detalhe_pop} "
+            f"(quebra por {resumo.get('quebra')})."
         )
     else:
-        vf = recorte
         log.warning(
             "      aviso:  não há palavra transcrita dentro deste trecho — o clipe "
             "sai SEM legenda. (Trecho de música, silêncio ou fala não reconhecida.)"
         )
+
+    # O filtro 'subtitles' recebe so o NOME do arquivo e o ffmpeg roda com cwd
+    # na pasta dele: caminho do Windows com ':' e '\' nao sobrevive aos tres
+    # parsers do filtergraph. Por isso 'fonte' e 'destino' sao absolutos.
+    cwd: Path | None = None
+    filtro_sub = None
+    if tem_legenda:
+        filtro_sub, cwd = ffmpeg_utils.opcao_subtitles(arquivo_ass)
+
+    estilo: dict[str, Any] = {}
+    montagem: composicao.Montagem | None = None
+    if comp is not None:
+        if not fps_fracao:
+            raise ErroRender(
+                "não consegui ler a taxa de quadros exata de fonte.mp4, e o preset "
+                f"'{preset_nome}' precisa dela para o movimento de câmera.",
+                sugestao=(
+                    "refaça a ingestão para gravar um fonte.mp4 íntegro:  "
+                    f"clipper ingest <entrada> {_FLAG_FORCE}   — ou renderize com um "
+                    "preset sem composição (--preset bold-amarelo)."
+                ),
+            )
+        ativos = composicao.gerar_ativos(comp, titulo, saida.trabalho_dir)
+        montagem = composicao.montar(
+            comp=comp,
+            ativos=ativos,
+            recorte=reframe,
+            duracao=duracao,
+            fps=fps_fracao,
+            punches=punches,
+            filtro_legenda=filtro_sub,
+            tem_audio=tem_audio,
+            pitch=pitch,
+        )
+        pilula = ativos.get("pilula") or {}
+        estilo = {
+            "preset": preset_nome,
+            "versao": composicao.VERSAO,
+            "impressao": impressao_estilo,
+            "legenda_impressao": marca_legenda,
+            "cartao": [comp.cartao_largura, comp.cartao_altura, comp.cartao_x, comp.cartao_y],
+            "kenburns": [1.0, round(comp.kenburns_ate, 4)],
+            "punch_em": punches,
+            "punch_ganho": comp.punch_ganho,
+            "punch_duracao": comp.punch_duracao,
+            "punch_inicio_minimo": comp.punch_inicio_minimo,
+            "fps": fps_fracao,
+            "pitch": bool(pitch),
+            "titulo_linhas": int(pilula.get("linhas") or 0),
+            "titulo_tamanho": int(pilula.get("tamanho") or 0),
+            "titulo_truncado": bool(pilula.get("truncado")),
+        }
+        if punches:
+            log.info(
+                "      movimento: zoom 1,00→"
+                f"{comp.kenburns_ate:.2f} ao longo do clipe e "
+                f"{len(punches)} punch-in(s) de +{comp.punch_ganho * 100:.0f}% em "
+                + ", ".join(f"{p:.1f}s" for p in punches)
+                + "."
+            )
+        else:
+            log.info(
+                f"      movimento: zoom 1,00→{comp.kenburns_ate:.2f} ao longo do clipe, "
+                "sem punch-in (nenhum pico de áudio elegível neste trecho)."
+            )
+        if pilula.get("truncado"):
+            log.warning(
+                "      aviso:  o título não coube na barra e foi cortado com reticências."
+            )
+    else:
+        estilo = {"legenda_impressao": marca_legenda}
+        # Caminho F3: recorte cheio, legenda por cima, nada mais.
+        # setsar=1 no fim da cadeia geometrica, sempre. Um recorte de 1920x1080
+        # sai 608x1080 (o ideal, 607,5, nao e inteiro), e o scale empurra essa
+        # sobra para o sample aspect ratio: sem o setsar o mp4 anuncia 1080x1920
+        # mas grava SAR 1216:1215 / DAR 76:135, e todo player que honra o SAR
+        # reamostra.
+        vf = (
+            f"crop={reframe['largura']}:{reframe['altura']}:{reframe['x']}:{reframe['y']},"
+            f"scale={LARGURA_SAIDA}:{ALTURA_SAIDA}:flags=lanczos,setsar=1"
+        )
+        if filtro_sub:
+            vf += "," + filtro_sub
 
     if pronto is not None:
         # O mp4 esta pronto e valido, mas nao havia metadado anterior para ele
@@ -1144,6 +1445,9 @@ def _renderizar_clipe(
         # renomeia. Ctrl+C, disco cheio ou ffmpeg morto no meio nao podem
         # deixar um mp4 truncado em clips/ passando por clipe pronto -- ele
         # tem tamanho > 0 e passaria em qualquer checagem de existencia.
+        # O que este try NAO cobre: MATAR o processo. No Windows o ffmpeg filho
+        # sobrevive ao pai e termina de escrever o .parcial. Quem limpa esse
+        # caso e _limpar_parciais(), no comeco do estagio.
         parcial = destino.with_name(destino.name + ".parcial")
         crono = Cronometro(f"render do clipe {id_clipe}")
         try:
@@ -1152,29 +1456,36 @@ def _renderizar_clipe(
             # passa a ser a pasta do .ass, e um caminho relativo cairia la
             # dentro. '-f mp4' e obrigatorio porque a extensao .parcial nao
             # diz nada ao ffmpeg sobre o formato de saida.
-            args = [
-                "-ss", f"{inicio:.3f}",
-                "-i", str(fonte),
-                "-t", f"{duracao:.3f}",
-                "-vf", vf,
+            args = ["-ss", f"{inicio:.3f}", "-t", f"{duracao:.3f}", "-i", str(fonte)]
+            if montagem is not None:
+                args.extend(montagem.entradas)
+                args.extend(["-filter_complex", montagem.filtro])
+                args.extend(["-map", montagem.rotulo_video])
+                if montagem.rotulo_audio:
+                    args.extend(["-map", montagem.rotulo_audio])
+                # O '-t' de SAIDA nao e redundante: a pilula do titulo entra
+                # como '-loop 1', que e uma entrada INFINITA, e nem o '-shortest'
+                # segura o render de um clipe de um minuto para sempre.
+                args.extend(["-t", f"{duracao:.3f}"])
+            else:
+                args.extend(["-vf", vf])
+            args.extend([
                 "-c:v", "libx264", "-preset", "medium", "-crf", "20",
                 "-pix_fmt", "yuv420p", "-profile:v", "high",
                 "-c:a", "aac", "-b:a", "160k", "-ac", "2", "-ar", "48000",
                 "-movflags", "+faststart",
                 "-f", "mp4",
                 str(parcial),
-            ]
+            ])
             with crono:
-                ffmpeg_utils.rodar(
-                    args,
-                    descricao=f"render do clipe {id_clipe}",
-                    cwd=cwd,
-                    sugestao=(
-                        "se a mensagem acima fala em fonte/fontconfig, o preset pede uma "
-                        "fonte que não está instalada nesta máquina: escolha outro preset "
-                        "(clipper render <entrada> --preset clean-branco) ou instale a fonte."
-                    ),
-                )
+                try:
+                    ffmpeg_utils.rodar(
+                        args,
+                        descricao=f"render do clipe {id_clipe}",
+                        cwd=cwd,
+                    )
+                except ErroFFmpeg as exc:
+                    raise _erro_do_ffmpeg(exc, preset_nome) from exc
             info = ffmpeg_utils.sondar(parcial)
             if parcial.stat().st_size == 0 or not info.tem_video:
                 raise ErroRender(
@@ -1185,7 +1496,19 @@ def _renderizar_clipe(
                         "comando — os clipes que já ficaram prontos são reaproveitados."
                     ),
                 )
-            parcial.replace(destino)
+            try:
+                parcial.replace(destino)
+            except OSError as exc:
+                raise _erro_de_escrita(
+                    destino,
+                    exc,
+                    o_que=f"o clipe {destino.name}",
+                    sugestao=(
+                        "feche o player ou o Explorer que está com esse arquivo aberto "
+                        "(ou libere espaço em disco) e repita o mesmo comando — os clipes "
+                        "que já ficaram prontos são reaproveitados."
+                    ),
+                ) from exc
         except BaseException:
             # BaseException de proposito: KeyboardInterrupt tambem tem que
             # levar o .parcial embora.
@@ -1221,15 +1544,74 @@ def _renderizar_clipe(
             "linhas": int(resumo["linhas"]),
             "palavras": int(resumo["palavras"]),
             "menor_k_centis": int(resumo["menor_k_centis"]),
+            "pop": int(resumo.get("pop") or 0),
+            "quebra": str(resumo.get("quebra") or ""),
         },
         segundos_encode=segundos_encode,
         fronteiras=fronteiras,
+        estilo=estilo,
     )
 
 
 # ==========================================================================
 # Metadados e relatorio
 # ==========================================================================
+
+
+def _corpo_metadados(
+    saida: Saida,
+    *,
+    todos: list[dict[str, Any]],
+    bloco_selecao: dict[str, Any],
+    info_fonte: Any,
+) -> dict[str, Any]:
+    """O dicionario de metadados.json. Um lugar so, usado no parcial e no fim."""
+    return {
+        "gerado_em": datetime.now().isoformat(timespec="seconds"),
+        "slug": saida.slug,
+        "selecao": bloco_selecao,
+        "fonte": {
+            "largura": info_fonte.largura,
+            "altura": info_fonte.altura,
+            "fps": round(info_fonte.fps, 3),
+            "duracao": round(info_fonte.duracao, 3),
+        },
+        "saida": {"largura": LARGURA_SAIDA, "altura": ALTURA_SAIDA},
+        "presets_usados": sorted({str(c.get("preset")) for c in todos if c.get("preset")}),
+        "clipes": todos,
+    }
+
+
+def _salvar_metadados_parcial(
+    saida: Saida,
+    *,
+    anteriores: list[dict[str, Any]],
+    itens: list[dict[str, Any]],
+    bloco_anterior: Any,
+    bloco_selecao: dict[str, Any],
+    info_fonte: Any,
+) -> None:
+    """Grava metadados.json com o que ja ficou pronto. Falha aqui nao interrompe.
+
+    E melhor esforco de proposito: a gravacao que VALE e a do fim do estagio, e
+    e ela que levanta erro acionavel se o disco estiver cheio. Esta aqui existe
+    so para que um clipe ja encodado nao se perca no meio do caminho.
+    """
+    try:
+        todos = _mesclar_clipes(
+            anteriores,
+            itens,
+            selecao_anterior=bloco_anterior,
+            selecao_atual=bloco_selecao,
+        )
+        escrever_json(
+            saida.metadados_json,
+            _corpo_metadados(
+                saida, todos=todos, bloco_selecao=bloco_selecao, info_fonte=info_fonte
+            ),
+        )
+    except (OSError, ValueError, TypeError):
+        return
 
 
 def _metadados_anteriores(saida: Saida) -> dict[str, Any]:
@@ -1385,6 +1767,22 @@ def _montar_relatorio(
         if motivo:
             linhas.append(f"- **Por que este trecho:** {motivo}")
         linhas.append(f"- **Enquadramento:** {_linha_reframe(item.get('reframe') or {})}")
+        estilo = item.get("estilo") or {}
+        if estilo.get("impressao"):
+            zoom = estilo.get("kenburns") or [1.0, 1.0]
+            punches = estilo.get("punch_em") or []
+            texto_punch = (
+                ", ".join(f"{float(p):.1f}s" for p in punches)
+                if punches
+                else "nenhum (sem pico de áudio elegível)"
+            )
+            linhas.append(
+                f"- **Composição:** cartão {estilo.get('cartao', [0, 0])[0]}×"
+                f"{estilo.get('cartao', [0, 0])[1]} sobre fundo borrado, zoom "
+                f"{float(zoom[0]):.2f}→{float(zoom[-1]):.2f}, punch-in de "
+                f"+{float(estilo.get('punch_ganho') or 0) * 100:.0f}% em: {texto_punch}"
+                + (" — áudio com pitch +0,5%" if estilo.get("pitch") else "")
+            )
         legenda = item.get("legenda") or {}
         if int(legenda.get("palavras") or 0) > 0:
             linhas.append(
@@ -1512,6 +1910,46 @@ def _avisar_orfaos(saida: Saida, todos: list[dict[str, Any]]) -> list[str]:
     return orfaos
 
 
+def _limpar_parciais(saida: Saida) -> None:
+    """Apaga .parcial de um render interrompido. Nunca levanta.
+
+    O encode e atomico (escreve em .parcial e so entao renomeia), e o Ctrl+C
+    esta coberto pelo try/except do proprio encode. O que NAO estava: matar o
+    processo. No Windows o ffmpeg filho sobrevive ao pai, termina o encode e
+    deixa um .parcial completo de dezenas de MB em clips/ -- que _avisar_orfaos
+    nao lista, porque ele so olha *.mp4, e que so seria apagado se aquele mesmo
+    clipe fosse reencodado.
+    """
+    log = obter()
+    for parcial in sorted(saida.clips_dir.glob("*.parcial")):
+        try:
+            tamanho = parcial.stat().st_size
+            parcial.unlink()
+            log.info(
+                f"   apaguei {parcial.name} ({humanizar_bytes(tamanho)}): sobra de um "
+                "render interrompido."
+            )
+        except OSError:
+            continue
+
+
+def _picos_de_energia(saida: Saida) -> list[Any]:
+    """Os picos de energia.json, ou lista vazia se ele nao existir/estiver torto.
+
+    Energia ausente NAO e erro de render: o clipe sai com o Ken Burns e sem
+    punch-in. Exigir energia.json aqui quebraria o 'render' de um projeto
+    antigo, que e justamente o comando que funciona offline.
+    """
+    try:
+        dados = ler_json(saida.energia_json)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return []
+    if not isinstance(dados, dict):
+        return []
+    picos = dados.get("picos")
+    return [p for p in picos if isinstance(p, dict)] if isinstance(picos, list) else []
+
+
 def renderizar(
     saida: Saida,
     estado: Estado,
@@ -1519,6 +1957,7 @@ def renderizar(
     preset: str = PRESET_PADRAO,
     forcar: bool = False,
     clipes: list[int] | None = None,
+    pitch: bool = False,
 ) -> dict[str, Any]:
     """Corta, reenquadra em 9:16, queima legenda e grava clips/ + relatorio.md.
 
@@ -1530,6 +1969,7 @@ def renderizar(
     _exigir_entradas(saida)
 
     preset_obj = carregar_preset(preset)
+    comp = carregar_composicao(preset)
     selecao = _ler_entrada(saida.selecao_json, "a seleção")
     lista = _clipes_da_selecao(selecao, saida.selecao_json)
     escolhidos = _filtrar_clipes(lista, clipes)
@@ -1547,7 +1987,13 @@ def renderizar(
         "preset": preset,
         "largura": LARGURA_SAIDA,
         "altura": ALTURA_SAIDA,
+        # O estilo entra na assinatura para que editar o preset -- e nao apenas
+        # trocar de preset -- refaca os clipes sozinho, sem --force.
+        "estilo": comp.impressao(pitch=pitch) if comp is not None else None,
+        "pitch": bool(pitch),
         **impressao,
+        **_impressao_transcricao(saida),
+        **(_impressao_energia(saida) if comp is not None else {}),
     }
     artefatos = [saida.metadados_json, saida.relatorio_md]
 
@@ -1569,6 +2015,8 @@ def renderizar(
             "   o estado diz que o render está feito, mas falta arquivo em "
             f"{saida.clips_dir.name}/ — vou refazer os clipes."
         )
+
+    _limpar_parciais(saida)
 
     transcricao = _ler_entrada(saida.transcricao_json, "a transcrição")
     if not isinstance(transcricao, dict):
@@ -1592,11 +2040,25 @@ def renderizar(
             sugestao=f'refaça a ingestão:  clipper ingest <entrada> {_FLAG_FORCE}',
         )
 
+    picos = _picos_de_energia(saida) if comp is not None else []
     log.info(
         f"   fonte {info_fonte.largura}×{info_fonte.altura} @ {info_fonte.fps:.2f} fps, "
         f"{humanizar_tempo(info_fonte.duracao)} — saída {LARGURA_SAIDA}×{ALTURA_SAIDA}, "
         f"preset '{preset}'."
     )
+    if comp is not None:
+        log.info(
+            f"   composição '{preset}': cartão {comp.cartao_largura}×{comp.cartao_altura} "
+            f"em ({comp.cartao_x},{comp.cartao_y}) sobre fundo borrado, "
+            f"{len(picos)} pico(s) de áudio no vídeo inteiro para escolher os punch-ins"
+            + (", áudio com pitch +0,5%" if pitch else "")
+            + "."
+        )
+        if not picos:
+            log.info(
+                "   (sem energia.json legível: os clipes saem com o zoom contínuo e "
+                "sem punch-in — o resto da composição não muda.)"
+            )
     log.info(
         f"   {len(escolhidos)} clipe(s) para renderizar; o encode é em CPU, "
         "conte alguns minutos."
@@ -1638,20 +2100,36 @@ def renderizar(
                 f"   [{posicao}/{len(escolhidos)}] clipe {id_clipe} — {titulo} "
                 f"({mmss(inicio)}–{mmss(fim)}, {fim - inicio:.0f}s)"
             )
-            itens.append(
-                _renderizar_clipe(
-                    saida=saida,
-                    clipe=clipe,
-                    id_clipe=id_clipe,
-                    preset_nome=preset,
-                    preset_obj=preset_obj,
-                    fronteiras=fronteiras,
-                    fonte=fonte,
-                    largura_fonte=info_fonte.largura,
-                    altura_fonte=info_fonte.altura,
-                    forcar=forcar,
-                    anterior=por_chave.get((id_clipe, preset)),
-                )
+            item = _renderizar_clipe(
+                saida=saida,
+                clipe=clipe,
+                id_clipe=id_clipe,
+                preset_nome=preset,
+                preset_obj=preset_obj,
+                fronteiras=fronteiras,
+                fonte=fonte,
+                largura_fonte=info_fonte.largura,
+                altura_fonte=info_fonte.altura,
+                forcar=forcar,
+                anterior=por_chave.get((id_clipe, preset)),
+                comp=comp,
+                picos=picos,
+                fps_fracao=info_fonte.fps_fracao,
+                pitch=pitch,
+                tem_audio=info_fonte.tem_audio,
+            )
+            itens.append(item)
+            # Grava o que ja existe a cada clipe. Sem isto, uma falha na
+            # gravacao final (disco cheio, arquivo aberto) deixava os clipes
+            # recem-encodados sem metadado nenhum -- e repetir o comando
+            # reencodava tudo de novo, ao contrario do que a mensagem promete.
+            _salvar_metadados_parcial(
+                saida,
+                anteriores=clipes_anteriores,
+                itens=itens,
+                bloco_anterior=bloco_anterior,
+                bloco_selecao=bloco_selecao,
+                info_fonte=info_fonte,
             )
 
     todos = _mesclar_clipes(
@@ -1662,20 +2140,9 @@ def renderizar(
     )
     presets_usados = sorted({str(c.get("preset")) for c in todos if c.get("preset")})
 
-    metadados = {
-        "gerado_em": datetime.now().isoformat(timespec="seconds"),
-        "slug": saida.slug,
-        "selecao": bloco_selecao,
-        "fonte": {
-            "largura": info_fonte.largura,
-            "altura": info_fonte.altura,
-            "fps": round(info_fonte.fps, 3),
-            "duracao": round(info_fonte.duracao, 3),
-        },
-        "saida": {"largura": LARGURA_SAIDA, "altura": ALTURA_SAIDA},
-        "presets_usados": presets_usados,
-        "clipes": todos,
-    }
+    metadados = _corpo_metadados(
+        saida, todos=todos, bloco_selecao=bloco_selecao, info_fonte=info_fonte
+    )
     # Daqui para baixo os clipes JA estao gravados: disco cheio ou arquivo
     # aberto em outro programa e falha previsivel, com conserto obvio -- e
     # repetir o comando agora custa segundos, porque os mp4 sao reaproveitados.
