@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClipPro</title>
+<link rel="stylesheet" href="/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23111417'/><rect x='30' y='18' width='40' height='64' rx='8' fill='%23ffe500'/></svg>">
+</head>
+<body>
+
+<header class="topo">
+  <a class="marca" href="#/" data-rota>
+    <span class="marca-quadro"></span>
+    <span>Clip<b>Pro</b></span>
+  </a>
+  <span class="topo-nota">painel local — nada sai desta máquina</span>
+</header>
+
+<main id="tela"></main>
+
+<!-- ============================ HOME ============================ -->
+<template id="tpl-home">
+  <section class="coluna">
+    <h1>Transformar um vídeo em cortes</h1>
+
+    <form class="cartao formulario" id="form-novo">
+      <div class="campo">
+        <label for="url">Link do vídeo</label>
+        <input type="text" id="url" name="url" placeholder="https://youtu.be/…" autocomplete="off">
+      </div>
+
+      <div class="ou"><span>ou</span></div>
+
+      <label class="solta" id="solta" for="arquivo">
+        <input type="file" id="arquivo" name="arquivo" accept="video/*" hidden>
+        <strong>Arraste um vídeo aqui</strong>
+        <span class="fraco">ou clique para escolher — mp4, mkv, mov…</span>
+        <span class="arquivo-escolhido" id="arquivo-nome" hidden></span>
+      </label>
+
+      <div class="linha">
+        <div class="campo">
+          <label for="n">Quantos cortes</label>
+          <input type="number" id="n" name="n" min="1" max="20" value="5">
+        </div>
+        <div class="campo">
+          <label for="preset">Visual</label>
+          <select id="preset" name="preset"></select>
+        </div>
+        <div class="campo">
+          <label for="modelo_whisper">Transcrição</label>
+          <select id="modelo_whisper" name="modelo_whisper"></select>
+        </div>
+      </div>
+
+      <div class="campo">
+        <label for="estrategia">O que procurar nos cortes</label>
+        <textarea id="estrategia" name="estrategia" rows="2"></textarea>
+      </div>
+
+      <div class="acoes">
+        <button type="submit" class="botao primario" id="enviar">Gerar cortes</button>
+        <span class="fraco" id="dica-api"></span>
+      </div>
+      <p class="erro" id="erro-novo" hidden></p>
+    </form>
+
+    <h2>Vídeos já processados</h2>
+    <div id="lista-jobs" class="lista"></div>
+  </section>
+</template>
+
+<!-- =========================== TELA DO JOB =========================== -->
+<template id="tpl-job">
+  <section class="coluna">
+    <a class="voltar" href="#/" data-rota>← todos os vídeos</a>
+    <h1 id="job-titulo">…</h1>
+    <p class="fraco" id="job-entrada"></p>
+
+    <div class="cartao">
+      <ol class="trilha" id="trilha"></ol>
+      <div class="barra"><div class="barra-cheia" id="barra-cheia"></div></div>
+      <p class="fraco" id="job-tempo"></p>
+    </div>
+
+    <div class="cartao alerta" id="bloco-erro" hidden>
+      <h2 id="erro-msg"></h2>
+      <p id="erro-sugestao"></p>
+      <pre id="erro-detalhe" hidden></pre>
+    </div>
+
+    <div class="cartao" id="bloco-manual" hidden>
+      <h2>Escolha dos cortes</h2>
+      <p>
+        Este vídeo está no modo manual. Copie o prompt, cole num chat com
+        qualquer modelo e traga de volta o <b>array JSON</b> que ele devolver.
+      </p>
+      <div class="acoes">
+        <button class="botao" id="copiar-prompt">Copiar prompt</button>
+        <span class="fraco" id="copiado" hidden>copiado ✓</span>
+      </div>
+      <label for="resposta">Cole a resposta do arquiteto</label>
+      <textarea id="resposta" rows="8" placeholder="[ { &quot;inicio&quot;: 12.5, &quot;fim&quot;: 58.0, … } ]"></textarea>
+      <div class="acoes">
+        <button class="botao primario" id="validar">Validar e continuar</button>
+      </div>
+      <div id="problemas" hidden>
+        <h3 id="problemas-titulo"></h3>
+        <ol class="problemas" id="problemas-lista"></ol>
+        <p class="fraco" id="problemas-sugestao"></p>
+      </div>
+    </div>
+
+    <div id="bloco-clipes" hidden>
+      <div class="cabeca-resultados">
+        <h2>Cortes prontos <span class="fraco" id="contagem"></span></h2>
+        <button class="botao" id="abrir-pasta">Abrir pasta</button>
+      </div>
+      <div class="grade" id="grade"></div>
+    </div>
+  </section>
+</template>
+
+<script src="/app.js"></script>
+</body>
+</html>

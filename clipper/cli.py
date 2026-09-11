@@ -362,6 +362,17 @@ def construir_parser() -> argparse.ArgumentParser:
         ),
     )
     subs.add_parser(
+        "ui",
+        parents=[geral],
+        help="abre o painel web local no navegador (127.0.0.1:8765)",
+        description=(
+            "Sobe o painel em http://127.0.0.1:8765 e abre o navegador. O painel "
+            "usa o MESMO motor do terminal: link ou arquivo, fila de um trabalho "
+            "por vez, e os clipes prontos numa grade de players. Só escuta em "
+            "127.0.0.1: nenhuma outra máquina da rede alcança."
+        ),
+    )
+    subs.add_parser(
         "info",
         parents=[entrada, geral],
         help="mostra o estado de cada estágio em out/<slug>/",
@@ -811,6 +822,9 @@ def main(argv: list[str] | None = None) -> int:
     # Console primeiro (sem arquivo): erros de resolucao da origem ja aparecem.
     registro.configurar(None, verboso=opcoes.verboso)
 
+    if comando == "ui":
+        return _comando_ui(opcoes)
+
     try:
         return _executar(comando, args.entrada, opcoes)
     except KeyboardInterrupt:
@@ -824,6 +838,48 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     except Exception as exc:  # noqa: BLE001 - ultima barreira: nada de stack cru
         return _erro_inesperado(exc)
+
+
+def _comando_ui(opcoes: Opcoes) -> int:
+    """Sobe o painel web. O terminal vira o log dele.
+
+    O import do servidor e tardio de proposito: quem so usa o CLI nao paga o
+    custo do fastapi/uvicorn, e a falta deles vira uma mensagem com o comando
+    de instalacao em vez de um ImportError cru.
+    """
+    log = registro.obter()
+    raiz = _raiz_saida(opcoes)
+    try:
+        from ui import server
+    except ImportError as exc:
+        raise ErroClipper(
+            "o painel precisa do FastAPI e do uvicorn, e eles não estão "
+            "instalados neste ambiente.",
+            detalhe=str(exc),
+            sugestao=(
+                "instale as dependências do projeto:  "
+                r".venv\Scripts\python -m pip install -r requirements.txt"
+            ),
+        ) from exc
+
+    log.info("")
+    log.info(f"  ClipPro — painel local em http://{server.HOST}:{server.PORTA}/")
+    log.info(f"  saída:  {raiz}")
+    log.info("  Só esta máquina alcança o painel. Ctrl+C encerra.")
+    log.info("")
+    try:
+        server.servir(raiz, abrir_navegador=True)
+    except OSError as exc:
+        raise ErroClipper(
+            f"não consegui abrir a porta {server.PORTA} em {server.HOST}.",
+            detalhe=str(exc),
+            sugestao=(
+                "provavelmente já há um painel aberto: veja se não existe outra "
+                f"aba em http://{server.HOST}:{server.PORTA}/ ou feche o processo "
+                "que está usando a porta."
+            ),
+        ) from exc
+    return 0
 
 
 # --------------------------------------------------------------------------

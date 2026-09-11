@@ -89,6 +89,29 @@ ele não renderiza um corte quebrado.
 Com `ANTHROPIC_API_KEY` no ambiente, use `--api` e o clipper conversa sozinho com
 o modelo, sem ida e volta.
 
+### O painel (se você prefere não usar o terminal)
+
+```powershell
+.venv\Scripts\python -m clipper ui
+```
+
+Abre `http://127.0.0.1:8765` no navegador. É a mesma coisa que a linha de
+comando faz — o painel só chama as mesmas funções — mas com:
+
+- campo de link **ou** arrastar-e-soltar de arquivo;
+- linha do tempo dos estágios com progresso ao vivo e estimativa;
+- no modo manual, um botão que copia o prompt e um campo para colar a resposta,
+  com os erros da validação listados **um a um**;
+- os cortes prontos numa grade de players verticais, com baixar, re-renderizar
+  e copiar gancho.
+
+Um trabalho por vez, em fila: dois vídeos ao mesmo tempo não terminariam mais
+rápido, só disputariam CPU e disco. Se você fechar o painel no meio, ele
+**retoma** de onde parou na próxima vez — o que já estava pronto não é refeito.
+
+O painel escuta **só em 127.0.0.1**: nenhuma outra máquina da rede alcança. Ele
+não pede senha e serve os seus vídeos, então isso não é configurável.
+
 ### Comandos
 
 ```
@@ -98,6 +121,7 @@ clipper transcribe <entrada>  transcreve e calcula a energia
 clipper select <entrada>      escolhe os trechos
 clipper render <entrada>      renderiza a partir de uma seleção pronta
 clipper info <entrada>        mostra o que já existe, sem processar nada
+clipper ui                    abre o painel web local
 ```
 
 `render` e `info` leem **apenas** `out/<slug>/`: aceitam o nome da pasta no lugar
@@ -126,7 +150,7 @@ próxima rodada — o clipper percebe a mudança sem precisar de `--force`.
 
 Um clipe que é recorte puro do original é fácil de casar quadro a quadro. O preset
 `cortes` muda a geometria, o movimento, o áudio e a tipografia do quadro inteiro.
-Medido nos clipes de teste: **SSIM de 0,41 a 0,49** contra o mesmo trecho da fonte
+Medido nos cinco clipes de teste: **SSIM de 0,41 a 0,73** contra o mesmo trecho da fonte
 (1,00 seria idêntico).
 
 ---
