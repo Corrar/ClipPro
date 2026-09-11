@@ -1,6 +1,6 @@
 {
-  "nome": "cortes-feed",
-  "descricao": "Composição nativa de feed: fundo do próprio vídeo borrado e escurecido, vídeo num cartão arredondado de 75% da altura, pílula de título em Segoe UI Black com barra amarela, progresso na base do cartão e karaokê Impact com uma palavra acesa por vez. O visual que o feed brasileiro reconhece.",
+  "nome": "cortes",
+  "descricao": "Preset padrão do ClipPro: fundo do próprio vídeo borrado e escurecido, vídeo num cartão arredondado de 75% da altura com sombra, pílula de título em Segoe UI Black com barra amarela, barra de progresso na base do cartão, zoom contínuo com punch-in nos picos de áudio e karaokê Impact com uma palavra acesa por vez. É o visual que o feed brasileiro reconhece, e é composto para o clipe não ser lido como cópia 1:1 do vídeo de origem.",
   "fonte": "Impact",
   "tamanho": 92,
   "negrito": false,

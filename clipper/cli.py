@@ -21,59 +21,21 @@ from typing import Any, Callable, Iterator
 from clipper import __version__, config, registro
 from clipper.config import Estado, Saida, humanizar_bytes, humanizar_tempo
 from clipper.erros import ErroClipper, ErroIngestao, ErroRender, ErroSelecao
-
-# --------------------------------------------------------------------------
-# Padroes das flags (um so lugar: o argparse e a classe Opcoes leem daqui)
-# --------------------------------------------------------------------------
-N_PADRAO = 5
-PRESET_PADRAO = "bold-amarelo"
-MODELO_PADRAO = "haiku"
-MODELOS_API = ("haiku", "sonnet")
-IDIOMA_PADRAO = "pt"
-MODELOS_WHISPER = ("tiny", "base", "small", "medium", "large-v3")
-# Altura maxima do download. 1080 nao e estetica: e o teto do H.264 no
-# YouTube. Acima disso vem VP9/AV1, que obriga a ingestao a reencodar o
-# video inteiro na CPU -- horas, num video longo -- em vez de remuxar em
-# segundos. O clipe final e 1080x1920, entao 1080p de origem paga a conta.
-ALTURA_MAX_PADRAO = 1080
-
-# Estagios que ainda nao existem. Este conjunto e o unico lugar que decide se
-# um 'clipper run' para com elegancia (codigo 0) ao esbarrar neles.
-# HOJE ELE ESTA VAZIO: a selecao saiu na F2 e o render saiu na F3, entao todo
-# estagio da fila e real e uma falha dele volta a ser falha de verdade (codigo
-# 1, mensagem de erro). O conjunto vazio e um estado NORMAL e suportado --
-# _rodar_estagios simplesmente nunca entra no ramo "nao_existe".
-# O maquinario de parada elegante continua de pe porque ele serve a OUTRA
-# parada, que nao tem nada de provisoria: a selecao em modo manual devolve
-# {"pendente": True} e o pipeline termina em 0 esperando o usuario -- ver
-# Parada, _rodar_estagios e _bloco_proximos_passos.
-ESTAGIOS_PENDENTES: frozenset[str] = frozenset()
-
-# Ordem canonica dos estagios e quais rodam em cada subcomando.
-ESTAGIOS_POR_COMANDO: dict[str, tuple[str, ...]] = {
-    "run": ("ingestao", "transcricao", "energia", "selecao", "render"),
-    "ingest": ("ingestao",),
-    "transcribe": ("ingestao", "transcricao", "energia"),
-    "select": ("ingestao", "transcricao", "energia", "selecao"),
-    "render": ("render",),
-    "info": ("ingestao", "transcricao", "energia", "selecao", "render"),
-}
-
-# O que cada subcomando REFAZ quando o usuario passa --force. Nao confundir com
-# ESTAGIOS_POR_COMANDO, que lista o que o subcomando EXECUTA: 'select' executa
-# ingestao/transcricao/energia porque precisa delas prontas, mas quem pede
-# 'select --force' quer refazer a SELECAO (0,1 s) -- nao rebaixar 1 GB de video
-# e rodar 20 minutos de whisper por cima do artefato de que o prompt saiu.
-# Os estagios de fora deste conjunto continuam decidindo pela propria
-# assinatura: mudou parametro deles, refazem sozinhos.
-ESTAGIOS_ALVO_DO_FORCE: dict[str, tuple[str, ...]] = {
-    "run": ("ingestao", "transcricao", "energia", "selecao", "render"),
-    "ingest": ("ingestao",),
-    "transcribe": ("transcricao", "energia"),
-    "select": ("selecao",),
-    "render": ("render",),
-    "info": (),
-}
+from clipper.motor import (
+    ALTURA_MAX_PADRAO,
+    ESTAGIOS_ALVO_DO_FORCE,
+    ESTAGIOS_POR_COMANDO,
+    IDIOMA_PADRAO,
+    MODELO_PADRAO,
+    MODELOS_API,
+    MODELOS_WHISPER,
+    N_PADRAO,
+    PRESET_PADRAO,
+    Estagio,
+    Opcoes,
+    montar_estagios,
+    rodar_estagios,
+)
 
 _EPILOGO = """\
 exemplos:
@@ -406,269 +368,6 @@ def construir_parser() -> argparse.ArgumentParser:
         description="Não processa nada: só resolve a origem e relata o que já existe.",
     )
     return parser
-
-
-# --------------------------------------------------------------------------
-# Opcoes normalizadas
-# --------------------------------------------------------------------------
-@dataclass(frozen=True)
-class Opcoes:
-    """Flags ja normalizadas, com padrao para o que o subcomando nao define."""
-
-    out: Path | None
-    forcar: bool
-    verboso: bool
-    n: int
-    estrategia: str
-    preset: str
-    modelo: str
-    modelo_whisper: str
-    idioma: str
-    threads: int | None
-    vad: bool
-    reencodar: bool
-    altura_max: int | None
-    resposta: Path | None
-    usar_api: bool
-    # None = renderiza a selecao inteira. Lista = so estes ids.
-    clipes: list[int] | None
-    pitch: bool
-
-    @classmethod
-    def de_args(cls, args: argparse.Namespace) -> "Opcoes":
-        return cls(
-            out=getattr(args, "out", None),
-            forcar=bool(getattr(args, "force", False)),
-            verboso=bool(getattr(args, "verboso", False)),
-            n=int(getattr(args, "n", N_PADRAO)),
-            estrategia=str(getattr(args, "estrategia", config.ESTRATEGIA_PADRAO)),
-            preset=str(getattr(args, "preset", PRESET_PADRAO)),
-            modelo=str(getattr(args, "modelo", MODELO_PADRAO)),
-            modelo_whisper=str(
-                getattr(args, "modelo_whisper", config.MODELO_WHISPER_PADRAO)
-            ),
-            idioma=str(getattr(args, "idioma", IDIOMA_PADRAO)),
-            threads=getattr(args, "threads", None),
-            vad=not bool(getattr(args, "sem_vad", False)),
-            reencodar=bool(getattr(args, "reencodar_fonte", False)),
-            altura_max=getattr(args, "altura_max", ALTURA_MAX_PADRAO),
-            resposta=getattr(args, "resposta", None),
-            usar_api=bool(getattr(args, "api", False)),
-            # argparse com action="append" devolve None quando a flag nao veio.
-            # Lista vazia recebe o mesmo tratamento de None: "renderize tudo" e
-            # o padrao, e uma lista vazia significaria "nao renderize nada".
-            clipes=(
-                [int(c) for c in getattr(args, "clipe", None) or ()] or None
-            ),
-            pitch=bool(getattr(args, "pitch", False)),
-        )
-
-
-# --------------------------------------------------------------------------
-# Estagios
-# --------------------------------------------------------------------------
-@dataclass(frozen=True)
-class Estagio:
-    """Um passo do pipeline: como chamar, como rotular e o que ele produz.
-
-    'padrao' so importa quando o artefato e uma PASTA: e o glob dos arquivos
-    que contam como resultado do estagio. O render grava .mp4 em clips/, e e o
-    tamanho somado deles que o resumo mostra -- nao o de qualquer arquivo que
-    tenha ido parar la.
-    """
-
-    nome: str
-    rotulo: str
-    artefato: Path
-    executar: Callable[[], Any]
-    pendente: bool = False
-    padrao: str | None = None
-
-
-def _rotulo_render(opcoes: Opcoes) -> str:
-    """Rotulo do estagio de render, dizendo tambem se ele foi restringido.
-
-    O render de 5 clipes leva minutos: quando o usuario pediu --clipe, a tela
-    precisa deixar claro que o resto da selecao NAO esta sendo refeito.
-    """
-    rotulo = f"Render dos clipes (preset {opcoes.preset})"
-    if opcoes.clipes:
-        ids = ", ".join(str(c) for c in opcoes.clipes)
-        rotulo += f", apenas o(s) clipe(s) {ids}"
-    return rotulo
-
-
-def _montar_estagios(
-    opcoes: Opcoes,
-    origem: Any,
-    saida: Saida,
-    estado: Estado,
-    forcados: frozenset[str] = frozenset(),
-) -> dict[str, Estagio]:
-    """Amarra cada estagio aos seus argumentos, sem executar nada ainda.
-
-    'forcados' e o conjunto de estagios que o --force deste subcomando refaz
-    (ver ESTAGIOS_ALVO_DO_FORCE). Quem esta fora dele recebe forcar=False e
-    continua reaproveitando o que ja existe -- e o que impede um
-    'select --force' de disparar download e whisper de novo.
-    """
-    # Import tardio: 'clipper --help' e 'clipper info' nao precisam pagar o
-    # custo de carregar faster-whisper/ctranslate2.
-    from clipper.pipeline import ingest, render, select, transcribe
-
-    def _forcar(nome: str) -> bool:
-        return nome in forcados
-
-    def _fazer(
-        nome: str,
-        rotulo: str,
-        artefato: Path,
-        alvo: Callable[[], Any],
-        padrao: str | None = None,
-    ) -> Estagio:
-        return Estagio(
-            nome=nome,
-            rotulo=rotulo,
-            artefato=artefato,
-            executar=alvo,
-            pendente=nome in ESTAGIOS_PENDENTES,
-            padrao=padrao,
-        )
-
-    estagios = [
-        _fazer(
-            "ingestao",
-            "Ingestão do vídeo",
-            saida.fonte_mp4,
-            lambda: ingest.ingerir(
-                origem,
-                saida,
-                estado,
-                forcar=_forcar("ingestao"),
-                reencodar=opcoes.reencodar,
-                altura_max=opcoes.altura_max,
-            ),
-        ),
-        _fazer(
-            "transcricao",
-            f"Transcrição (whisper {opcoes.modelo_whisper})",
-            saida.transcricao_json,
-            lambda: transcribe.transcrever(
-                saida,
-                estado,
-                modelo=opcoes.modelo_whisper,
-                idioma=opcoes.idioma,
-                forcar=_forcar("transcricao"),
-                threads=opcoes.threads,
-                vad=opcoes.vad,
-            ),
-        ),
-        _fazer(
-            "energia",
-            "Curva de energia do áudio",
-            saida.energia_json,
-            lambda: transcribe.calcular_energia(
-                saida, estado, forcar=_forcar("energia")
-            ),
-        ),
-        _fazer(
-            "selecao",
-            # O rotulo segue a MESMA regra de prioridade do select.py: com
-            # --resposta o arquivo local vence, mesmo que --api esteja junto.
-            # A tela nao pode anunciar 'API' enquanto le um arquivo do disco.
-            (
-                f"Seleção dos clipes (API {opcoes.modelo})"
-                if opcoes.usar_api and opcoes.resposta is None
-                else "Seleção dos clipes (modo manual)"
-            ),
-            saida.selecao_json,
-            lambda: select.selecionar(
-                saida,
-                estado,
-                estrategia=opcoes.estrategia,
-                n=opcoes.n,
-                modelo=opcoes.modelo,
-                forcar=_forcar("selecao"),
-                resposta_manual=str(opcoes.resposta) if opcoes.resposta else None,
-                usar_api=opcoes.usar_api,
-            ),
-        ),
-        _fazer(
-            "render",
-            _rotulo_render(opcoes),
-            saida.clips_dir,
-            lambda: render.renderizar(
-                saida,
-                estado,
-                preset=opcoes.preset,
-                forcar=_forcar("render"),
-                clipes=opcoes.clipes,
-                pitch=opcoes.pitch,
-            ),
-            padrao="*.mp4",
-        ),
-    ]
-    return {e.nome: e for e in estagios}
-
-
-@dataclass(frozen=True)
-class Parada:
-    """Motivo pelo qual a fila de estagios terminou antes do fim, sem erro.
-
-    Sao dois motivos, e eles nao se parecem:
-
-      "nao_existe"  -- o estagio ainda nao foi implementado. O pipeline para
-                       porque o clipper acaba ali. Com ESTAGIOS_PENDENTES
-                       vazio (o caso de hoje) este motivo nunca acontece; o
-                       ramo fica de pe para a proxima fase que entrar meio
-                       pronta.
-      "aguardando"  -- o estagio rodou, fez o que tinha que fazer e devolveu
-                       {"pendente": True}: falta uma acao do usuario. Hoje so
-                       a selecao em modo manual faz isso -- e ela nao e
-                       provisoria, e o funcionamento normal do modo manual.
-    """
-
-    estagio: Estagio
-    motivo: str
-    resultado: dict[str, Any]
-
-
-def _rodar_estagios(
-    estagios: list[Estagio],
-    medidos: dict[str, float],
-    *,
-    tolerar_pendentes: bool,
-) -> Parada | None:
-    """Roda os estagios em ordem.
-
-    Devolve None se todos rodaram ate o fim. Devolve uma Parada quando a fila
-    foi interrompida sem que isso seja erro: um estagio ainda nao implementado
-    e o chamador aceitou parar ali (tolerar_pendentes=True, usado so pelo
-    'run'), ou um estagio que devolveu {"pendente": True} porque a bola agora
-    esta com o usuario.
-
-    Com ESTAGIOS_PENDENTES vazio, est.pendente e sempre False: o except
-    reergue a excecao como qualquer outra falha e so a parada "aguardando"
-    (selecao em modo manual) continua acontecendo. Nada aqui depende de o
-    conjunto ter algum nome dentro.
-    """
-    log = registro.obter()
-    for est in estagios:
-        try:
-            with registro.etapa(est.rotulo) as crono:
-                resultado = est.executar()
-            medidos[est.nome] = crono.segundos
-        except (ErroSelecao, ErroRender) as exc:
-            if not (tolerar_pendentes and est.pendente):
-                raise
-            log.info("")
-            log.info(f"   {exc.mensagem}")
-            if exc.sugestao:
-                log.info(f"   -> {exc.sugestao}")
-            return Parada(est, "nao_existe", {})
-        if isinstance(resultado, dict) and resultado.get("pendente"):
-            return Parada(est, "aguardando", resultado)
-    return None
 
 
 # --------------------------------------------------------------------------
@@ -1402,7 +1101,7 @@ def _executar(comando: str, entrada: str, opcoes: Opcoes) -> int:
         _cabecalho(comando, entrada, origem, saida)
         if aviso:
             registro.obter().info(f"  aviso:  {aviso}")
-        estagios = _montar_estagios(opcoes, origem, saida, estado)
+        estagios = montar_estagios(opcoes, origem, saida, estado)
         return _comando_info(saida, estado, estagios, entrada)
 
     # O 'render' le APENAS out/<slug>/ (fonte.mp4, transcricao.json,
@@ -1452,7 +1151,7 @@ def _executar(comando: str, entrada: str, opcoes: Opcoes) -> int:
     if selecao_poupada:
         forcados = forcados - {"selecao"}
 
-    estagios = _montar_estagios(opcoes, origem, saida, estado, forcados)
+    estagios = montar_estagios(opcoes, origem, saida, estado, forcados)
 
     # Vale para 'select' e 'run': os dois aceitam --resposta. Nos demais
     # subcomandos a flag nem existe, entao opcoes.resposta e None.
@@ -1500,7 +1199,7 @@ def _executar(comando: str, entrada: str, opcoes: Opcoes) -> int:
 
     medidos: dict[str, float] = {}
     escolhidos = [estagios[n] for n in alvos]
-    parada = _rodar_estagios(
+    parada = rodar_estagios(
         escolhidos, medidos, tolerar_pendentes=(comando == "run")
     )
 

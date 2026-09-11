@@ -103,7 +103,7 @@ FRACAO_MINIMA_ROSTOS = 0.5
 # absorve), e um falso negativo joga o clipe inteiro no recorte central.
 CONFIANCA_ROSTO = 0.3
 
-PRESET_PADRAO = "bold-amarelo"
+PRESET_PADRAO = "cortes"
 
 # --- letterbox da fonte ----------------------------------------------------
 # Video entregue em 16:9 mas FILMADO mais largo vem com tarja preta em cima e

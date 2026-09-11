@@ -24,3 +24,10 @@ pillow==12.3.0
 
 # --- Reframe 9:16 (deteccao de rosto) ---
 mediapipe==1.0.1
+
+# --- Painel web local (clipper ui) ---
+# Servidor que roda em 127.0.0.1 e so envolve as funcoes do pipeline; nenhuma
+# regra de estagio vive nele.
+fastapi==0.121.2
+uvicorn[standard]==0.41.0
+python-multipart==0.0.20      # upload multipart do painel
