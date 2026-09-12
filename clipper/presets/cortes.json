@@ -17,6 +17,10 @@
   "margem_inferior": 520,
   "max_palavras_linha": 3,
   "max_caracteres_linha": 18,
+  "min_palavras_linha": 3,
+  "gap_maximo_fusao_s": 1.2,
+  "max_linhas_bloco": 2,
+  "destaque_minimo_letras": 3,
   "pop_escala": 112,
   "pop_subida_ms": 90,
   "pop_descida_ms": 120,
@@ -72,6 +76,16 @@
       "acento_largura": 8,
       "acento_altura": 44,
       "acento_gap": 22
+    },
+    "gancho": {
+      "ativo": true,
+      "duracao_s": 3.0,
+      "fade_saida_s": 0.4,
+      "y": 196
+    },
+    "zona_segura": {
+      "topo": 180,
+      "base": 1420
     },
     "progresso": {
       "ativo": true,

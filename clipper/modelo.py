@@ -61,6 +61,9 @@ _CONHECIDAS: dict[str, Any] = {
         "max_palavras_linha", "max_caracteres_linha",
         "cor_destaque", "pop_escala", "pop_subida_ms", "pop_descida_ms",
         "pop_volta_ms", "largura_por_medida", "arquivo_fonte",
+        # conformidade de legenda (F6)
+        "min_palavras_linha", "gap_maximo_fusao_s", "max_linhas_bloco",
+        "destaque_minimo_letras", "margem_direita",
     ),
     "composicao": {
         "__folhas__": ("ativo", "fade_s"),
@@ -85,6 +88,12 @@ _CONHECIDAS: dict[str, Any] = {
                 "acento", "acento_cor", "acento_largura", "acento_altura",
                 "acento_gap",
             ),
+        },
+        "gancho": {
+            "__folhas__": ("ativo", "duracao_s", "fade_saida_s", "y"),
+        },
+        "zona_segura": {
+            "__folhas__": ("topo", "base"),
         },
         "progresso": {
             "__folhas__": (

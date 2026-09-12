@@ -69,6 +69,30 @@ class Preset:
     largura_por_medida: bool = False
     arquivo_fonte: str = ""
 
+    # --- conformidade de legenda (F6). Todos com padrao DESLIGADO, e o padrao
+    # e "igual a F4a": um preset que nao declara nenhum destes gera exatamente
+    # o mesmo ASS de antes, byte a byte.
+    #
+    # min_palavras_linha 0 = sem piso. O teto (max_palavras_linha) NAO muda:
+    # o piso so junta bloco curto, nunca afrouxa o teto.
+    min_palavras_linha: int = 0
+    # Nao fundir ATRAVES de uma pausa maior que isto. Bloco curto separado do
+    # vizinho por silencio longo e uma escolha de quem falou, nao sobra de
+    # quebra -- juntar os dois ressuscitaria texto que ja saiu da tela.
+    gap_maximo_fusao_s: float = 1.2
+    # Maximo de linhas dentro de um bloco. A segunda linha (\N) so nasce
+    # quando a largura obriga; nunca para "equilibrar" visual.
+    max_linhas_bloco: int = 2
+    # Palavra com menos letras que isto NAO recebe o destaque da palavra
+    # ativa: o realce pula para a proxima que alcance o limiar. 0 = desligado.
+    # Defeito que isto mata, visto em render real: "E A PRIMEIRA" com o "A"
+    # aceso em amarelo.
+    destaque_minimo_letras: int = 0
+    # Margem direita propria. -1 = simetrica com margem_lateral, que e o que
+    # os presets de fabrica usam (zero pixel de diferenca). O respiro
+    # assimetrico para a coluna de botoes e botao de modelo, nao padrao.
+    margem_direita: int = -1
+
     @classmethod
     def de_dict(cls, dados: dict[str, Any]) -> "Preset":
         campos = {f: dados[f] for f in cls.__dataclass_fields__ if f in dados}
@@ -81,6 +105,11 @@ class Preset:
     @property
     def cor_do_pop(self) -> str:
         return self.cor_destaque or self.cor_falada
+
+    @property
+    def margem_dir(self) -> int:
+        """A margem direita efetiva: a propria, ou a lateral quando nao ha."""
+        return self.margem_lateral if int(self.margem_direita) < 0 else int(self.margem_direita)
 
 
 def _centis(segundos: float) -> int:
@@ -163,7 +192,7 @@ def teto_de_largura(preset: Preset, largura_canvas: int = 1080) -> float:
     glifo; e o que sobra ainda tem que caber COM a palavra em pop, que estica a
     linha inteira -- o libass remede e recentraliza a cada quadro.
     """
-    util = max(80.0, float(largura_canvas) - 2.0 * float(preset.margem_lateral))
+    util = max(80.0, float(largura_canvas) - float(preset.margem_lateral) - float(preset.margem_dir))
     util -= 2.0 * (float(preset.contorno) + float(preset.sombra))
     if preset.tem_pop:
         util /= max(1.0, float(preset.pop_escala) / 100.0)
@@ -223,6 +252,125 @@ def agrupar_linhas(
     return linhas
 
 
+def _letras(texto: str) -> int:
+    """Quantas LETRAS a palavra tem, ignorando pontuacao e acento combinante.
+
+    "e" tem 1, "de," tem 2, "que" tem 3. A pontuacao nao conta porque quem le
+    a tela ve a palavra, nao o ponto -- e e a palavra curta que fica feia
+    acesa sozinha.
+    """
+    limpo = unicodedata.normalize("NFC", str(texto))
+    return sum(1 for c in limpo if c.isalpha())
+
+
+def _lacuna(anterior: Sequence[dict[str, Any]], proxima: Sequence[dict[str, Any]]) -> float:
+    """Silencio entre o fim de um bloco e o comeco do seguinte, em segundos."""
+    try:
+        return max(0.0, float(proxima[0]["inicio"]) - float(anterior[-1]["fim"]))
+    except (IndexError, KeyError, TypeError, ValueError):
+        return 0.0
+
+
+def fundir_curtos(
+    linhas: list[list[dict[str, Any]]],
+    *,
+    minimo: int,
+    maximo: int,
+    gap_maximo: float,
+) -> list[list[dict[str, Any]]]:
+    """Junta blocos abaixo do piso, sem afrouxar o teto nem atravessar pausa.
+
+    Por que o piso existe: `agrupar_linhas` fecha a linha no fim de frase, e
+    uma frase de uma palavra ("Sim.") vira um bloco de uma palavra. Um flash
+    de uma palavra na tela nao da tempo de ler e pisca.
+
+    Duas guardas, e as duas podem DEIXAR o bloco curto -- de proposito:
+
+      teto: fundir nunca pode passar de `maximo`. O teto e o que mantem a
+      linha curta o bastante para caber na area segura; afrouxa-lo para
+      cumprir o piso trocaria um defeito por outro.
+
+      lacuna: nao funde atraves de silencio maior que `gap_maximo`. Bloco
+      separado do vizinho por pausa longa esta separado porque quem falou
+      parou ali; juntar traria de volta um texto que ja tinha saido.
+
+    Tenta primeiro juntar com o bloco SEGUINTE (a leitura segue para a
+    frente); so entao com o anterior, que e o que salva o bloco final, sem
+    vizinho a direita.
+    """
+    if minimo <= 1 or not linhas:
+        return linhas
+
+    atual = [list(linha) for linha in linhas]
+    mudou = True
+    while mudou:
+        mudou = False
+        for i, bloco in enumerate(atual):
+            if len(bloco) >= minimo:
+                continue
+            # para a frente
+            if i + 1 < len(atual):
+                proximo = atual[i + 1]
+                if len(bloco) + len(proximo) <= maximo and _lacuna(bloco, proximo) <= gap_maximo:
+                    atual[i] = bloco + proximo
+                    del atual[i + 1]
+                    mudou = True
+                    break
+            # para tras
+            if i > 0:
+                anterior = atual[i - 1]
+                if len(anterior) + len(bloco) <= maximo and _lacuna(anterior, bloco) <= gap_maximo:
+                    atual[i - 1] = anterior + bloco
+                    del atual[i]
+                    mudou = True
+                    break
+    return atual
+
+
+def quebrar_bloco(
+    bloco: Sequence[dict[str, Any]],
+    *,
+    maiusculas: bool,
+    medidor: Any,
+    teto: float,
+    max_linhas: int,
+) -> list[list[dict[str, Any]]]:
+    """Divide um bloco em ate `max_linhas` linhas, e SO se a largura obrigar.
+
+    Sem medidor, ou cabendo em uma linha, devolve o bloco inteiro numa linha
+    so -- que e o comportamento da F4a. A segunda linha nasce da largura, nao
+    de gosto: o ponto de corte escolhido e o que deixa as duas linhas mais
+    parecidas, porque linha longa sobre linha curta le pior que duas medias.
+    """
+    palavras = list(bloco)
+    if medidor is None or teto <= 0 or max_linhas <= 1 or len(palavras) < 2:
+        return [palavras]
+
+    def texto(seq: Sequence[dict[str, Any]]) -> str:
+        junto = " ".join(str(p.get("texto") or "").strip() for p in seq)
+        return junto.upper() if maiusculas else junto
+
+    if medidor(texto(palavras)) <= teto:
+        return [palavras]
+
+    melhor, menor_desequilibrio = None, None
+    for corte in range(1, len(palavras)):
+        a, b = palavras[:corte], palavras[corte:]
+        la, lb = medidor(texto(a)), medidor(texto(b))
+        if la > teto or lb > teto:
+            continue
+        desequilibrio = abs(la - lb)
+        if menor_desequilibrio is None or desequilibrio < menor_desequilibrio:
+            melhor, menor_desequilibrio = corte, desequilibrio
+
+    if melhor is None:
+        # Nenhum corte faz as duas linhas caberem -- uma palavra sozinha mais
+        # larga que a caixa, tipicamente. Uma linha so e melhor do que duas
+        # linhas ambas estourando.
+        return [palavras]
+    return [palavras[:melhor], palavras[melhor:]]
+
+
 def _cabecalho(preset: Preset, largura: int, altura: int) -> str:
     negrito = -1 if preset.negrito else 0
     return f"""\
@@ -237,14 +385,14 @@ YCbCr Matrix: TV.709
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Clip,{preset.fonte},{preset.tamanho},{preset.cor_falada},{preset.cor_por_falar},{preset.cor_contorno},{preset.cor_sombra},{negrito},0,0,0,100,100,{preset.espacamento},0,1,{preset.contorno},{preset.sombra},2,{preset.margem_lateral},{preset.margem_lateral},{preset.margem_inferior},1
+Style: Clip,{preset.fonte},{preset.tamanho},{preset.cor_falada},{preset.cor_por_falar},{preset.cor_contorno},{preset.cor_sombra},{negrito},0,0,0,100,100,{preset.espacamento},0,1,{preset.contorno},{preset.sombra},2,{preset.margem_lateral},{preset.margem_dir},{preset.margem_inferior},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
 
 
-def _bloco_palavra(preset: Preset, k: int, t0_ms: int) -> str:
+def _bloco_palavra(preset: Preset, k: int, t0_ms: int, *, destacar: bool = True) -> str:
     """O bloco de override de UMA palavra: karaoke, pop de escala e cor.
 
     Sem pop o bloco e o da F3, "{\\kNN}". Com pop ele carrega quatro coisas, e
@@ -270,6 +418,22 @@ def _bloco_palavra(preset: Preset, k: int, t0_ms: int) -> str:
     """
     if not preset.tem_pop:
         return "{\\k" + str(k) + "}"
+
+    if not destacar:
+        # Palavra curta demais para merecer o realce. Ela NAO some nem fica
+        # sem karaoke: continua acendendo no tempo certo, direto na cor de
+        # "ja falada". O que se pula e o flash de destaque, e o realce
+        # naturalmente recai na proxima palavra que alcance o limiar.
+        #
+        # A linha de base vai explicita (\\fscx100\\fscy100\\1c) porque
+        # override de ASS vale para todo o texto que vem DEPOIS dele: sem
+        # repor escala e cor aqui, esta palavra herdaria o que a anterior
+        # deixou no ar.
+        return (
+            "{\\k" + str(k)
+            + "\\fscx100\\fscy100\\1c" + preset.cor_falada
+            + "}"
+        )
 
     e = t0_ms + k * 10
     janela = max(10, e - t0_ms)
@@ -330,10 +494,22 @@ def montar_ass(
         medidor=medidor,
         teto=teto,
     )
+    # Piso de palavras DEPOIS do agrupamento, nao dentro dele: agrupar decide
+    # onde a frase quebra, fundir decide se o pedaco resultante e curto demais
+    # para ficar sozinho. Sao duas perguntas diferentes, e misturar as duas na
+    # mesma passada tornaria impossivel dizer qual regra fechou a linha.
+    linhas = fundir_curtos(
+        linhas,
+        minimo=int(preset.min_palavras_linha),
+        maximo=int(preset.max_palavras_linha),
+        gap_maximo=float(preset.gap_maximo_fusao_s),
+    )
 
     eventos: list[str] = []
     menor_k = None
     total_palavras = 0
+    blocos_com_duas_linhas = 0
+    destaques_pulados = 0
 
     for i, linha in enumerate(linhas):
         ini_linha = max(0.0, float(linha[0]["inicio"]) - inicio)
@@ -348,12 +524,26 @@ def montar_ass(
         if fim_linha <= ini_linha:
             fim_linha = min(ini_linha + 0.10, duracao)
 
+        # A segunda linha visual (\N) sai da LARGURA, nunca de gosto. O bloco
+        # continua sendo UM Dialogue: o \N e quebra de linha dentro dele, e o
+        # relogio do karaoke atravessa a quebra sem saber que ela existe.
+        visuais = quebrar_bloco(
+            linha,
+            maiusculas=bool(preset.maiusculas),
+            medidor=medidor,
+            teto=teto,
+            max_linhas=int(preset.max_linhas_bloco),
+        )
+        if len(visuais) > 1:
+            blocos_com_duas_linhas += 1
+
         pedacos: list[str] = []
         # Relogio da linha: o \t de cada palavra e contado do inicio do
         # Dialogue, e a soma dos \k anteriores E esse relogio (em centisegundos
         # convertidos para ms). Recalcular pelo timestamp da palavra abriria
         # uma diferenca de ate um centissegundo por palavra contra o karaoke.
         decorrido_ms = 0
+        limiar = int(preset.destaque_minimo_letras)
         for j, palavra in enumerate(linha):
             comeca = max(0.0, float(palavra["inicio"]) - inicio)
             if j + 1 < len(linha):
@@ -363,16 +553,24 @@ def montar_ass(
             k = _centis(proxima - comeca)
             if menor_k is None or k < menor_k:
                 menor_k = k
-            texto = str(palavra["texto"]).strip()
-            if preset.maiusculas:
-                texto = texto.upper()
-            pedacos.append(_bloco_palavra(preset, k, decorrido_ms) + _escapar(texto))
+            cru = str(palavra["texto"]).strip()
+            texto = cru.upper() if preset.maiusculas else cru
+            destacar = limiar <= 0 or _letras(cru) >= limiar
+            if not destacar and preset.tem_pop:
+                destaques_pulados += 1
+            if j:
+                # Separador ANTES desta palavra: quebra de linha quando ela
+                # abre a segunda linha visual, espaco no resto.
+                pedacos.append("\\N" if j == len(visuais[0]) and len(visuais) > 1 else " ")
+            pedacos.append(
+                _bloco_palavra(preset, k, decorrido_ms, destacar=destacar) + _escapar(texto)
+            )
             decorrido_ms += k * 10
             total_palavras += 1
 
         eventos.append(
             f"Dialogue: 0,{_tempo_ass(ini_linha)},{_tempo_ass(fim_linha)},Clip,,0,0,0,,"
-            + " ".join(pedacos)
+            + "".join(pedacos)
         )
 
     resumo = {
@@ -383,5 +581,10 @@ def montar_ass(
         "pop": int(preset.pop_escala) if preset.tem_pop else 0,
         "quebra": "largura medida" if medidor is not None else "contagem de caracteres",
         "teto_largura": round(teto, 1),
+        "piso_palavras": int(preset.min_palavras_linha),
+        "blocos_duas_linhas": blocos_com_duas_linhas,
+        "destaques_pulados": destaques_pulados,
+        "menor_bloco_palavras": min((len(l) for l in linhas), default=0),
+        "maior_bloco_palavras": max((len(l) for l in linhas), default=0),
     }
     return _cabecalho(preset, largura, altura) + "\n".join(eventos) + "\n", resumo

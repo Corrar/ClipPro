@@ -1368,7 +1368,16 @@ def _renderizar_clipe(
                     "preset sem composição (--preset bold-amarelo)."
                 ),
             )
-        ativos = composicao.gerar_ativos(comp, titulo, saida.trabalho_dir)
+        # O gancho e o novo dono do slot do topo. Ele ja chegava ate aqui --
+        # metadados.json e relatorio.md sempre o carregaram --, so nunca tinha
+        # virado pixel. Quem decide entre gancho e titulo e gerar_ativos(),
+        # pelo `gancho.ativo` do modelo.
+        ativos = composicao.gerar_ativos(
+            comp,
+            titulo,
+            saida.trabalho_dir,
+            gancho=str(clipe.get("gancho_sugerido") or ""),
+        )
         montagem = composicao.montar(
             comp=comp,
             ativos=ativos,

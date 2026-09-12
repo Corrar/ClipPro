@@ -330,8 +330,245 @@ def e_regressao_ass(_: Path) -> None:
             f"{nome}: no cabeçalho, só a linha Style muda (E2)",
             EXCECOES["E2"] if difs_cab else "cabeçalho intacto",
         )
-        confere(True, f"{nome}: blocos mudaram como o E3 prevê",
-                f"{len(la)} -> {len(lb)} linhas")
+        confere(len(lb) <= len(la), f"{nome}: o E3 não criou bloco novo",
+                f"{la.count('') + sum(1 for x in la if x.startswith('Dialogue:'))} -> "
+                f"{sum(1 for x in lb if x.startswith('Dialogue:'))} blocos")
+
+
+def _blocos_do_ass(texto: str) -> list[str]:
+    """Só o campo Text de cada Dialogue.
+
+    O formato tem NOVE vírgulas antes do texto (Layer, Start, End, Style,
+    Name, MarginL, MarginR, MarginV, Effect) e DOIS pares ",," no caminho --
+    depois de Name e depois de Effect. Cortar no primeiro ",," traz "0,0,0,,"
+    junto e infla qualquer contagem feita em cima.
+    """
+    return [
+        l.split(",", 9)[9]
+        for l in texto.splitlines()
+        if l.startswith("Dialogue:") and l.count(",") >= 9
+    ]
+
+
+def _palavras_do_bloco(corpo: str) -> list[str]:
+    """As palavras de um Dialogue, na ordem, sem as chaves de override.
+
+    Cada palavra carrega exatamente um \\k, então a contagem de \\k é o
+    controle independente de que este parser não está inventando palavra.
+    """
+    import re
+
+    palavras = [w for w in re.sub(r"\{[^}]*\}", "\x00", corpo).split("\x00") if w.strip()]
+    assert len(palavras) == corpo.count("\\k"), (
+        f"parser de bloco divergiu da contagem de \\k: "
+        f"{len(palavras)} peça(s) para {corpo.count(chr(92) + 'k')} \\k em {corpo!r}"
+    )
+    return palavras
+
+
+def e_legenda_conformidade(_: Path) -> None:
+    """P1: nenhum bloco passa de 7 palavras nem de 2 linhas. Percorre TODOS."""
+    from clipper.modelo import Modelo
+
+    for nome in MODELOS_COMPOSTOS:
+        preset = Modelo.de_fabrica(nome).legenda
+        blocos = _blocos_do_ass(ass_do_modelo(nome))
+        confere(bool(blocos), f"{nome}: gerou blocos", f"{len(blocos)} blocos")
+
+        piores_palavras = max(len(_palavras_do_bloco(b)) for b in blocos)
+        confere(piores_palavras <= 7, f"{nome}: nenhum bloco passa de 7 palavras",
+                f"maior = {piores_palavras}")
+        confere(piores_palavras <= preset.max_palavras_linha,
+                f"{nome}: o teto do preset continua valendo (o piso não o afrouxou)",
+                f"teto = {preset.max_palavras_linha}, maior = {piores_palavras}")
+
+        piores_linhas = max(b.count("\\N") + 1 for b in blocos)
+        confere(piores_linhas <= 2, f"{nome}: nenhum bloco passa de 2 linhas",
+                f"maior = {piores_linhas}")
+
+        de_uma = [b for b in blocos if len(_palavras_do_bloco(b)) == 1]
+        antes = [b for b in _blocos_do_ass(ler_baseline(f"legenda-{nome}.ass"))
+                 if len(_palavras_do_bloco(b)) == 1]
+        confere(len(de_uma) < len(antes),
+                f"{nome}: o piso reduziu os blocos de uma palavra",
+                f"{len(antes)} -> {len(de_uma)}")
+
+
+def e_legenda_destaque_pula_curtas(_: Path) -> None:
+    """E3: palavra com menos letras que o limiar nunca recebe o realce."""
+    import re
+    import unicodedata
+
+    from clipper.modelo import Modelo
+
+    for nome in MODELOS_COMPOSTOS:
+        preset = Modelo.de_fabrica(nome).legenda
+        limiar = preset.destaque_minimo_letras
+        confere(limiar >= 3, f"{nome}: o limiar de letras está ligado", f"limiar = {limiar}")
+
+        destaque = preset.cor_do_pop
+        faltas, pulados = [], 0
+        for bloco in _blocos_do_ass(ass_do_modelo(nome)):
+            for chaves, palavra in re.findall(r"\{([^}]*)\}([^{]*)", bloco):
+                nu = "".join(c for c in unicodedata.normalize("NFC", palavra) if c.isalpha())
+                tem_destaque = f"\\1c{destaque}" in chaves
+                if len(nu) < limiar and tem_destaque:
+                    faltas.append(palavra.strip())
+                elif len(nu) < limiar:
+                    pulados += 1
+        confere(not faltas, f"{nome}: nenhuma palavra curta recebe destaque",
+                f"{pulados} puladas" if not faltas else f"falhas: {faltas}")
+
+    # O caso que o Bruno viu no MP4: "É A PRIMEIRA" com o A amarelo.
+    antes = ler_baseline("legenda-cortes.ass")
+    agora = ass_do_modelo("cortes")
+    alvo = "&H0000E5FF&"
+    confere(f"\\1c{alvo}" in antes.split("PRIMEIRA")[0].split("}É")[0],
+            "o baseline realmente continha o defeito (É com destaque)")
+    confere("}É" not in agora or f"\\1c{alvo}" not in agora.split("}É")[0].split("{")[-1],
+            "o defeito do 'É' amarelo não sobrevive")
+
+
+def e_legenda_guarda_de_lacuna(_: Path) -> None:
+    """E3: o piso não funde através de pausa longa, mesmo ficando curto."""
+    import dataclasses
+
+    from clipper import legendas as L
+    from clipper.modelo import Modelo
+
+    preset = Modelo.de_fabrica("cortes").legenda
+
+    # Caso ISOLADO: dois blocos de uma palavra, separados por 2s. O teto (3)
+    # permite a fusão de sobra, então só a guarda pode impedi-la. Medir isso
+    # na fixture inteira não serviria: lá o teto bloqueia antes da guarda, e a
+    # prova passaria sem nunca exercitar a regra que diz testar.
+    curto = [
+        [{"texto": "Sim.", "inicio": 0.0, "fim": 0.4}],
+        [{"texto": "Claro.", "inicio": 2.4, "fim": 2.9}],
+    ]
+    com = L.fundir_curtos(curto, minimo=3, maximo=3, gap_maximo=1.2)
+    sem = L.fundir_curtos(curto, minimo=3, maximo=3, gap_maximo=999.0)
+    confere(len(com) == 2, "com a guarda, a pausa de 2,0 s impede a fusão",
+            "os dois blocos ficam curtos, de propósito")
+    confere(len(sem) == 1, "sem a guarda, os mesmos dois blocos se fundiriam",
+            "a guarda é o que faz a diferença, não o teto")
+
+    perto = [
+        [{"texto": "Sim.", "inicio": 0.0, "fim": 0.4}],
+        [{"texto": "Claro.", "inicio": 0.9, "fim": 1.4}],
+    ]
+    confere(len(L.fundir_curtos(perto, minimo=3, maximo=3, gap_maximo=1.2)) == 1,
+            "pausa curta (0,5 s) não impede a fusão")
+
+    teto = [
+        [{"texto": "Sim.", "inicio": 0.0, "fim": 0.4}],
+        [{"texto": "a", "inicio": 0.5, "fim": 0.6},
+         {"texto": "b", "inicio": 0.7, "fim": 0.8},
+         {"texto": "c", "inicio": 0.9, "fim": 1.0}],
+    ]
+    confere(len(L.fundir_curtos(teto, minimo=3, maximo=3, gap_maximo=1.2)) == 2,
+            "o teto também pode deixar o bloco curto, e isso é permitido",
+            "1+3 = 4 passaria do teto 3")
+
+    # E na fixture real: nenhum bloco pode ter atravessado pausa longa.
+    fx = palavras_sinteticas()
+    cru = L.agrupar_linhas(fx["palavras"], max_palavras=preset.max_palavras_linha,
+                           max_caracteres=preset.max_caracteres_linha)
+    final = L.fundir_curtos(cru, minimo=preset.min_palavras_linha,
+                            maximo=preset.max_palavras_linha,
+                            gap_maximo=preset.gap_maximo_fusao_s)
+    travessias = sum(
+        1 for b in final
+        for i in range(len(b) - 1)
+        if float(b[i + 1]["inicio"]) - float(b[i]["fim"]) > preset.gap_maximo_fusao_s
+    )
+    confere(travessias == 0, "na fixture, nenhum bloco atravessa pausa longa",
+            f"gap máximo = {preset.gap_maximo_fusao_s}s")
+    confere(all(len(b) <= preset.max_palavras_linha for b in final),
+            "o teto continua respeitado depois da fusão",
+            f"maior = {max(len(b) for b in final)}, teto = {preset.max_palavras_linha}")
+
+
+def e_legenda_segunda_linha_por_largura(_: Path) -> None:
+    """E3: o \\N nasce da largura e só dela.
+
+    Usa um medidor SINTÉTICO (largura = nº de caracteres) porque a fonte real
+    é do Windows e não existe neste sandbox. A prova é da REGRA de quebra; que
+    a fonte real meça o que se espera é prova física.
+    """
+    from clipper import legendas as L
+
+    def medir(texto: str) -> float:
+        return float(len(texto))
+
+    palavras = [{"texto": p, "inicio": i * 0.4, "fim": i * 0.4 + 0.3}
+                for i, p in enumerate(["alpha", "bravo", "charlie"])]
+
+    uma = L.quebrar_bloco(palavras, maiusculas=False, medidor=medir, teto=100.0, max_linhas=2)
+    confere(len(uma) == 1, "cabendo na largura, o bloco fica em uma linha só")
+
+    duas = L.quebrar_bloco(palavras, maiusculas=False, medidor=medir, teto=14.0, max_linhas=2)
+    confere(len(duas) == 2, "estourando a largura, nasce a segunda linha")
+    confere(sum(len(l) for l in duas) == len(palavras), "nenhuma palavra se perde na quebra")
+    confere([p["texto"] for l in duas for p in l] == ["alpha", "bravo", "charlie"],
+            "a ordem das palavras sobrevive")
+
+    sem_medidor = L.quebrar_bloco(palavras, maiusculas=False, medidor=None, teto=0.0, max_linhas=2)
+    confere(len(sem_medidor) == 1, "sem medidor não há quebra (comportamento da F4a)")
+
+    gigante = [{"texto": "x" * 80, "inicio": 0.0, "fim": 0.4}]
+    confere(len(L.quebrar_bloco(gigante, maiusculas=False, medidor=medir,
+                                teto=10.0, max_linhas=2)) == 1,
+            "palavra sozinha maior que a caixa não vira duas linhas estouradas")
+
+
+def e_gancho_no_filtergraph(_: Path) -> None:
+    """E1: o gancho tem recorte temporal, fade de saída e Y na zona segura."""
+    from clipper.modelo import Modelo
+
+    for nome in MODELOS_COMPOSTOS:
+        c = Modelo.de_fabrica(nome).composicao
+        g = filtergraph(c)
+
+        confere(c.gancho_ativo, f"{nome}: o gancho é o padrão (a substituição, não o escape)")
+        confere(f"enable='between(t,0,{c.gancho_duracao_s:g})'" in g,
+                f"{nome}: o overlay tem enable entre 0 e a duração",
+                f"{c.gancho_duracao_s:g}s")
+        confere(2.5 <= c.gancho_duracao_s <= 3.0, f"{nome}: duração na faixa pedida",
+                f"{c.gancho_duracao_s:g}s")
+        ramo = next(e for e in g.split(";") if e.endswith("[pilula]"))
+        confere("fade=t=out" in ramo and ":d=0:" not in ramo,
+                f"{nome}: fade de saída no ramo da pílula, nunca com d=0",
+                "guarda do fade (composicao.py:1113)")
+        confere(c.gancho_y >= c.zona_topo,
+                f"{nome}: o gancho começa dentro da zona segura",
+                f"y={c.gancho_y} >= topo={c.zona_topo}")
+        confere(f"y='{c.gancho_y}+" in g, f"{nome}: o Y da zona segura chegou ao grafo")
+        confere("pow(1-min(t/" in g, f"{nome}: a animação de entrada foi mantida")
+
+
+def e_gancho_escape_restaura_titulo(_: Path) -> None:
+    """E1: desligar gancho.ativo devolve exatamente a caixa permanente."""
+    import json
+
+    from clipper.modelo import Modelo
+
+    for nome in MODELOS_COMPOSTOS:
+        fonte = Modelo.de_fabrica(nome).para_json()
+        fonte["composicao"]["gancho"]["ativo"] = False
+        escape = Modelo.de_dict(fonte, nome)
+
+        g = filtergraph(escape.composicao)
+        ramo = next(e for e in g.split(";") if e.endswith("[pilula]"))
+        confere("enable='between" not in g, f"{nome}: sem gancho, sem recorte temporal")
+        confere("fade=t=out" not in ramo,
+                f"{nome}: sem gancho, sem fade de saída no ramo da pílula",
+                "o fade=t=out da cauda é do clipe, não da pílula")
+
+        antes = ler_baseline(f"filtergraph-{nome}.txt").replace(";\n", ";").strip()
+        confere(g == antes,
+                f"{nome}: o escape devolve o filtergraph do baseline, byte a byte",
+                "a caixa permanente de título volta inteira")
 
 
 def e_modelo_sem_composicao(_: Path) -> None:
@@ -365,6 +602,81 @@ def f_clipe_curto_gera(_: Path) -> None:
             f"{float(info.duracao):.2f}s")
 
 
+def f_gancho_no_frame(raiz: Path) -> None:
+    """P1 FÍSICA: o gancho aparece em t=1 s e sumiu em t=4 s.
+
+    Renderiza um clipe curto com o modelo `cortes`, extrai os dois frames e
+    mede a banda do topo. Não compara com imagem de referência -- compara o
+    clipe COM ELE MESMO em dois instantes, que é o que a regra afirma: a
+    faixa do gancho muda, o resto do quadro não.
+
+    Os dois PNG ficam em disco para inspeção do Bruno; o caminho sai no fim.
+    """
+    from clipper import composicao as C
+    from clipper import ffmpeg_utils
+    from clipper.modelo import Modelo
+
+    sys.path.insert(0, str(RAIZ / "provas"))
+    from provas.gerar_clipe_curto import DESTINO_PADRAO, gerar
+
+    fonte = DESTINO_PADRAO if DESTINO_PADRAO.is_file() else gerar(DESTINO_PADRAO, 40.0)
+    trabalho = raiz / "_trabalho"
+    trabalho.mkdir(parents=True, exist_ok=True)
+
+    modelo = Modelo.de_fabrica("cortes")
+    comp = modelo.composicao
+    gancho = "ELE NÃO FAZIA IDEIA DO QUE VINHA DEPOIS"
+
+    ativos = C.gerar_ativos(comp, "Título que não deve aparecer", trabalho, gancho=gancho)
+    confere(ativos.get("pilula") is not None, "a pílula foi desenhada a partir do gancho")
+
+    info = ffmpeg_utils.sondar(fonte)
+    montagem = C.montar(
+        comp=comp, ativos=ativos,
+        recorte={"largura": 405, "altura": 720, "x": 437, "y": 0},
+        duracao=10.0, fps=info.fps_fracao or "30/1",
+        punches=[], filtro_legenda=None, tem_audio=info.tem_audio, pitch=False,
+    )
+    clipe = raiz / "gancho.mp4"
+    args = ["-ss", "2.000", "-t", "10.000", "-i", str(fonte)]
+    args += montagem.entradas
+    args += ["-filter_complex", montagem.filtro, "-map", montagem.rotulo_video]
+    if montagem.rotulo_audio:
+        args += ["-map", montagem.rotulo_audio]
+    args += ["-t", "10.000", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+             "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-y", str(clipe)]
+    ffmpeg_utils.rodar(args, descricao="render do clipe de prova do gancho", timeout=300.0)
+    confere(clipe.is_file() and clipe.stat().st_size > 0, "o clipe de prova foi renderizado")
+
+    frames = {}
+    for rotulo, ts in (("t1", 1.0), ("t4", 4.0)):
+        destino = raiz / f"gancho-{rotulo}.png"
+        ffmpeg_utils.rodar(
+            ["-ss", f"{ts:.3f}", "-i", str(clipe), "-frames:v", "1", "-y", str(destino)],
+            descricao=f"frame em t={ts:g}s", timeout=120.0,
+        )
+        frames[rotulo] = destino
+        confere(destino.is_file(), f"frame extraído em t={ts:g}s", str(destino))
+
+    from PIL import Image, ImageChops, ImageStat
+
+    a = Image.open(frames["t1"]).convert("L")
+    b = Image.open(frames["t4"]).convert("L")
+    topo = (0, comp.gancho_y, C.LARGURA_SAIDA, comp.gancho_y + int(ativos["pilula"]["altura"]))
+    # Banda de controle: no meio do cartão, longe do gancho e da legenda.
+    meio = (0, 900, C.LARGURA_SAIDA, 1000)
+
+    d_topo = ImageStat.Stat(ImageChops.difference(a.crop(topo), b.crop(topo))).mean[0]
+    d_meio = ImageStat.Stat(ImageChops.difference(a.crop(meio), b.crop(meio))).mean[0]
+
+    confere(d_topo > 6.0, "a faixa do gancho muda entre t=1 s e t=4 s",
+            f"diferença média {d_topo:.1f}")
+    confere(d_topo > d_meio * 2.0,
+            "a mudança está no topo, não no quadro inteiro",
+            f"topo {d_topo:.1f} x meio {d_meio:.1f}")
+    print(f"    >>> frames para inspeção: {frames['t1']}  e  {frames['t4']}")
+
+
 # ==========================================================================
 # Registro
 # ==========================================================================
@@ -376,10 +688,17 @@ ESTRUTURAIS: dict[str, tuple[str, Callable[[Path], None]]] = {
     "E-M4": ("Emenda 1: preset sem composição segue no caminho F3", e_modelo_sem_composicao),
     "E-R1": ("Regressão: filtergraph x baseline 12fc1e2b (delta só em E1)", e_regressao_filtergraph),
     "E-R2": ("Regressão: .ass x baseline 12fc1e2b (delta só em E2/E3)", e_regressao_ass),
+    "E-L1": ("E3: conformidade — ≤7 palavras e ≤2 linhas em TODOS os blocos", e_legenda_conformidade),
+    "E-L2": ("E3: destaque nunca cai em palavra de ≤2 letras", e_legenda_destaque_pula_curtas),
+    "E-L3": ("E3: a guarda de lacuna impede fusão através de pausa longa", e_legenda_guarda_de_lacuna),
+    "E-L4": ("E3: a segunda linha (\\N) nasce da largura e só dela", e_legenda_segunda_linha_por_largura),
+    "E-G1": ("E1: gancho com enable, fade de saída e Y na zona segura", e_gancho_no_filtergraph),
+    "E-G2": ("E1: o escape devolve a caixa permanente de título", e_gancho_escape_restaura_titulo),
 }
 
 FISICAS: dict[str, tuple[str, Callable[[Path], None]]] = {
     "F-G1": ("Gerador lavfi produz clipe sondável", f_clipe_curto_gera),
+    "F-G2": ("E1 física: gancho visível em t=1 s e ausente em t=4 s", f_gancho_no_frame),
 }
 
 

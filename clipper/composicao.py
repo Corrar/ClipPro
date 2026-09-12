@@ -63,7 +63,13 @@ ALTURA_SAIDA = 1920
 #   1 -- primeira versao da composicao (F4a).
 #   2 -- pilula, acento e fio do cartao passam a ser desenhados com antialias;
 #        o pop da legenda passa a ser proporcional a duracao da palavra.
-VERSAO = 2
+#   3 -- F6: o slot do topo troca de dono (titulo permanente -> gancho com
+#        recorte temporal), a legenda ganha piso de palavras com guarda de
+#        lacuna, e o destaque passa a pular palavra curta. Bump DELIBERADO:
+#        o resultado muda para os MESMOS parametros, entao todo clipe ja
+#        gravado e refeito uma vez -- de proposito, nao por efeito colateral
+#        de ter somado campo ao dataclass.
+VERSAO = 3
 
 # Fontes do Windows por nome de familia. A tabela cobre o que os presets usam;
 # o que nao estiver aqui ainda e procurado na pasta de fontes do sistema.
@@ -189,6 +195,18 @@ class Composicao:
     titulo_acento_altura: int
     titulo_acento_gap: int
 
+    # gancho: o slot do topo com recorte temporal (F6)
+    gancho_ativo: bool
+    gancho_duracao_s: float
+    gancho_fade_saida_s: float
+    gancho_y: int
+
+    # zona segura da UI do Shorts. Os numeros saem da interface do app
+    # (coluna de botoes a direita, descricao e handle na base) e sao
+    # AJUSTAVEIS: quando a UI mudar, muda-se aqui, nao no codigo que desenha.
+    zona_topo: int
+    zona_base: int
+
     # barra de progresso
     progresso_ativo: bool
     progresso_altura: int
@@ -299,6 +317,14 @@ def de_preset(dados: Any, nome: str) -> Composicao | None:
     # o valor impossivel e aparado, nao repassado.
     progresso_recuo = max(0, min(int(_num(comp, "progresso.recuo", 40)), (largura - 40) // 2))
 
+    # Zona segura da UI do Shorts, em pixels do canvas 1080x1920. 180 no topo
+    # cobre a faixa onde o app desenha o proprio cabecalho; 1420 na base deixa
+    # livres os ~26% de baixo, onde ficam descricao e handle. Os dois sao
+    # PARAMETROS: a UI do app muda com o tempo, e quando mudar troca-se o
+    # numero no modelo, sem tocar em quem desenha.
+    zona_topo = max(0, int(_num(comp, "zona_segura.topo", 180)))
+    zona_base = min(ALTURA_SAIDA, int(_num(comp, "zona_segura.base", 1420)))
+
     return Composicao(
         nome=nome,
         cartao_largura=largura,
@@ -343,6 +369,16 @@ def de_preset(dados: Any, nome: str) -> Composicao | None:
         titulo_acento_largura=int(_num(comp, "titulo.acento_largura", 8)),
         titulo_acento_altura=int(_num(comp, "titulo.acento_altura", 44)),
         titulo_acento_gap=int(_num(comp, "titulo.acento_gap", 22)),
+        gancho_ativo=_flag(comp, "gancho.ativo", False),
+        gancho_duracao_s=max(0.5, _num(comp, "gancho.duracao_s", 3.0)),
+        gancho_fade_saida_s=max(0.0, _num(comp, "gancho.fade_saida_s", 0.4)),
+        # O piso do topo e aplicado AQUI, no carregamento, e nao na hora de
+        # desenhar: um preset que peca y=64 para o gancho recebe 180 e o
+        # filtergraph ja nasce dentro da zona segura. Aparar no carregador e
+        # o que faz a regra valer para todo modelo futuro de graca.
+        gancho_y=max(zona_topo, int(_num(comp, "gancho.y", zona_topo))),
+        zona_topo=zona_topo,
+        zona_base=zona_base,
         progresso_ativo=_flag(comp, "progresso.ativo", True),
         progresso_altura=progresso_altura,
         progresso_recuo=progresso_recuo,
@@ -875,7 +911,9 @@ def pilula_titulo(comp: Composicao, titulo: str, destino: Path) -> dict[str, Any
     }
 
 
-def gerar_ativos(comp: Composicao, titulo: str, trabalho: Path) -> dict[str, Any]:
+def gerar_ativos(
+    comp: Composicao, titulo: str, trabalho: Path, *, gancho: str = ""
+) -> dict[str, Any]:
     """Gera (ou reaproveita) os PNG desta composicao e devolve os caminhos.
 
     Os arquivos levam no nome a marca de DESENHO -- o hash so dos campos que
@@ -906,10 +944,22 @@ def gerar_ativos(comp: Composicao, titulo: str, trabalho: Path) -> dict[str, Any
             if _na_frente_do_cartao(comp, frente) is None:
                 frente = None  # type: ignore[assignment]
 
+        # De quem e o slot do topo. Com o gancho ligado ele e o dono e o
+        # titulo NAO aparece em pixel nenhum -- vive no nome do arquivo, em
+        # metadados.json e no relatorio. Desligar `gancho.ativo` devolve a
+        # caixa permanente de titulo, e e esse o escape.
         pilula = None
-        if comp.titulo_ativo and str(titulo or "").strip():
-            alvo = trabalho / f"titulo_{marca}_{_marca_texto(titulo)}.png"
-            pilula = pilula_titulo(comp, titulo, alvo)
+        texto_do_topo = ""
+        if comp.gancho_ativo:
+            # Sem gancho escrito o topo fica LIMPO. Cair de volta no titulo
+            # aqui ressuscitaria a caixa permanente justamente no clipe em
+            # que o modelo nao entregou gancho -- o oposto do pedido.
+            texto_do_topo = str(gancho or "").strip()
+        elif comp.titulo_ativo:
+            texto_do_topo = str(titulo or "").strip()
+        if texto_do_topo:
+            alvo = trabalho / f"titulo_{marca}_{_marca_texto(texto_do_topo)}.png"
+            pilula = pilula_titulo(comp, texto_do_topo, alvo)
         _limpar_ativos_antigos(trabalho, marca)
     except ImportError as exc:  # Pillow ausente
         raise ErroRender(
@@ -1104,7 +1154,9 @@ def montar(
 
     if "pilula" in indices:
         p = ativos["pilula"]
-        alvo_y = comp.titulo_y
+        # O gancho mora mais abaixo que a caixa de titulo morava: o topo do
+        # canvas pertence a UI do Shorts, e a pilula em y=64 caia dentro dela.
+        alvo_y = comp.gancho_y if comp.gancho_ativo else comp.titulo_y
         desloca = -(int(p["altura"]) + alvo_y)
         if comp.titulo_alinhamento == "esquerda":
             px = str(comp.titulo_x)
@@ -1116,14 +1168,34 @@ def montar(
         ramo = ["format=rgba"]
         if comp.titulo_fade_s > 0:
             ramo.append(f"fade=t=in:st=0:d={comp.titulo_fade_s:g}:alpha=1")
+        if comp.gancho_ativo and comp.gancho_fade_saida_s > 0:
+            # Mesma guarda do fade de entrada, pelo mesmo motivo: 'fade' com
+            # d=0 nao e desligado, cai no padrao de 25 QUADROS. O 'st' nunca
+            # e negativo -- gancho mais curto que o proprio fade sairia
+            # desbotando antes de aparecer.
+            saida = min(float(comp.gancho_fade_saida_s), float(comp.gancho_duracao_s))
+            ramo.append(
+                f"fade=t=out:st={max(0.0, comp.gancho_duracao_s - saida):.3f}"
+                f":d={saida:g}:alpha=1"
+            )
         partes.append(f"[{indices['pilula']}:v]" + ",".join(ramo) + "[pilula]")
         # format=yuv420 explicito, nunca o 'auto' padrao: com 'auto' o overlay
         # negocia um formato intermediario e faz o quadro INTEIRO dar uma volta
         # de croma -- 1,6 milhao de pixels alterados fora da pilula e +23% de
         # tempo de render, medidos. Vale para TODO overlay deste grafo.
+        # 'enable' corta o overlay inteiro depois do gancho: passado o
+        # recorte, o topo fica limpo E o ffmpeg para de compor a camada.
+        # Sem ele a pilula ficaria ate o ultimo frame, que e o que a F4a
+        # fazia e o que esta troca existe para desfazer.
+        recorte_temporal = (
+            f":enable='between(t,0,{comp.gancho_duracao_s:g})'"
+            if comp.gancho_ativo
+            else ""
+        )
         partes.append(
             f"[{ultimo}][pilula]overlay=x={px}:"
-            f"y='{alvo_y}+({desloca})*pow(1-min(t/{max(0.01, comp.titulo_deslize_s):g},1),3)':"
+            f"y='{alvo_y}+({desloca})*pow(1-min(t/{max(0.01, comp.titulo_deslize_s):g},1),3)'"
+            f"{recorte_temporal}:"
             "format=yuv420[compt]"
         )
         ultimo = "compt"
