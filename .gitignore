@@ -13,6 +13,13 @@ _teste/
 # fica na raiz e seria sobrescrita pelo proximo. Vive junto do out/.
 resposta*.json
 
+# EXCECAO (CLIP-F6 / Emenda 2): as fixtures de prova SAO versionadas de
+# proposito -- prova de regressao nao pode depender de diretorio ignorado.
+# A regra acima nao tem barra inicial, entao casava em QUALQUER profundidade
+# e engolia a fixture em silencio: 'git add' nao reportava erro nenhum, e o
+# buraco so apareceria na proxima maquina, com a prova falhando sem motivo.
+!provas/fixtures/**/resposta*.json
+
 # nunca versionar segredos
 .env
 *.key
