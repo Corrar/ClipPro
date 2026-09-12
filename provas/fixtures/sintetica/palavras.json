@@ -1,0 +1,128 @@
+{
+  "_comentario": "Transcricao SINTETICA e deterministica, desenhada para exercitar as regras da F6: palavra de <=2 letras, bloco de uma palavra so, lacuna longa entre blocos e palavra longa demais para a largura. Nao veio de video nenhum -- a fixture real do job vive em provas/fixtures/wetyO2gOOeU/.",
+  "idioma": "pt",
+  "inicio": 3.0,
+  "fim": 14.48,
+  "palavras": [
+    {
+      "texto": "É",
+      "inicio": 3.0,
+      "fim": 3.22
+    },
+    {
+      "texto": "a",
+      "inicio": 3.24,
+      "fim": 3.42
+    },
+    {
+      "texto": "primeira",
+      "inicio": 3.44,
+      "fim": 3.9
+    },
+    {
+      "texto": "vez",
+      "inicio": 3.94,
+      "fim": 4.24
+    },
+    {
+      "texto": "que",
+      "inicio": 4.27,
+      "fim": 4.47
+    },
+    {
+      "texto": "eu",
+      "inicio": 4.49,
+      "fim": 4.67
+    },
+    {
+      "texto": "vejo",
+      "inicio": 4.69,
+      "fim": 5.03
+    },
+    {
+      "texto": "isso.",
+      "inicio": 5.06,
+      "fim": 5.46
+    },
+    {
+      "texto": "Sim.",
+      "inicio": 5.81,
+      "fim": 6.23
+    },
+    {
+      "texto": "Agora",
+      "inicio": 8.03,
+      "fim": 8.43
+    },
+    {
+      "texto": "olha",
+      "inicio": 8.47,
+      "fim": 8.79
+    },
+    {
+      "texto": "o",
+      "inicio": 8.82,
+      "fim": 8.96
+    },
+    {
+      "texto": "que",
+      "inicio": 8.98,
+      "fim": 9.18
+    },
+    {
+      "texto": "aconteceu",
+      "inicio": 9.2,
+      "fim": 9.76
+    },
+    {
+      "texto": "de",
+      "inicio": 10.06,
+      "fim": 10.24
+    },
+    {
+      "texto": "um",
+      "inicio": 10.26,
+      "fim": 10.44
+    },
+    {
+      "texto": "jeito",
+      "inicio": 10.46,
+      "fim": 10.78
+    },
+    {
+      "texto": "extraordinariamente",
+      "inicio": 10.81,
+      "fim": 11.73
+    },
+    {
+      "texto": "simples.",
+      "inicio": 11.77,
+      "fim": 12.29
+    },
+    {
+      "texto": "Não.",
+      "inicio": 12.69,
+      "fim": 13.07
+    },
+    {
+      "texto": "Olha",
+      "inicio": 13.13,
+      "fim": 13.47
+    },
+    {
+      "texto": "só",
+      "inicio": 13.5,
+      "fim": 13.76
+    },
+    {
+      "texto": "isso",
+      "inicio": 13.79,
+      "fim": 14.09
+    },
+    {
+      "texto": "aqui.",
+      "inicio": 14.12,
+      "fim": 14.48
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+[Script Info]
+; Gerado pelo ClipPro -- legenda karaoke palavra a palavra.
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+WrapStyle: 2
+ScaledBorderAndShadow: yes
+YCbCr Matrix: TV.709
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Clip,Segoe UI Black,84,&H00E3EDF2&,&H007C888E&,&H00090B0D&,&H8C000000&,0,0,0,0,100,100,0,0,1,2,3,2,171,171,450,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:00.94,Clip,,0,0,0,,{\k24\fscx100\fscy100\1c&H004AC2FF&\t(0,72,\fscx112\fscy112)\t(72,144,\fscx100\fscy100)\t(168,240,\1c&H00E3EDF2&)}É {\k20\fscx100\fscy100\1c&H004AC2FF&\t(240,300,\fscx112\fscy112)\t(300,360,\fscx100\fscy100)\t(380,440,\1c&H00E3EDF2&)}a {\k50\fscx100\fscy100\1c&H004AC2FF&\t(440,530,\fscx112\fscy112)\t(530,650,\fscx100\fscy100)\t(850,940,\1c&H00E3EDF2&)}primeira
+Dialogue: 0,0:00:00.94,0:00:01.69,Clip,,0,0,0,,{\k33\fscx100\fscy100\1c&H004AC2FF&\t(0,90,\fscx112\fscy112)\t(90,189,\fscx100\fscy100)\t(240,330,\1c&H00E3EDF2&)}vez {\k22\fscx100\fscy100\1c&H004AC2FF&\t(330,396,\fscx112\fscy112)\t(396,462,\fscx100\fscy100)\t(484,550,\1c&H00E3EDF2&)}que {\k20\fscx100\fscy100\1c&H004AC2FF&\t(550,610,\fscx112\fscy112)\t(610,670,\fscx100\fscy100)\t(690,750,\1c&H00E3EDF2&)}eu
+Dialogue: 0,0:00:01.69,0:00:02.81,Clip,,0,0,0,,{\k37\fscx100\fscy100\1c&H004AC2FF&\t(0,90,\fscx112\fscy112)\t(90,201,\fscx100\fscy100)\t(280,370,\1c&H00E3EDF2&)}vejo {\k75\fscx100\fscy100\1c&H004AC2FF&\t(370,460,\fscx112\fscy112)\t(460,580,\fscx100\fscy100)\t(1030,1120,\1c&H00E3EDF2&)}isso.
+Dialogue: 0,0:00:02.81,0:00:03.58,Clip,,0,0,0,,{\k77\fscx100\fscy100\1c&H004AC2FF&\t(0,90,\fscx112\fscy112)\t(90,210,\fscx100\fscy100)\t(680,770,\1c&H00E3EDF2&)}Sim.
+Dialogue: 0,0:00:05.03,0:00:05.98,Clip,,0,0,0,,{\k44\fscx100\fscy100\1c&H004AC2FF&\t(0,90,\fscx112\fscy112)\t(90,210,\fscx100\fscy100)\t(350,440,\1c&H00E3EDF2&)}Agora {\k35\fscx100\fscy100\1c&H004AC2FF&\t(440,530,\fscx112\fscy112)\t(530,635,\fscx100\fscy100)\t(700,790,\1c&H00E3EDF2&)}olha {\k16\fscx100\fscy100\1c&H004AC2FF&\t(790,838,\fscx112\fscy112)\t(838,886,\fscx100\fscy100)\t(902,950,\1c&H00E3EDF2&)}o
+Dialogue: 0,0:00:05.98,0:00:07.06,Clip,,0,0,0,,{\k22\fscx100\fscy100\1c&H004AC2FF&\t(0,66,\fscx112\fscy112)\t(66,132,\fscx100\fscy100)\t(154,220,\1c&H00E3EDF2&)}que {\k86\fscx100\fscy100\1c&H004AC2FF&\t(220,310,\fscx112\fscy112)\t(310,430,\fscx100\fscy100)\t(990,1080,\1c&H00E3EDF2&)}aconteceu
+Dialogue: 0,0:00:07.06,0:00:07.81,Clip,,0,0,0,,{\k20\fscx100\fscy100\1c&H004AC2FF&\t(0,60,\fscx112\fscy112)\t(60,120,\fscx100\fscy100)\t(140,200,\1c&H00E3EDF2&)}de {\k20\fscx100\fscy100\1c&H004AC2FF&\t(200,260,\fscx112\fscy112)\t(260,320,\fscx100\fscy100)\t(340,400,\1c&H00E3EDF2&)}um {\k35\fscx100\fscy100\1c&H004AC2FF&\t(400,490,\fscx112\fscy112)\t(490,595,\fscx100\fscy100)\t(660,750,\1c&H00E3EDF2&)}jeito
+Dialogue: 0,0:00:07.81,0:00:08.77,Clip,,0,0,0,,{\k96\fscx100\fscy100\1c&H004AC2FF&\t(0,90,\fscx112\fscy112)\t(90,210,\fscx100\fscy100)\t(870,960,\1c&H00E3EDF2&)}extraordinariamente
+Dialogue: 0,0:00:08.77,0:00:09.64,Clip,,0,0,0,,{\k87\fscx100\fscy100\1c&H004AC2FF&\t(0,90,\fscx112\fscy112)\t(90,210,\fscx100\fscy100)\t(780,870,\1c&H00E3EDF2&)}simples.
+Dialogue: 0,0:00:09.69,0:00:10.13,Clip,,0,0,0,,{\k44\fscx100\fscy100\1c&H004AC2FF&\t(0,90,\fscx112\fscy112)\t(90,210,\fscx100\fscy100)\t(350,440,\1c&H00E3EDF2&)}Não.
+Dialogue: 0,0:00:10.13,0:00:11.12,Clip,,0,0,0,,{\k37\fscx100\fscy100\1c&H004AC2FF&\t(0,90,\fscx112\fscy112)\t(90,201,\fscx100\fscy100)\t(280,370,\1c&H00E3EDF2&)}Olha {\k29\fscx100\fscy100\1c&H004AC2FF&\t(370,457,\fscx112\fscy112)\t(457,544,\fscx100\fscy100)\t(573,660,\1c&H00E3EDF2&)}só {\k33\fscx100\fscy100\1c&H004AC2FF&\t(660,750,\fscx112\fscy112)\t(750,849,\fscx100\fscy100)\t(900,990,\1c&H00E3EDF2&)}isso
+Dialogue: 0,0:00:11.12,0:00:11.48,Clip,,0,0,0,,{\k36\fscx100\fscy100\1c&H004AC2FF&\t(0,90,\fscx112\fscy112)\t(90,198,\fscx100\fscy100)\t(270,360,\1c&H00E3EDF2&)}aqui.
