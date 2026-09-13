@@ -40,6 +40,7 @@ substituir os dois — é um commit.
 | 1.5 | RULINGS DO ARQUITETO — destrava Emenda 1 + P1 | — |
 | 1.6 | CORREÇÃO DO ARQUITETO — ATO 0 | 12/09 |
 | **D1** | **COLAGEM B — triagem do P1 + liberação P2–P4** (§9) | 13/09 |
+| **D2** | **Triagem do relatório final + checklist de merge** (§10) | 13/09 |
 
 **Convenção a partir da D1:** diretivas do arquiteto são **numeradas e
 autossuficientes**. Cada uma é transcrita aqui inteira, como seção própria.
@@ -466,3 +467,82 @@ Conteúdo fixo, do briefing original (1.1), a ser gravado em cada
 - [ ] Título representa o que ocorreu (sem sensacionalismo falso)
 - [ ] Substancialmente diferente dos outros clipes do canal
 ```
+
+
+---
+
+## 10. D2 — triagem do relatório final
+
+Recebida em 13/09. Transcrição verbatim.
+
+```
+D2 — TRIAGEM DO RELATÓRIO FINAL (CLIP-F6)
+
+Primeiro ato: append desta D2 inteira ao docs/lote-clip-f6/RULINGS.md +
+commit [CLIP-F6], conforme a regra vigente.
+
+REGISTROS E VEREDITOS:
+1. Relatório final @ 08ab0c8 ACEITO estruturalmente. 24/24 estruturais
+   registradas. Destaques de qualidade: zero delta na regressão v1 com os
+   presets não-compostos como controle; conclusao ausente = 0 etapas.
+2. As três decisões do executor: APROVADAS — capa.jpg do MP4 renderizado;
+   conserto de sobreposição só v1×v1 (par com v2 reporta sem consertar);
+   conclusao.y = 1040 por medição.
+3. Pergunta 1: SIM — autorizada UMA adição de código: prova estrutural
+   E-C4, vão mínimo ≥ 24 px entre a base da pílula de conclusão e o topo do
+   bloco de legenda, calculado do modelo, nos dois presets compostos. Nada
+   além dela.
+4. Pergunta 2: o bloco de 1 palavra no fim FICA — limite conhecido; o teto
+   não afrouxa.
+5. Pergunta 3: a ressalva de reconstrução FICA como registro histórico.
+   Auditoria encerrada sem discrepância.
+6. acrossfade −15 ms/junção (−30 ms pior caso): aceito, documentado.
+7. Dívidas (geradores duplicados, unificação total dos validadores,
+   CI/LICENSE/pyproject): registradas para lote de higiene futuro.
+
+FALHA DE TRANSPORTE Nº 3 — o prompt v2 não chegou ao arquiteto. Correção
+permanente: gravar o prompt v2 GERADO PELO CÓDIGO (cabeçalho, sem
+transcrição) em docs/lote-clip-f6/prompt-v2.txt, no mesmo commit da E-C4.
+A revisão do arquiteto sobre esse texto é ITEM DE MERGE.
+
+CHECKLIST DE MERGE (nada de merge antes de TODOS):
+[ ] prompt-v2.txt revisado e aprovado pelo arquiteto
+[ ] 6 físicas verdes no Windows do Bruno + inspeção visual dele
+    (conclusão no fim, acima da legenda, sem sobrepor; capa composta 9:16)
+[ ] fixtures reais commitadas + as 2 provas de material real verdes aqui
+[ ] palavra explícita do Bruno
+Pós-merge (registrar): master vira a versão de trabalho; VERSAO 3
+re-renderiza os clipes em cache na primeira passada — esperado.
+
+PARE mantido: além de E-C4 + prompt-v2.txt (um commit), nenhum código.
+```
+
+### 10.1 Checklist de merge — estado
+
+| | Item | Estado |
+|---|---|---|
+| 1 | `prompt-v2.txt` revisado e aprovado pelo arquiteto | **pendente** |
+| 2 | 6 físicas verdes no Windows + inspeção visual do Bruno | **pendente** |
+| 3 | Fixtures reais commitadas + 2 provas de material real verdes | **pendente** |
+| 4 | Palavra explícita do Bruno | **pendente** |
+
+**Nada de merge antes de todos os quatro.**
+
+### 10.2 Pós-merge, a registrar
+
+- `master` vira a versão de trabalho.
+- `VERSAO 3` re-renderiza os clipes em cache na primeira passada — **esperado**,
+  é o bump deliberado do R7.
+
+### 10.3 Falhas de transporte do lote
+
+Três documentos foram dados como enviados sem ter chegado a esta sessão:
+
+| # | Documento | Consequência |
+|---|---|---|
+| 1 | "briefing v2" | Q1–Q6 vieram depois, em 1.5 |
+| 2 | "GOVERNANÇA PERSISTIDA" | `CLAUDE.md` nasceu como reconstrução declarada |
+| 3 | prompt v2 (saída do executor) | corrigido: passa a ser gravado no repo |
+
+A correção da nº 3 vale como padrão: **artefato que o arquiteto precisa
+revisar não viaja só pelo chat — é gravado no branch.**
