@@ -146,9 +146,9 @@ ordem. Os trechos separados existem para REMOVER GORDURA INTERNA:
 Regras do uso:
 
   - só corte gordura se o clipe ficar MELHOR. Na dúvida, use um trecho só.
-  - PRESERVE O SENTIDO E A SEQUÊNCIA. Os trechos entram na ordem em que você
-    os listar, e ela tem que estar em ordem crescente no tempo: colar o fim antes
-    do começo inverte a fala.
+  - PRESERVE O SENTIDO E A SEQUÊNCIA. Os trechos entram colados na ordem em
+    que você os listar, e essa lista tem que estar em ordem crescente no
+    tempo: colar o fim antes do começo inverte a fala.
   - não corte no meio de um raciocínio só para encurtar. O corte tem que ser
     invisível para quem ouve — se a emenda deixar a frase sem pé, não corte.
   - no máximo {max_seg} trechos. Mais que isso deixa de ser limpeza e vira
