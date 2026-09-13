@@ -92,6 +92,12 @@ _CONHECIDAS: dict[str, Any] = {
         "gancho": {
             "__folhas__": ("ativo", "duracao_s", "fade_saida_s", "y"),
         },
+        "conclusao": {
+            "__folhas__": ("duracao_s", "fade_s", "y"),
+        },
+        "juncao": {
+            "__folhas__": ("crossfade_audio_s",),
+        },
         "zona_segura": {
             "__folhas__": ("topo", "base"),
         },

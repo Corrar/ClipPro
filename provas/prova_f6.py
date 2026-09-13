@@ -677,6 +677,614 @@ def f_gancho_no_frame(raiz: Path) -> None:
     print(f"    >>> frames para inspeção: {frames['t1']}  e  {frames['t4']}")
 
 
+
+
+# ==========================================================================
+# P2/P3 — contrato v2, render concatenado e pacote de publicacao
+# ==========================================================================
+
+
+def _cenario():
+    """Transcricao sintetica com frases regulares, para montar casos v2.
+
+    Gerada aqui e nao versionada de proposito: ela nao descreve nenhum video
+    real, so precisa ter fronteiras previsiveis para que cada mordida do
+    validador falhe pelo motivo que a prova quer testar, e nao por acaso.
+    """
+    from clipper.fronteiras import Fronteiras
+
+    # A LACUNA de 60s no meio nao e enfeite: sem ela todo tempo do video tem
+    # uma fronteira a menos de 4s, e a tolerancia de encaixe (15s) absorve
+    # qualquer erro. A mordida "fronteira fora de bloco" so pode ser testada
+    # onde existe um tempo ORFAO -- e silencio longo e onde isso acontece de
+    # verdade num video (intervalo, corte de camera, musica).
+    palavras, t, idx = [], 0.0, 0
+    while t < 400.0:
+        if 180.0 <= t < 240.0:
+            t = 240.0
+        for k in range(6):
+            palavras.append(
+                {"texto": f"p{idx}" + ("." if k == 5 else ""),
+                 "inicio": round(t, 3), "fim": round(t + 0.6, 3)}
+            )
+            t += 0.65
+            idx += 1
+    fr = Fronteiras.de_transcricao({"palavras": palavras, "duracao": round(t, 3)})
+    energia = {"rms_norm": [0.5] * (int(t) + 2), "janela_s": 1.0}
+    return fr, energia
+
+
+_BASE_CLIPE = {
+    "titulo": "Um título",
+    "score_0_10": 8.0,
+    "motivo": "um motivo",
+    "gancho_sugerido": "um gancho",
+}
+
+
+def _clipe_v2(fr, pares):
+    from clipper.fronteiras import mmss
+
+    return {
+        **_BASE_CLIPE,
+        "segmentos": [
+            {"inicio": mmss(fr.frases[a].inicio), "fim": mmss(fr.frases[b].fim)}
+            for a, b in pares
+        ],
+    }
+
+
+def _clipe_v1(fr, a, b):
+    from clipper.fronteiras import mmss
+
+    return {**_BASE_CLIPE, "inicio": mmss(fr.frases[a].inicio), "fim": mmss(fr.frases[b].fim)}
+
+
+def e_v2_valida_passa(_: Path) -> None:
+    """Um clipe v2 bem formado passa, e o span não vira o corte."""
+    from clipper.pipeline import select
+
+    fr, energia = _cenario()
+    ok, probs = select.validar([_clipe_v2(fr, [(0, 3), (20, 24)])], fr, energia, n=5)
+    confere(not probs, "v2 válida passa sem problema", str(probs)[:120])
+    confere(len(ok) == 1, "um clipe aprovado")
+    c = ok[0]
+    soma = sum(s["duracao"] for s in c["segmentos"])
+    span = c["fim"] - c["inicio"]
+    confere(len(c["segmentos"]) == 2, "os dois segmentos sobreviveram")
+    confere(abs(c["duracao"] - soma) < 0.01,
+            "a duração é a SOMA dos segmentos", f"{soma:.1f}s")
+    confere(span > soma + 1.0,
+            "o span é maior que a soma — é span, não o corte",
+            f"span {span:.1f}s x soma {soma:.1f}s")
+
+    esquema = select._para_esquema(1, c)
+    confere("segmentos" in esquema, "o esquema de saída carrega `segmentos`")
+    confere(esquema["span_inicio"] == round(c["inicio"], 3),
+            "o esquema marca o span explicitamente")
+
+
+def e_v2_mordidas(_: Path) -> None:
+    """As 8 mordidas obrigatórias, cada uma com asserção que DISCRIMINA.
+
+    Não basta reprovar: cada caso tem de reprovar pelo motivo certo. Uma prova
+    que só conta problemas passaria com a mensagem errada, e a mensagem é o
+    produto — é ela que diz ao usuário o que consertar.
+    """
+    from clipper.fronteiras import mmss
+    from clipper.pipeline import select
+
+    fr, energia = _cenario()
+
+    def reprova(clipe, marca, descricao):
+        _, probs = select.validar([clipe], fr, energia, n=5)
+        achou = [p for p in probs if marca.lower() in p.lower()]
+        confere(bool(probs), f"{descricao}: reprovou")
+        confere(bool(achou), f"{descricao}: a mensagem discrimina o motivo",
+                (achou[0] if achou else (probs[0] if probs else ""))[:110])
+
+    # 1. fronteira fora de bloco: um tempo no meio da lacuna de silêncio, longe
+    #    de qualquer abertura ou fechamento. Deslocar poucos segundos não serve
+    #    de mordida — a tolerância de encaixe existe justamente para absorver
+    #    isso, e absorveria.
+    torto = _clipe_v2(fr, [(0, 3)])
+    torto["segmentos"][0]["fim"] = mmss(210.0)
+    reprova(torto, "fronteira de frase", "1. fronteira fora de bloco")
+
+    # 2. segmentos fora de ordem
+    reprova(_clipe_v2(fr, [(20, 24), (0, 3)]), "ordem crescente",
+            "2. segmentos fora de ordem")
+
+    # 3. sobreposicao interna
+    reprova(_clipe_v2(fr, [(0, 10), (5, 14)]), "se sobrepõem",
+            "3. sobreposição entre segmentos do mesmo clipe")
+
+    # 4. soma curta demais
+    reprova(_clipe_v2(fr, [(0, 0), (10, 10)]), "somam", "4. soma abaixo de 20s")
+
+    # 5. soma longa demais. Cada segmento tem ~39s -- válido sozinho --, e é a
+    #    SOMA que estoura. Segmentos individualmente longos demais reprovariam
+    #    antes, pelo limite por trecho, e a prova não testaria a regra do total.
+    reprova(_clipe_v2(fr, [(0, 9), (15, 24), (30, 39)]), "somam",
+            "5. soma acima de 90s (cada segmento válido sozinho)")
+
+    # 6. mais de 3 segmentos
+    reprova(_clipe_v2(fr, [(0, 2), (10, 12), (20, 22), (30, 32)]), "máximo é 3",
+            "6. mais de 3 segmentos")
+
+    # 7. inicio/fim junto com segmentos
+    hibrido = _clipe_v2(fr, [(0, 5)])
+    hibrido["inicio"] = mmss(fr.frases[0].inicio)
+    hibrido["fim"] = mmss(fr.frases[5].fim)
+    reprova(hibrido, "UMA das duas formas", "7. inicio/fim junto com segmentos")
+
+    # 8. sobreposicao ENTRE clipes, pela uniao
+    # Os dois têm ~31s cada (dentro do limite) e compartilham material só no
+    # segundo segmento: a reprovação tem de vir da UNIÃO, não da duração.
+    a = _clipe_v2(fr, [(0, 3), (40, 43)])
+    b = _clipe_v2(fr, [(42, 45), (60, 63)])
+    _, probs = select.validar([a, b], fr, energia, n=5)
+    achou = [p for p in probs if "compartilham material" in p]
+    confere(bool(achou), "8. dois clipes que compartilham material são reprovados",
+            achou[0][:110] if achou else str(probs)[:110])
+
+
+def e_v2_uniao_nao_span(_: Path) -> None:
+    """Spans que se cruzam SEM material em comum são aceitos.
+
+    É a razão de a regra ser sobre a união e não sobre o span: dois clipes
+    podem intercalar trechos do mesmo intervalo do vídeo sem dividir um
+    segundo sequer.
+    """
+    from clipper.pipeline import select
+
+    fr, energia = _cenario()
+    a = _clipe_v2(fr, [(0, 5), (60, 65)])     # span 0..65
+    b = _clipe_v2(fr, [(20, 25), (40, 45)])   # span 20..45 — DENTRO do span de a
+    ok, probs = select.validar([a, b], fr, energia, n=5)
+    confere(not probs, "spans aninhados sem material comum passam", str(probs)[:120])
+    confere(len(ok) == 2, "os dois clipes foram aprovados")
+
+    ia = select.intervalos_do_clipe(ok[0])
+    ib = select.intervalos_do_clipe(ok[1])
+    confere(select._cruzam(ia, ib) is None, "as uniões realmente não se tocam")
+    span_a = (ok[0]["inicio"], ok[0]["fim"])
+    span_b = (ok[1]["inicio"], ok[1]["fim"])
+    confere(span_a[0] < span_b[0] and span_b[1] < span_a[1],
+            "e os spans se cruzam de fato — a regra do span teria reprovado",
+            f"{span_a} contém {span_b}")
+
+
+def e_v1_intacto_no_validador(_: Path) -> None:
+    """O contrato v1 continua válido, e sem `segmentos` na saída."""
+    from clipper.pipeline import select
+
+    fr, energia = _cenario()
+    ok, probs = select.validar([_clipe_v1(fr, 0, 7)], fr, energia, n=5)
+    confere(not probs, "v1 passa sem problema", str(probs)[:120])
+    esquema = select._para_esquema(1, ok[0])
+    confere("segmentos" not in esquema,
+            "o esquema do v1 não ganha `segmentos` — contrato byte a byte")
+    confere("span_inicio" not in esquema, "nem span_inicio")
+    confere(esquema["duracao"] == round(esquema["fim"] - esquema["inicio"], 3),
+            "no v1 a duração continua sendo fim - inicio")
+
+
+def e_esquema_api_aceita_v2(_: Path) -> None:
+    """O caminho --api aceita v2 sem afrouxar additionalProperties."""
+    from clipper.pipeline import select
+
+    item = select.ESQUEMA_JSON["properties"]["clipes"]["items"]
+    confere(item["additionalProperties"] is False,
+            "additionalProperties continua False")
+    for campo in ("segmentos", "descricao", "capa_ts", "conclusao"):
+        confere(campo in item["properties"], f"`{campo}` está no esquema da API")
+    seg = item["properties"]["segmentos"]
+    confere(seg["maxItems"] == select.MAX_SEGMENTOS,
+            "o teto de segmentos do esquema é o mesmo do validador",
+            f"{seg['maxItems']}")
+    confere(seg["items"]["additionalProperties"] is False,
+            "um segmento também não aceita campo extra")
+    confere(set(item["required"]) == set(select._CAMPOS_OBRIGATORIOS),
+            "os obrigatórios do esquema não mudaram")
+
+
+def e_conclusao_ausente_grafo_identico(_: Path) -> None:
+    """Sem `conclusao`, o filtergraph é idêntico ao de antes do campo existir."""
+    from clipper.modelo import Modelo
+
+    comp = Modelo.de_fabrica("cortes").composicao
+    sem = filtergraph(comp)
+    confere(sem == ler_baseline("filtergraph-cortes.txt").replace(";\n", ";").strip()
+            or "concl" not in sem,
+            "sem conclusão, nenhuma etapa de conclusão no grafo")
+    confere("[concl]" not in sem, "nenhum rótulo [concl]")
+    confere("compc" not in sem, "nenhum rótulo compc")
+
+    from clipper import composicao as C
+
+    ativos = ativos_falsos()
+    ativos["conclusao"] = {"arquivo": Path("/f/concl.png"), "largura": 700, "altura": 108}
+    com = C.montar(
+        comp=comp, ativos=ativos, recorte=dict(RECORTE_PADRAO), duracao=42.0,
+        fps="30000/1001", punches=(5.0, 12.0), filtro_legenda="subtitles=clipe.ass",
+        tem_audio=True, pitch=False,
+    ).filtro
+    novas = [e for e in com.split(";") if e not in sem.split(";")]
+    de_concl = [e for e in novas if "concl" in e]
+    outras = [e for e in novas if "concl" not in e]
+    confere(len(de_concl) == 2, "a conclusão acrescenta duas etapas",
+            f"{len(de_concl)}")
+    # A terceira diferença é a CAUDA: ela passa a ler de [compc] em vez de
+    # [compt]. Não é etapa nova nem efeito colateral -- é o encadeamento
+    # seguindo o último rótulo, como faz para toda camada opcional do grafo.
+    confere(len(outras) == 1 and outras[0].startswith("[compc]"),
+            "a única outra mudança é a cauda lendo do novo rótulo",
+            outras[0][:60] if outras else "nenhuma")
+    confere(
+        outras[0].replace("[compc]", "[compt]", 1)
+        in sem.split(";"),
+        "e essa cauda é byte a byte a de antes, só com o rótulo trocado",
+    )
+    confere("enable='between(t,40.000,42.000)'" in com,
+            "a conclusão ocupa os últimos 2 s", "duração 42 s")
+    confere(":d=0:" not in com, "nenhum fade com d=0 (a guarda vale para o novo)")
+
+
+def e_concat_v2_no_grafo(_: Path) -> None:
+    """Render v2: concat antes do crop, PNGs renumerados, crossfade no áudio."""
+    from clipper import composicao as C
+    from clipper.modelo import Modelo
+
+    comp = Modelo.de_fabrica("cortes").composicao
+    g = C.montar(
+        comp=comp, ativos=ativos_falsos(), recorte=dict(RECORTE_PADRAO),
+        duracao=35.0, fps="30000/1001", punches=(2.0, 19.0),
+        filtro_legenda="subtitles=c.ass", tem_audio=True, pitch=False,
+        entradas_video=3,
+    ).filtro
+    etapas = g.split(";")
+
+    confere("concat=n=3:v=1:a=0" in g, "os 3 segmentos são concatenados")
+    i_concat = next(i for i, e in enumerate(etapas) if "concat=" in e)
+    i_crop = next(i for i, e in enumerate(etapas) if "crop=" in e)
+    confere(i_concat < i_crop, "o concat vem ANTES do crop",
+            f"etapa {i_concat} < {i_crop}")
+    for i in range(3):
+        confere(f"[{i}:v]setpts=PTS-STARTPTS[s{i}v]" in g,
+                f"segmento {i} tem setpts próprio antes do concat")
+
+    confere("[3:v]format=gray[mk]" in g,
+            "os PNGs foram renumerados a partir de N", "máscara = entrada 3")
+    confere(g.count("acrossfade=") == 2, "duas junções de áudio para 3 segmentos")
+    confere("acrossfade=d=0.015" in g, "crossfade de 15 ms")
+    confere("concat=n=3:v=1:a=1" not in g, "o vídeo corta seco (jump cut), sem fade")
+
+    i_cross = max(i for i, e in enumerate(etapas) if "acrossfade" in e)
+    i_loud = next(i for i, e in enumerate(etapas) if "loudnorm" in e)
+    confere(i_cross < i_loud, "o loudnorm roda no áudio JÁ concatenado",
+            f"etapa {i_cross} < {i_loud}")
+    confere("[aout]" in g, "o ponto de junção [aout] existe (semente F7)")
+
+
+def e_remapeamento_de_tempos(_: Path) -> None:
+    """Punches e legendas saem do tempo da fonte para o do clipe."""
+    from clipper import composicao as C
+    from clipper import legendas as L
+
+    segs = [{"inicio": 10.0, "fim": 30.0}, {"inicio": 100.0, "fim": 115.0}]
+    vivos = C.remapear_tempos([5.0, 12.0, 29.0, 50.0, 101.0, 114.0, 200.0], segs)
+    confere(vivos == [2.0, 19.0, 21.0, 34.0],
+            "punch dentro dos segmentos é remapeado; fora, morre", str(vivos))
+    confere(all(0 <= v <= 35.0 for v in vivos),
+            "nenhum punch cai fora da timeline concatenada")
+
+    palavras = [{"texto": f"p{i}", "inicio": i * 1.0, "fim": i * 1.0 + 0.8}
+                for i in range(140)]
+    novas, total = L.resincronizar(palavras, segs)
+    confere(abs(total - 35.0) < 0.01, "a duração concatenada é a soma", f"{total}s")
+    confere(len(novas) == 35, "só as palavras dos segmentos sobreviveram",
+            f"{len(novas)} de {len(palavras)}")
+    confere(all(0 <= p["inicio"] and p["fim"] <= total + 1e-6 for p in novas),
+            "nenhuma palavra cai fora do clipe")
+    confere(novas == sorted(novas, key=lambda p: p["inicio"]),
+            "as palavras saem em ordem crescente")
+
+
+def e_capa_ts_fora_rejeita(_: Path) -> None:
+    """`capa_ts` fora dos segmentos mantidos é rejeitado na validação."""
+    from clipper.fronteiras import mmss
+    from clipper.pipeline import select
+
+    fr, energia = _cenario()
+
+    dentro = _clipe_v2(fr, [(0, 5), (40, 45)])
+    dentro["capa_ts"] = mmss(fr.frases[2].inicio)
+    ok, probs = select.validar([dentro], fr, energia, n=5)
+    confere(not probs, "capa_ts dentro de um segmento passa", str(probs)[:110])
+    confere("capa_ts" in select._para_esquema(1, ok[0]),
+            "e chega ao esquema de saída")
+
+    fora = _clipe_v2(fr, [(0, 5), (40, 45)])
+    fora["capa_ts"] = mmss(fr.frases[20].inicio)  # na gordura removida
+    _, probs = select.validar([fora], fr, energia, n=5)
+    achou = [p for p in probs if "capa_ts" in p and "fora dos trechos" in p]
+    confere(bool(achou), "capa_ts na gordura removida é rejeitado",
+            achou[0][:110] if achou else str(probs)[:110])
+
+
+def e_opcionais_limites(_: Path) -> None:
+    """descricao e conclusao respeitam os limites de tamanho."""
+    from clipper.pipeline import select
+
+    fr, energia = _cenario()
+
+    longo = _clipe_v1(fr, 0, 7)
+    longo["descricao"] = "x" * (select.MAX_DESCRICAO_CHARS + 1)
+    _, probs = select.validar([longo], fr, energia, n=5)
+    confere(any("descricao" in p and "limite" in p for p in probs),
+            f"descrição acima de {select.MAX_DESCRICAO_CHARS} chars é rejeitada")
+
+    longo2 = _clipe_v1(fr, 0, 7)
+    longo2["conclusao"] = "y" * (select.MAX_CONCLUSAO_CHARS + 1)
+    _, probs = select.validar([longo2], fr, energia, n=5)
+    confere(any("conclusao" in p and str(select.MAX_CONCLUSAO_CHARS) in p for p in probs),
+            f"conclusão acima de {select.MAX_CONCLUSAO_CHARS} chars é rejeitada")
+
+    bom = _clipe_v1(fr, 0, 7)
+    bom["descricao"] = "Uma descrição curta."
+    bom["conclusao"] = "E foi assim."
+    ok, probs = select.validar([bom], fr, energia, n=5)
+    confere(not probs, "dentro do limite, passam", str(probs)[:110])
+    esquema = select._para_esquema(1, ok[0])
+    confere(esquema.get("descricao") == "Uma descrição curta.", "descrição chega à saída")
+    confere(esquema.get("conclusao") == "E foi assim.", "conclusão chega à saída")
+
+
+def e_publicacao_md(_: Path) -> None:
+    """publicacao.md traz título, descrição, gancho e o checklist inteiro."""
+    from clipper.pipeline.render import CHECKLIST_PUBLICACAO, montar_publicacao
+
+    clipe = {
+        "inicio": 10.0, "fim": 55.0,
+        "gancho_sugerido": "Ele não fazia ideia do que vinha",
+        "descricao": "Uma descrição para o post.",
+        "conclusao": "E foi assim que acabou.",
+    }
+    segs = [{"inicio": 10.0, "fim": 30.0}, {"inicio": 40.0, "fim": 55.0}]
+    texto = montar_publicacao(
+        clipe, titulo="O título do clipe", arquivo_mp4="clips/01-x--cortes.mp4",
+        capa="clips/01-x--cortes.capa.jpg", duracao=35.0, segmentos=segs,
+    )
+    confere(texto.startswith("# O título do clipe"), "abre com o título")
+    confere("clips/01-x--cortes.mp4" in texto, "cita o mp4")
+    confere("clips/01-x--cortes.capa.jpg" in texto, "cita a capa")
+    confere("Ele não fazia ideia do que vinha" in texto, "traz o gancho")
+    confere("Uma descrição para o post." in texto, "traz a descrição")
+    confere("E foi assim que acabou." in texto, "traz a conclusão")
+    confere("00:10–00:30, 00:40–00:55" in texto, "lista os trechos da fonte")
+    for item in CHECKLIST_PUBLICACAO:
+        confere(f"- [ ] {item}" in texto, f"checklist: {item[:40]}…")
+    confere(texto.endswith("\n") and "\r" not in texto,
+            "termina em LF e não contém CR (a mordida de CRLF da casa)")
+
+    magro = montar_publicacao(
+        {"inicio": 0.0, "fim": 30.0}, titulo="Sem nada", arquivo_mp4="clips/a.mp4",
+        capa=None, duracao=30.0, segmentos=[],
+    )
+    confere("_(o modelo não sugeriu descrição)_" in magro,
+            "sem descrição, o arquivo diz isso em vez de mentir")
+    confere("Capa:" not in magro, "sem capa, não inventa a linha")
+
+
+def e_prompt_v2(_: Path) -> None:
+    """O prompt v2 ensina segmentos, gancho verificável e payoff."""
+    from clipper import prompt_selecao
+    from clipper.pipeline import select
+
+    fr, energia = _cenario()
+    texto = prompt_selecao.montar(
+        titulo="Vídeo de teste", fronteiras=fr, energia=energia,
+        estrategia="ganchos e punchlines", n=5,
+        min_s=select.MIN_CLIPE_S, max_s=select.MAX_CLIPE_S,
+        max_seg=select.MAX_SEGMENTOS, max_desc=select.MAX_DESCRICAO_CHARS,
+        max_concl=select.MAX_CONCLUSAO_CHARS,
+    )
+    for marca, o_que in (
+        ("PROMESSA VERIFICÁVEL", "o gancho como promessa verificável"),
+        ("PAYOFF", "o payoff identificado"),
+        ("FECHAR nele", "o clipe fechando no payoff"),
+        ("segmentos", "o campo segmentos"),
+        ("GORDURA", "a remoção de gordura interna"),
+        ("PRESERVE O SENTIDO", "preservar sentido e sequência"),
+        ("ordem crescente", "a ordem crescente"),
+        ("é rejeitado", "a rejeição das duas formas juntas"),
+        ("capa_ts", "o capa_ts"),
+        ("descricao", "a descricao"),
+        ("conclusao", "a conclusao"),
+    ):
+        confere(marca in texto, f"o prompt cobre {o_que}")
+
+    confere(f"entre {select.MIN_CLIPE_S:.0f} e {select.MAX_CLIPE_S:.0f} segundos" in texto,
+            "os limites de duração vêm de quem valida", "20 e 90")
+    confere(f"no máximo {select.MAX_SEGMENTOS} trechos" in texto,
+            "o teto de segmentos vem de quem valida")
+    confere(f"até {select.MAX_DESCRICAO_CHARS} caracteres" in texto,
+            "o limite da descrição vem de quem valida")
+    confere("\r" not in texto, "o prompt não carrega CR")
+
+
+
+
+def _render_v2(raiz: Path, segmentos, *, conclusao: str = "", capa_ts=None):
+    """Renderiza um clipe v2 de verdade e devolve (mp4, duracao_esperada)."""
+    from clipper import composicao as C
+    from clipper import ffmpeg_utils
+    from clipper.modelo import Modelo
+
+    sys.path.insert(0, str(RAIZ / "provas"))
+    from provas.gerar_clipe_curto import DESTINO_PADRAO, gerar
+
+    fonte = DESTINO_PADRAO if DESTINO_PADRAO.is_file() else gerar(DESTINO_PADRAO, 40.0)
+    raiz.mkdir(parents=True, exist_ok=True)
+    trabalho = raiz / "_trabalho"
+
+    modelo = Modelo.de_fabrica("cortes")
+    comp = modelo.composicao
+    ativos = C.gerar_ativos(
+        comp, "Título fora do vídeo", trabalho,
+        gancho="O QUE ACONTECEU DEPOIS", conclusao=conclusao,
+    )
+    info = ffmpeg_utils.sondar(fonte)
+    total = sum(s["fim"] - s["inicio"] for s in segmentos)
+
+    montagem = C.montar(
+        comp=comp, ativos=ativos,
+        recorte={"largura": 405, "altura": 720, "x": 437, "y": 0},
+        duracao=total, fps=info.fps_fracao or "30/1",
+        punches=[], filtro_legenda=None, tem_audio=info.tem_audio, pitch=False,
+        entradas_video=len(segmentos),
+    )
+    args: list[str] = []
+    for s in segmentos:
+        args += ["-ss", f"{s['inicio']:.3f}", "-t", f"{s['fim'] - s['inicio']:.3f}",
+                 "-i", str(fonte)]
+    args += montagem.entradas
+    args += ["-filter_complex", montagem.filtro, "-map", montagem.rotulo_video]
+    if montagem.rotulo_audio:
+        args += ["-map", montagem.rotulo_audio]
+    destino = raiz / f"v2-{len(segmentos)}seg.mp4"
+    args += ["-t", f"{total:.3f}", "-c:v", "libx264", "-preset", "veryfast",
+             "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
+             "-ar", "48000", "-y", str(destino)]
+    ffmpeg_utils.rodar(args, descricao="render v2 de prova", timeout=600.0)
+    return destino, total
+
+
+def _medir_lufs(caminho: Path) -> float | None:
+    """I integrado do arquivo, pelo loudnorm em modo de análise."""
+    import json as _json
+    import re as _re
+
+    from clipper import ffmpeg_utils
+
+    saida = ffmpeg_utils.rodar(
+        ["-hide_banner", "-i", str(caminho),
+         "-af", "loudnorm=I=-14:TP=-1.5:LRA=11:print_format=json",
+         "-f", "null", "-"],
+        descricao=f"medição de loudness de {caminho.name}", timeout=300.0,
+    )
+    bloco = _re.findall(r"\{[^{}]*input_i[^{}]*\}", saida, _re.DOTALL)
+    if not bloco:
+        return None
+    try:
+        return float(_json.loads(bloco[-1])["input_i"])
+    except (ValueError, KeyError, _json.JSONDecodeError):
+        return None
+
+
+def f_v2_duracao(raiz: Path) -> None:
+    """A duração do MP4 v2 bate com a SOMA dos segmentos, ±0,5 s."""
+    from clipper import ffmpeg_utils
+
+    segmentos = [{"inicio": 2.0, "fim": 14.0}, {"inicio": 22.0, "fim": 33.0}]
+    mp4, total = _render_v2(raiz, segmentos)
+    info = ffmpeg_utils.sondar(mp4)
+    medida = float(info.duracao)
+    confere(abs(medida - total) <= 0.5,
+            "duração do MP4 = soma dos segmentos ±0,5 s",
+            f"soma {total:.2f}s, medido {medida:.2f}s, erro {abs(medida - total):.3f}s")
+    confere(info.tem_audio, "o clipe concatenado tem áudio")
+    print(f"    >>> clipe v2 para inspeção: {mp4}")
+
+
+def f_v2_lufs(raiz: Path) -> None:
+    """O loudnorm no resultado concatenado entrega -14 LUFS ±1."""
+    segmentos = [{"inicio": 2.0, "fim": 14.0}, {"inicio": 22.0, "fim": 33.0}]
+    mp4, _ = _render_v2(raiz, segmentos)
+    lufs = _medir_lufs(mp4)
+    if lufs is None:
+        raise Pulou("não consegui ler o input_i do loudnorm nesta build do ffmpeg")
+    confere(abs(lufs - (-14.0)) <= 1.0, "-14 LUFS ±1 no arquivo concatenado",
+            f"medido {lufs:.2f} LUFS")
+
+
+def f_v2_capa(raiz: Path) -> None:
+    """capa.jpg sai do instante certo: extrair de novo no mesmo ts bate."""
+    from clipper import ffmpeg_utils
+    from clipper.pipeline.render import _gravar_capa, _instante_da_capa
+
+    segmentos = [{"inicio": 2.0, "fim": 14.0}, {"inicio": 22.0, "fim": 33.0}]
+    mp4, total = _render_v2(raiz, segmentos)
+
+    # capa_ts em tempo da FONTE, dentro do 2º segmento: 25s da fonte cai em
+    # 12+3 = 15s do clipe concatenado.
+    clipe = {"inicio": 2.0, "fim": 33.0, "capa_ts": 25.0}
+    instante = _instante_da_capa(clipe, segmentos, total)
+    confere(abs(instante - 15.0) < 0.01,
+            "capa_ts da fonte foi convertido para o tempo do clipe",
+            f"fonte 25,0s -> clipe {instante:.2f}s")
+
+    capa = _gravar_capa(mp4, instante, raiz / "capa.jpg")
+    confere(capa is not None and capa.is_file(), "capa.jpg foi gravada")
+
+    conferencia = raiz / "capa-conferencia.jpg"
+    ffmpeg_utils.rodar(
+        ["-ss", f"{instante:.3f}", "-i", str(mp4), "-frames:v", "1", "-q:v", "3",
+         "-y", str(conferencia)],
+        descricao="capa de conferência", timeout=120.0,
+    )
+    from PIL import Image, ImageChops, ImageStat
+
+    a = Image.open(capa).convert("L")
+    b = Image.open(conferencia).convert("L")
+    confere(a.size == b.size, "as duas capas têm o mesmo tamanho", f"{a.size}")
+    d = ImageStat.Stat(ImageChops.difference(a, b)).mean[0]
+    confere(d < 1.0, "extrair de novo no mesmo ts dá o mesmo quadro",
+            f"diferença média {d:.3f}")
+
+    outra = raiz / "capa-outro-ts.jpg"
+    ffmpeg_utils.rodar(
+        ["-ss", f"{max(0.0, instante - 5.0):.3f}", "-i", str(mp4), "-frames:v", "1",
+         "-q:v", "3", "-y", str(outra)],
+        descricao="capa de controle", timeout=120.0,
+    )
+    c = Image.open(outra).convert("L")
+    d2 = ImageStat.Stat(ImageChops.difference(a, c)).mean[0]
+    confere(d2 > d, "e um ts diferente dá um quadro diferente — o controle",
+            f"mesmo ts {d:.3f} x outro ts {d2:.3f}")
+    print(f"    >>> capa para inspeção: {capa}")
+
+
+def f_conclusao_no_frame(raiz: Path) -> None:
+    """A conclusão aparece no fim e não no meio."""
+    from clipper import ffmpeg_utils
+
+    segmentos = [{"inicio": 2.0, "fim": 16.0}, {"inicio": 22.0, "fim": 33.0}]
+    mp4, total = _render_v2(raiz, segmentos, conclusao="E FOI ASSIM QUE ACABOU")
+
+    frames = {}
+    for rotulo, ts in (("meio", total / 2.0), ("fim", max(0.0, total - 0.8))):
+        destino = raiz / f"conclusao-{rotulo}.png"
+        ffmpeg_utils.rodar(
+            ["-ss", f"{ts:.3f}", "-i", str(mp4), "-frames:v", "1", "-y", str(destino)],
+            descricao=f"frame em t={ts:.1f}s", timeout=120.0,
+        )
+        frames[rotulo] = destino
+
+    from PIL import Image, ImageChops, ImageStat
+    from clipper.modelo import Modelo
+
+    comp = Modelo.de_fabrica("cortes").composicao
+    a = Image.open(frames["meio"]).convert("L")
+    b = Image.open(frames["fim"]).convert("L")
+    faixa = (0, comp.conclusao_y, 1080, min(1920, comp.conclusao_y + 140))
+    d = ImageStat.Stat(ImageChops.difference(a.crop(faixa), b.crop(faixa))).mean[0]
+    confere(d > 6.0, "a faixa da conclusão muda entre o meio e o fim",
+            f"diferença média {d:.1f}")
+    print(f"    >>> frames da conclusão: {frames['meio']}  e  {frames['fim']}")
+
+
 # ==========================================================================
 # Registro
 # ==========================================================================
@@ -694,11 +1302,27 @@ ESTRUTURAIS: dict[str, tuple[str, Callable[[Path], None]]] = {
     "E-L4": ("E3: a segunda linha (\\N) nasce da largura e só dela", e_legenda_segunda_linha_por_largura),
     "E-G1": ("E1: gancho com enable, fade de saída e Y na zona segura", e_gancho_no_filtergraph),
     "E-G2": ("E1: o escape devolve a caixa permanente de título", e_gancho_escape_restaura_titulo),
+    "E-V1": ("P2: v2 válida passa; o span não é o corte", e_v2_valida_passa),
+    "E-V2": ("P2: as 8 mordidas, cada uma discriminando o motivo", e_v2_mordidas),
+    "E-V3": ("P2: não-sobreposição é pela UNIÃO, não pelo span", e_v2_uniao_nao_span),
+    "E-V4": ("P2: o contrato v1 segue intacto no validador", e_v1_intacto_no_validador),
+    "E-V5": ("P2: o caminho --api aceita v2 sem afrouxar o esquema", e_esquema_api_aceita_v2),
+    "E-C1": ("P2: sem conclusão, grafo idêntico; com ela, 2 etapas", e_conclusao_ausente_grafo_identico),
+    "E-C2": ("P2: concat antes do crop, PNGs renumerados, crossfade", e_concat_v2_no_grafo),
+    "E-C3": ("P2: punches e legendas remapeados para a timeline", e_remapeamento_de_tempos),
+    "E-P1": ("P3: capa_ts fora dos segmentos é rejeitado", e_capa_ts_fora_rejeita),
+    "E-P2": ("P3: limites de descricao e conclusao", e_opcionais_limites),
+    "E-P3": ("P3: publicacao.md com título, gancho e checklist", e_publicacao_md),
+    "E-P4": ("P4: o prompt v2 ensina segmentos, gancho e payoff", e_prompt_v2),
 }
 
 FISICAS: dict[str, tuple[str, Callable[[Path], None]]] = {
     "F-G1": ("Gerador lavfi produz clipe sondável", f_clipe_curto_gera),
     "F-G2": ("E1 física: gancho visível em t=1 s e ausente em t=4 s", f_gancho_no_frame),
+    "F-V1": ("P2 física: duração do MP4 = soma dos segmentos ±0,5 s", f_v2_duracao),
+    "F-V2": ("P2 física: -14 LUFS ±1 no áudio concatenado", f_v2_lufs),
+    "F-P1": ("P3 física: capa.jpg sai do instante certo", f_v2_capa),
+    "F-C1": ("P2 física: a conclusão aparece no fim, não no meio", f_conclusao_no_frame),
 }
 
 

@@ -84,6 +84,7 @@ from clipper.config import (
 from clipper.erros import ErroClipper, ErroFFmpeg, ErroRender
 from clipper.fronteiras import Fronteiras, mmss
 from clipper.legendas import Preset
+from clipper.pipeline import select
 from clipper.registro import Cronometro, obter
 
 ESTAGIO = "render"
@@ -798,6 +799,17 @@ def _validar_clipes(escolhidos: list[dict[str, Any]], caminho: Path) -> None:
                 f"({clipe.get('id')!r})"
             )
 
+        # v2: se o clipe declara `segmentos`, a FORMA e conferida pela mesma
+        # funcao que o select usa -- importada, nao copiada. O render nao tem
+        # como conferir fronteira de frase (isso exige a transcricao, que ele
+        # nao carrega para validar), mas nao pode montar um filtergraph em
+        # cima de um `segmentos` malformado.
+        if select.e_v2(clipe):
+            erros_forma = select.conferir_forma_segmentos(clipe.get("segmentos"), nome)
+            if erros_forma:
+                defeitos.extend(erros_forma)
+                continue
+
         tempos: dict[str, float] = {}
         for campo in ("inicio", "fim"):
             if campo not in clipe:
@@ -955,6 +967,20 @@ def _erro_de_escrita(
     )
 
 
+def _escrever_texto(caminho: Path, texto: str) -> Path:
+    """Escrita atomica de texto. utf-8 e LF explicitos: o alvo e o Windows.
+
+    Sem `newline="\n"` o Python traduziria cada \n para \r\n no Windows e o
+    mesmo conteudo sairia com bytes diferentes em cada maquina -- o bastante
+    para uma prova de diff acusar mudanca que nao houve.
+    """
+    tmp = caminho.with_name(caminho.name + ".tmp")
+    caminho.parent.mkdir(parents=True, exist_ok=True)
+    tmp.write_text(texto, encoding="utf-8", newline="\n")
+    tmp.replace(caminho)
+    return caminho
+
+
 def _gravar_ass(caminho: Path, texto: str) -> None:
     tmp = caminho.with_name(caminho.name + ".tmp")
     try:
@@ -972,6 +998,125 @@ def _gravar_ass(caminho: Path, texto: str) -> None:
                 "clips/ são reaproveitados, então o render recomeça de onde parou."
             ),
         ) from exc
+
+
+# ==========================================================================
+# Pacote de publicacao (F6/P3): capa.jpg e publicacao.md por clipe
+# ==========================================================================
+
+# O checklist e ESTATICO e vem do briefing do lote: e o que o Bruno confere
+# antes de publicar, e nao depende de nada do clipe.
+CHECKLIST_PUBLICACAO = (
+    "Autorização/licença do material confirmada",
+    "Contribuição editorial perceptível sem ler a descrição",
+    "O 1º segundo promete exatamente o que o clipe entrega",
+    "Começo, progressão e payoff presentes",
+    "Legendas legíveis, fora da UI, sem cobrir rosto/ação",
+    "Título representa o que ocorreu (sem sensacionalismo falso)",
+    "Substancialmente diferente dos outros clipes do canal",
+)
+
+# Onde a capa cai quando o clipe nao pede `capa_ts`: 1s depois do inicio. Nao
+# e o frame 0 de proposito -- no primeiro quadro o fade de entrada ainda esta
+# escurecendo a imagem e a pilula do gancho ainda esta deslizando.
+_CAPA_PADRAO_S = 1.0
+
+
+def _instante_da_capa(
+    clipe: dict[str, Any], segmentos: list[dict[str, Any]], duracao: float
+) -> float:
+    """O instante da capa, em tempo do CLIPE (nao da fonte).
+
+    `capa_ts` chega em tempo da FONTE, porque e assim que o modelo enxerga o
+    video. A capa, porem, e extraida do mp4 JA RENDERIZADO: assim ela sai
+    composta, em 9:16, com cartao e legenda -- igual ao que o espectador ve.
+    Uma capa tirada da fonte mostraria o vídeo horizontal cru, que nao e o
+    produto.
+    """
+    bruto = clipe.get("capa_ts")
+    if bruto is not None:
+        try:
+            fonte_ts = float(bruto)
+        except (TypeError, ValueError):
+            fonte_ts = None
+        if fonte_ts is not None:
+            if segmentos:
+                convertidos = composicao.remapear_tempos([fonte_ts], segmentos)
+                if convertidos:
+                    return max(0.0, min(convertidos[0], max(0.0, duracao - 0.05)))
+            else:
+                relativo = fonte_ts - float(clipe["inicio"])
+                if 0.0 <= relativo <= duracao:
+                    return max(0.0, min(relativo, max(0.0, duracao - 0.05)))
+    return max(0.0, min(_CAPA_PADRAO_S, max(0.0, duracao - 0.05)))
+
+
+def _gravar_capa(clipe_mp4: Path, instante: float, destino: Path) -> Path | None:
+    """Extrai um quadro do clipe pronto. Nunca derruba o render se falhar."""
+    try:
+        ffmpeg_utils.rodar(
+            [
+                "-ss", f"{instante:.3f}",
+                "-i", str(clipe_mp4),
+                "-frames:v", "1",
+                "-q:v", "3",
+                "-y", str(destino),
+            ],
+            descricao=f"capa de {clipe_mp4.name}",
+            timeout=120.0,
+        )
+    except ErroClipper as exc:
+        obter().warning(
+            f"      aviso:  não consegui gravar a capa de {clipe_mp4.name}: {exc}"
+        )
+        return None
+    return destino if destino.is_file() else None
+
+
+def montar_publicacao(
+    clipe: dict[str, Any],
+    *,
+    titulo: str,
+    arquivo_mp4: str,
+    capa: str | None,
+    duracao: float,
+    segmentos: list[dict[str, Any]],
+) -> str:
+    """O texto de clips/<clipe>.publicacao.md.
+
+    Funcao pura para poder ser conferida sem renderizar nada.
+    """
+    linhas: list[str] = [f"# {titulo}", ""]
+    linhas.append(f"- **Arquivo:** `{arquivo_mp4}`")
+    if capa:
+        linhas.append(f"- **Capa:** `{capa}`")
+    linhas.append(f"- **Duração:** {duracao:.1f}s")
+    if segmentos:
+        faixas = ", ".join(
+            f"{mmss(s['inicio'])}–{mmss(s['fim'])}" for s in segmentos
+        )
+        linhas.append(f"- **Trechos da fonte:** {faixas} ({len(segmentos)} segmentos)")
+    else:
+        linhas.append(
+            f"- **Trecho da fonte:** {mmss(float(clipe['inicio']))}–"
+            f"{mmss(float(clipe['fim']))}"
+        )
+
+    gancho = str(clipe.get("gancho_sugerido") or "").strip()
+    if gancho:
+        linhas += ["", "## Gancho", "", f"> {gancho}"]
+
+    descricao = str(clipe.get("descricao") or "").strip()
+    linhas += ["", "## Descrição", ""]
+    linhas.append(descricao if descricao else "_(o modelo não sugeriu descrição)_")
+
+    conclusao = str(clipe.get("conclusao") or "").strip()
+    if conclusao:
+        linhas += ["", "## Conclusão na tela", "", f"> {conclusao}"]
+
+    linhas += ["", "## Checklist", ""]
+    linhas += [f"- [ ] {item}" for item in CHECKLIST_PUBLICACAO]
+    return "\n".join(linhas) + "\n"
 
 
 def _item_metadado(
@@ -1242,9 +1387,19 @@ def _renderizar_clipe(
     e '--clipe N' custar segundos em vez de minutos.
     """
     log = obter()
+    # `inicio` e `fim` sao o SPAN do clipe (min e max da uniao). Num clipe v1
+    # eles SAO o corte; num v2 o material entre segmentos foi removido, e a
+    # duracao real e a SOMA dos segmentos, nao o span.
+    segmentos = [
+        {"inicio": float(s["inicio"]), "fim": float(s["fim"])}
+        for s in (clipe.get("segmentos") or [])
+    ]
     inicio = float(clipe["inicio"])
     fim = float(clipe["fim"])
-    duracao = max(0.0, fim - inicio)
+    if segmentos:
+        duracao = sum(s["fim"] - s["inicio"] for s in segmentos)
+    else:
+        duracao = max(0.0, fim - inicio)
     titulo = str(clipe.get("titulo") or f"clipe {id_clipe}")
 
     destino = (saida.clips_dir / _nome_arquivo(id_clipe, titulo, preset_nome)).resolve()
@@ -1259,6 +1414,14 @@ def _renderizar_clipe(
     punches = (
         composicao.escolher_punches(picos, inicio, fim, comp) if comp is not None else []
     )
+    if segmentos and punches:
+        # `escolher_punches` devolve instantes contados do inicio do SPAN, mas
+        # o clipe concatenado nao tem span nenhum -- ele tem a soma. Converto
+        # de volta para tempo da fonte e dali para o tempo do clipe. Punch que
+        # caiu na gordura removida morre: soco de zoom no lugar errado e pior
+        # que soco nenhum.
+        absolutos = [inicio + p for p in punches]
+        punches = composicao.remapear_tempos(absolutos, segmentos)
     pronto = (
         None
         if forcar
@@ -1319,7 +1482,12 @@ def _renderizar_clipe(
         id_clipe=id_clipe,
     )
 
-    palavras = fronteiras.palavras_entre(inicio, fim)
+    if segmentos:
+        palavras: list[dict[str, Any]] = []
+        for s in segmentos:
+            palavras.extend(fronteiras.palavras_entre(s["inicio"], s["fim"]))
+    else:
+        palavras = fronteiras.palavras_entre(inicio, fim)
     texto_ass, resumo = legendas.montar_ass(
         palavras,
         preset=preset_obj,
@@ -1327,6 +1495,7 @@ def _renderizar_clipe(
         fim=fim,
         largura=LARGURA_SAIDA,
         altura=ALTURA_SAIDA,
+        segmentos=segmentos or None,
     )
     arquivo_ass = saida.trabalho_dir / f"legenda_{id_clipe}_{preset_nome}.ass"
     _gravar_ass(arquivo_ass, texto_ass)
@@ -1377,8 +1546,10 @@ def _renderizar_clipe(
             titulo,
             saida.trabalho_dir,
             gancho=str(clipe.get("gancho_sugerido") or ""),
+            conclusao=str(clipe.get("conclusao") or ""),
         )
         montagem = composicao.montar(
+            entradas_video=max(1, len(segmentos)),
             comp=comp,
             ativos=ativos,
             recorte=reframe,
@@ -1465,7 +1636,20 @@ def _renderizar_clipe(
             # passa a ser a pasta do .ass, e um caminho relativo cairia la
             # dentro. '-f mp4' e obrigatorio porque a extensao .parcial nao
             # diz nada ao ffmpeg sobre o formato de saida.
-            args = ["-ss", f"{inicio:.3f}", "-t", f"{duracao:.3f}", "-i", str(fonte)]
+            if segmentos:
+                # Uma entrada por segmento, cada uma com o SEU '-ss'/'-t'. O
+                # seek de entrada continua sendo o rapido, e o concat acontece
+                # dentro do filtergraph -- decodificar do zero e cortar com
+                # 'trim' custaria a leitura do video inteiro por segmento.
+                args = []
+                for s in segmentos:
+                    args += [
+                        "-ss", f"{s['inicio']:.3f}",
+                        "-t", f"{s['fim'] - s['inicio']:.3f}",
+                        "-i", str(fonte),
+                    ]
+            else:
+                args = ["-ss", f"{inicio:.3f}", "-t", f"{duracao:.3f}", "-i", str(fonte)]
             if montagem is not None:
                 args.extend(montagem.entradas)
                 args.extend(["-filter_complex", montagem.filtro])
@@ -1536,6 +1720,31 @@ def _renderizar_clipe(
         f"{info.duracao:.1f}s, {humanizar_bytes(bytes_arquivo)}, "
         f"encode em {humanizar_tempo(segundos_encode)}."
     )
+
+    # ---- pacote de publicacao (P3) ------------------------------------
+    # Roda TAMBEM para clipe reaproveitado: quem apagou a capa sem apagar o
+    # mp4 recebe a capa de volta na proxima rodada, sem reencodar um minuto
+    # de video para isso.
+    capa_destino = destino.with_suffix(".capa.jpg")
+    if not capa_destino.is_file():
+        _gravar_capa(destino, _instante_da_capa(clipe, segmentos, duracao), capa_destino)
+    capa_rel = f"clips/{capa_destino.name}" if capa_destino.is_file() else None
+
+    publicacao = destino.with_suffix(".publicacao.md")
+    try:
+        _escrever_texto(
+            publicacao,
+            montar_publicacao(
+                clipe,
+                titulo=titulo,
+                arquivo_mp4=f"clips/{destino.name}",
+                capa=capa_rel,
+                duracao=duracao,
+                segmentos=segmentos,
+            ),
+        )
+    except OSError as exc:
+        log.warning(f"      aviso:  não consegui gravar {publicacao.name}: {exc}")
 
     return _item_metadado(
         clipe=clipe,

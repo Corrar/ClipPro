@@ -82,6 +82,21 @@ _CAMPOS_OBRIGATORIOS = (
     "gancho_sugerido",
 )
 
+# O v2 troca o par inicio/fim por `segmentos`. O resto do contrato e o mesmo --
+# um clipe continua precisando de titulo, nota, motivo e gancho.
+_CAMPOS_OBRIGATORIOS_V2 = tuple(
+    c for c in _CAMPOS_OBRIGATORIOS if c not in ("inicio", "fim")
+) + ("segmentos",)
+
+# Quantos trechos nao contiguos um clipe pode juntar. Mais que tres deixa de
+# ser "tirar a gordura" e vira remontagem: o espectador perde o fio.
+MAX_SEGMENTOS = 3
+
+# Campos opcionais do v2/P3. Ausentes, nada muda no render nem na saida.
+MAX_DESCRICAO_CHARS = 200
+MAX_CONCLUSAO_CHARS = 90
+_CAMPOS_OPCIONAIS = ("descricao", "capa_ts", "conclusao")
+
 # Chaves aceitas quando o modelo embrulha o array num objeto.
 _CHAVES_DE_LISTA = ("clipes", "clips", "resultado", "selecao")
 
@@ -118,10 +133,34 @@ ESQUEMA_JSON: dict[str, Any] = {
                 "properties": {
                     "inicio": {"type": "string"},
                     "fim": {"type": "string"},
+                    # v2: 1 a 3 trechos nao contiguos. O esquema nao sabe
+                    # exigir "ou inicio/fim OU segmentos" -- 'required' e uma
+                    # lista so --, entao inicio/fim seguem obrigatorios AQUI e
+                    # quem separa as duas formas e validar(). O esquema garante
+                    # que os campos existem e tem o tipo certo; a regra de
+                    # negocio continua nossa, como ja era para duracao e
+                    # fronteira.
+                    "segmentos": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": MAX_SEGMENTOS,
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "inicio": {"type": "string"},
+                                "fim": {"type": "string"},
+                            },
+                            "required": ["inicio", "fim"],
+                            "additionalProperties": False,
+                        },
+                    },
                     "titulo": {"type": "string"},
                     "score_0_10": {"type": "number"},
                     "motivo": {"type": "string"},
                     "gancho_sugerido": {"type": "string"},
+                    "descricao": {"type": "string"},
+                    "capa_ts": {"type": "string"},
+                    "conclusao": {"type": "string"},
                 },
                 "required": list(_CAMPOS_OBRIGATORIOS),
                 "additionalProperties": False,
@@ -397,6 +436,293 @@ def _conferir_encaixe(
         )
 
 
+# ==========================================================================
+# Contrato v2: um clipe pode juntar 1 a 3 trechos nao contiguos
+# ==========================================================================
+#
+# O v1 continua valendo byte a byte: {"inicio": "mm:ss", "fim": "mm:ss", ...}.
+# O v2 troca esse par por {"segmentos": [{"inicio", "fim"}, ...]}.
+#
+# Os DOIS juntos no mesmo clipe sao rejeitados de proposito. Nao e rigor
+# gratuito: se o modelo mandar as duas formas, nao ha como saber qual delas ele
+# quis -- e escolher uma por conta propria renderizaria um trecho que o titulo
+# e o gancho podem nao descrever.
+
+
+def e_v2(item: Any) -> bool:
+    """True quando o clipe declara `segmentos` (mesmo vazio ou torto)."""
+    return isinstance(item, dict) and item.get("segmentos") is not None
+
+
+def conferir_forma_segmentos(valor: Any, rotulo: str) -> list[str]:
+    """Confere so a FORMA de `segmentos`. Nao olha fronteira nem duracao.
+
+    Separada do resto porque o estagio de render tambem precisa dela e NAO
+    pode duplicar a regra: ele importa esta funcao. O render nao tem como
+    conferir fronteira (isso exige a transcricao, que ele nao carrega para
+    validar), mas tem como recusar um `segmentos` malformado antes de tentar
+    montar um filtergraph em cima dele.
+
+    Devolve a lista de problemas no padrao f"{rotulo}: ...", vazia se estiver
+    tudo certo.
+    """
+    problemas: list[str] = []
+    if not isinstance(valor, list):
+        return [
+            f"{rotulo}: `segmentos` tem que ser uma lista de trechos "
+            f"(veio um {type(valor).__name__})."
+        ]
+    if not valor:
+        return [
+            f"{rotulo}: `segmentos` veio vazio. Use de 1 a {MAX_SEGMENTOS} trechos, "
+            "ou o formato antigo com `inicio` e `fim`."
+        ]
+    if len(valor) > MAX_SEGMENTOS:
+        problemas.append(
+            f"{rotulo}: vieram {len(valor)} segmentos e o máximo é {MAX_SEGMENTOS}. "
+            "Junte os trechos mais próximos ou escolha outro clipe."
+        )
+    for i, seg in enumerate(valor, 1):
+        onde = f"{rotulo}, segmento {i}"
+        if not isinstance(seg, dict):
+            problemas.append(
+                f"{onde}: cada segmento é um objeto com `inicio` e `fim` "
+                f"(veio um {type(seg).__name__})."
+            )
+            continue
+        faltam = [c for c in ("inicio", "fim") if seg.get(c) is None]
+        if faltam:
+            problemas.append(
+                f"{onde}: faltou preencher {', '.join(faltam)}."
+            )
+        sobra = [c for c in seg if c not in ("inicio", "fim")]
+        if sobra:
+            problemas.append(
+                f"{onde}: campo(s) não previsto(s) em um segmento: "
+                f"{', '.join(sorted(sobra))}. Um segmento tem só `inicio` e `fim`."
+            )
+    return problemas
+
+
+def _encaixar_segmentos(
+    segmentos: list[dict[str, Any]],
+    fronteiras: Fronteiras,
+    rotulo: str,
+    *,
+    min_s: float,
+    max_s: float,
+    tolerancia: float,
+) -> tuple[list[dict[str, Any]] | None, list[str]]:
+    """Encaixa cada segmento em fronteira e confere as regras do conjunto.
+
+    Reusa `fronteiras.encaixar()` com `min_s=0`: a duracao minima e do CLIPE
+    INTEIRO, nao de cada trecho -- um segmento de 4s que tira uma preparacao
+    repetida e exatamente o que o v2 existe para permitir. O teto por segmento
+    continua sendo `max_s`, porque um trecho sozinho maior que o clipe inteiro
+    nao pode existir.
+    """
+    problemas: list[str] = []
+    encaixados: list[dict[str, Any]] = []
+
+    for i, seg in enumerate(segmentos, 1):
+        onde = f"{rotulo}, segmento {i}"
+        try:
+            ini = para_segundos(seg["inicio"])
+        except (ValueError, TypeError, KeyError):
+            problemas.append(
+                f"{onde}: não entendi o `inicio` {seg.get('inicio')!r}. Use mm:ss "
+                "(ou segundos), copiado da lista de blocos."
+            )
+            continue
+        try:
+            fim = para_segundos(seg["fim"])
+        except (ValueError, TypeError, KeyError):
+            problemas.append(
+                f"{onde}: não entendi o `fim` {seg.get('fim')!r}. Use mm:ss "
+                "(ou segundos), copiado da lista de blocos."
+            )
+            continue
+        if fim <= ini:
+            problemas.append(
+                f"{onde}: o `fim` ({mmss(fim)}) não vem depois do `inicio` "
+                f"({mmss(ini)})."
+            )
+            continue
+        fora = [
+            nome
+            for nome, valor in (("inicio", ini), ("fim", fim))
+            if valor < -_EPS or valor > fronteiras.duracao + _EPS
+        ]
+        if fora:
+            verbo = "cai" if len(fora) == 1 else "caem"
+            problemas.append(
+                f"{onde}: `{'` e `'.join(fora)}` {verbo} fora do vídeo, que tem "
+                f"{mmss(fronteiras.duracao)}."
+            )
+            continue
+        try:
+            enc = fronteiras.encaixar(
+                ini, fim, min_s=0.0, max_s=max_s, tolerancia=tolerancia
+            )
+        except ErroSelecao as exc:
+            recado = f"{onde}: {exc.mensagem}"
+            if exc.sugestao:
+                recado += f" {exc.sugestao}"
+            problemas.append(recado)
+            continue
+        encaixados.append(
+            {
+                "inicio": enc.inicio,
+                "fim": enc.fim,
+                "duracao": round(enc.duracao, 3),
+                "inicio_pedido": round(ini, 3),
+                "fim_pedido": round(fim, 3),
+                "frase_inicio": enc.frase_inicio,
+                "frase_fim": enc.frase_fim,
+                "palavra_inicio": enc.palavra_inicio,
+                "palavra_fim": enc.palavra_fim,
+                "ajuste_inicio": enc.ajuste_inicio,
+                "ajuste_fim": enc.ajuste_fim,
+            }
+        )
+
+    if problemas or not encaixados:
+        return None, problemas
+
+    # Ordem crescente: a checagem e sobre o que o modelo MANDOU, na ordem em
+    # que mandou. Reordenar por conta propria mudaria a sequencia das falas, e
+    # o sentido junto.
+    for i in range(len(encaixados) - 1):
+        a, b = encaixados[i], encaixados[i + 1]
+        if b["inicio"] < a["inicio"] - _EPS:
+            problemas.append(
+                f"{rotulo}: os segmentos têm que vir em ordem crescente, e o "
+                f"segmento {i + 2} ({mmss(b['inicio'])}) começa antes do segmento "
+                f"{i + 1} ({mmss(a['inicio'])}). Reordene mantendo a sequência das "
+                "falas."
+            )
+        elif b["inicio"] < a["fim"] - _EPS:
+            problemas.append(
+                f"{rotulo}: os segmentos {i + 1} e {i + 2} se sobrepõem "
+                f"({mmss(a['inicio'])}–{mmss(a['fim'])} contra "
+                f"{mmss(b['inicio'])}–{mmss(b['fim'])}). Dois trechos do mesmo "
+                "clipe não podem compartilhar nenhum segundo."
+            )
+    if problemas:
+        return None, problemas
+
+    total = sum(s["duracao"] for s in encaixados)
+    if total < min_s - _EPS:
+        problemas.append(
+            f"{rotulo}: os segmentos somam {total:.0f}s e o mínimo é {min_s:.0f}s. "
+            "Estique um dos trechos ou acrescente outro."
+        )
+    elif total > max_s + _EPS:
+        problemas.append(
+            f"{rotulo}: os segmentos somam {total:.0f}s e o máximo é {max_s:.0f}s. "
+            "Encurte um dos trechos ou remova um."
+        )
+    if problemas:
+        return None, problemas
+
+    return encaixados, []
+
+
+def _conferir_capa_ts(
+    valor: Any, segmentos: list[dict[str, Any]], rotulo: str
+) -> tuple[float | None, list[str]]:
+    """`capa_ts` tem que cair DENTRO de algum segmento que o clipe mantem.
+
+    Um tempo que cai na gordura removida nao existe no mp4 final: a capa
+    mostraria um quadro que o espectador nunca ve.
+    """
+    if valor is None:
+        return None, []
+    try:
+        ts = para_segundos(valor)
+    except (ValueError, TypeError):
+        return None, [
+            f"{rotulo}: não entendi o `capa_ts` {valor!r}. Use mm:ss."
+        ]
+    for s in segmentos:
+        if s["inicio"] - _EPS <= ts <= s["fim"] + _EPS:
+            return ts, []
+    faixas = ", ".join(f"{mmss(s['inicio'])}–{mmss(s['fim'])}" for s in segmentos)
+    return None, [
+        f"{rotulo}: `capa_ts` ({mmss(ts)}) cai fora dos trechos que o clipe "
+        f"mantém ({faixas}). Escolha um instante que exista no clipe final."
+    ]
+
+
+def _conferir_opcionais(
+    item: dict[str, Any], segmentos: list[dict[str, Any]], rotulo: str
+) -> tuple[dict[str, Any], list[str]]:
+    """descricao, conclusao e capa_ts. Ausentes, nada muda no render."""
+    problemas: list[str] = []
+    extras: dict[str, Any] = {}
+
+    descricao = item.get("descricao")
+    if descricao is not None:
+        texto = _texto_nao_vazio(descricao)
+        if texto is None:
+            problemas.append(f"{rotulo}: `descricao`, se vier, tem que ser texto não vazio.")
+        elif len(texto) > MAX_DESCRICAO_CHARS:
+            problemas.append(
+                f"{rotulo}: a `descricao` tem {len(texto)} caracteres e o limite é "
+                f"{MAX_DESCRICAO_CHARS}. Corte o que não couber."
+            )
+        else:
+            extras["descricao"] = texto
+
+    conclusao = item.get("conclusao")
+    if conclusao is not None:
+        texto = _texto_nao_vazio(conclusao)
+        if texto is None:
+            problemas.append(f"{rotulo}: `conclusao`, se vier, tem que ser texto não vazio.")
+        elif len(texto) > MAX_CONCLUSAO_CHARS:
+            problemas.append(
+                f"{rotulo}: a `conclusao` tem {len(texto)} caracteres e o limite é "
+                f"{MAX_CONCLUSAO_CHARS} — ela é queimada na tela nos últimos segundos "
+                "e precisa ser lida de relance."
+            )
+        else:
+            extras["conclusao"] = texto
+
+    ts, erros = _conferir_capa_ts(item.get("capa_ts"), segmentos, rotulo)
+    problemas.extend(erros)
+    if ts is not None:
+        extras["capa_ts"] = round(ts, 3)
+
+    return extras, problemas
+
+
+def intervalos_do_clipe(clipe: dict[str, Any]) -> list[tuple[float, float]]:
+    """Os trechos que o clipe REALMENTE ocupa na fonte.
+
+    No v1 e um so, o proprio [inicio, fim]. No v2 e a uniao dos segmentos --
+    e nao o span, que inclui a gordura removida. A diferenca importa: dois
+    clipes v2 podem ter spans que se cruzam sem compartilhar um segundo
+    sequer de material.
+    """
+    segmentos = clipe.get("segmentos")
+    if isinstance(segmentos, list) and segmentos:
+        return [(float(s["inicio"]), float(s["fim"])) for s in segmentos]
+    return [(float(clipe["inicio"]), float(clipe["fim"]))]
+
+
+def _cruzam(a: list[tuple[float, float]], b: list[tuple[float, float]]) -> tuple[float, float] | None:
+    """Primeiro par de trechos que compartilha material, ou None."""
+    for ia, fa in a:
+        for ib, fb in b:
+            if ia < fb - _EPS and ib < fa - _EPS:
+                return (max(ia, ib), min(fa, fb))
+    return None
+
+
+def _faixas(intervalos: list[tuple[float, float]]) -> str:
+    return " + ".join(f"{mmss(i)}–{mmss(f)}" for i, f in intervalos)
+
+
 def validar(
     dados: Any,
     fronteiras: Fronteiras,
@@ -456,7 +782,24 @@ def validar(
             )
             continue
 
-        faltando = [c for c in _CAMPOS_OBRIGATORIOS if item.get(c) is None]
+        # v1 e v2 sao formas EXCLUSIVAS. Com as duas no mesmo clipe nao ha como
+        # saber qual delas o modelo quis, e escolher por conta propria
+        # renderizaria um trecho que o titulo e o gancho podem nao descrever.
+        v2 = e_v2(item)
+        tem_par_v1 = item.get("inicio") is not None or item.get("fim") is not None
+        if v2 and tem_par_v1:
+            quais = " e ".join(
+                f"`{c}`" for c in ("inicio", "fim") if item.get(c) is not None
+            )
+            problemas.append(
+                f"{rotulo}: veio `segmentos` junto com {quais}. Use UMA das duas "
+                "formas: ou `inicio` e `fim` para um trecho contínuo, ou "
+                "`segmentos` para 1 a 3 trechos separados — nunca as duas."
+            )
+            continue
+
+        campos = _CAMPOS_OBRIGATORIOS_V2 if v2 else _CAMPOS_OBRIGATORIOS
+        faltando = [c for c in campos if item.get(c) is None]
         if faltando:
             problemas.append(
                 f"{rotulo}: faltou preencher {', '.join(faltando)}. Repita o clipe "
@@ -492,6 +835,72 @@ def validar(
                     "Use a escala pedida."
                 )
                 score = None
+
+        if v2:
+            erros_forma = conferir_forma_segmentos(item.get("segmentos"), rotulo)
+            if erros_forma:
+                problemas.extend(erros_forma)
+                continue
+            segs, erros_seg = _encaixar_segmentos(
+                item["segmentos"],
+                fronteiras,
+                rotulo,
+                min_s=min_s,
+                max_s=max_s,
+                tolerancia=tolerancia,
+            )
+            if segs is None:
+                problemas.extend(erros_seg)
+                continue
+            extras, erros_opt = _conferir_opcionais(item, segs, rotulo)
+            if erros_opt:
+                problemas.extend(erros_opt)
+                continue
+            if titulo is None or motivo is None or gancho is None or score is None:
+                continue
+
+            # SPAN, nao o corte. `inicio` e `fim` aqui sao o min e o max da
+            # uniao dos segmentos -- servem para ordenar, para nomear e para
+            # dizer de onde no video o clipe saiu. A duracao REAL do clipe e a
+            # SOMA dos segmentos, e e ela que vai em `duracao`. Quem renderiza
+            # le `segmentos`; quem so precisa situar o clipe le o span.
+            total = sum(s["duracao"] for s in segs)
+            aprovados.append(
+                {
+                    "rotulo": rotulo,
+                    "segmentos": segs,
+                    "inicio": segs[0]["inicio"],
+                    "fim": segs[-1]["fim"],
+                    "span_inicio": segs[0]["inicio"],
+                    "span_fim": segs[-1]["fim"],
+                    "duracao": round(total, 3),
+                    "inicio_pedido": segs[0]["inicio_pedido"],
+                    "fim_pedido": segs[-1]["fim_pedido"],
+                    "frase_inicio": segs[0]["frase_inicio"],
+                    "frase_fim": segs[-1]["frase_fim"],
+                    "palavra_inicio": segs[0]["palavra_inicio"],
+                    "palavra_fim": segs[-1]["palavra_fim"],
+                    "ajuste_inicio": segs[0]["ajuste_inicio"],
+                    "ajuste_fim": segs[-1]["ajuste_fim"],
+                    "titulo": titulo,
+                    "score_0_10": round(score, 3),
+                    "motivo": motivo,
+                    "gancho_sugerido": gancho,
+                    "texto": " […] ".join(
+                        fronteiras.texto_entre(s["inicio"], s["fim"]) for s in segs
+                    ),
+                    "energia_media": round(
+                        sum(
+                            _energia_media(energia, s["inicio"], s["fim"]) * s["duracao"]
+                            for s in segs
+                        )
+                        / max(total, _EPS),
+                        3,
+                    ),
+                    **extras,
+                }
+            )
+            continue
 
         if "inicio" in faltando or "fim" in faltando:
             continue
@@ -559,6 +968,18 @@ def validar(
             # problema acima e nao entra no resultado.
             continue
 
+        # Os opcionais do P3 valem para as duas formas. No v1 o clipe e um
+        # trecho continuo, entao ele proprio e o unico "segmento" onde o
+        # capa_ts pode cair.
+        extras, erros_opt = _conferir_opcionais(
+            item,
+            [{"inicio": encaixe.inicio, "fim": encaixe.fim}],
+            rotulo,
+        )
+        if erros_opt:
+            problemas.extend(erros_opt)
+            continue
+
         aprovados.append(
             {
                 "rotulo": rotulo,
@@ -579,6 +1000,7 @@ def validar(
                 "gancho_sugerido": gancho,
                 "texto": fronteiras.texto_entre(encaixe.inicio, encaixe.fim),
                 "energia_media": _energia_media(energia, encaixe.inicio, encaixe.fim),
+                **extras,
             }
         )
 
@@ -611,6 +1033,26 @@ def validar(
     resultado: list[dict[str, Any]] = []
     for clipe in aprovados:
         anterior = resultado[-1] if resultado else None
+
+        # Com v2 no meio, a comparacao e entre UNIOES. O conserto automatico
+        # abaixo continua valendo so para v1 contra v1: mover o inicio de um
+        # clipe de tres segmentos mudaria qual gordura foi removida, e isso e
+        # decisao de quem escolheu os trechos, nao conserto de borda.
+        if anterior is not None and (clipe.get("segmentos") or anterior.get("segmentos")):
+            comum = _cruzam(intervalos_do_clipe(anterior), intervalos_do_clipe(clipe))
+            if comum is not None:
+                problemas.append(
+                    f"{anterior['rotulo']} e {clipe['rotulo']} compartilham material "
+                    f"({mmss(comum[0])}–{mmss(comum[1])}): "
+                    f"{_faixas(intervalos_do_clipe(anterior))} contra "
+                    f"{_faixas(intervalos_do_clipe(clipe))}. Dois clipes não podem "
+                    "ter nenhum segundo em comum — escolha outro trecho para um dos "
+                    "dois."
+                )
+                continue
+            resultado.append(clipe)
+            continue
+
         if anterior is not None and clipe["inicio"] < anterior["fim"] - _EPS:
             frase = fronteiras.primeiro_inicio_apos(anterior["fim"])
             nova_duracao = clipe["fim"] - frase.inicio if frase is not None else 0.0
@@ -675,15 +1117,38 @@ def validar(
 
     # ---- invariantes finais: falhar aqui e bug do clipper -------------------
     for clipe in resultado:
-        _conferir_encaixe(
-            fronteiras, clipe["inicio"], clipe["fim"], min_s, max_s, "a validação"
-        )
+        if clipe.get("segmentos"):
+            # No v2 o limite de duracao e do TOTAL, e cada segmento responde
+            # sozinho pela fronteira. Passar o span por _conferir_encaixe
+            # reprovaria um clipe legitimo de dois trechos distantes.
+            for i, s in enumerate(clipe["segmentos"], 1):
+                _conferir_encaixe(
+                    fronteiras, s["inicio"], s["fim"], 0.0, max_s,
+                    f"a validação (segmento {i} de {clipe['rotulo']})",
+                )
+            total = sum(s["duracao"] for s in clipe["segmentos"])
+            if total < min_s - _EPS or total > max_s + _EPS:
+                raise ErroClipper(
+                    f"bug interno do clipper: a validação aprovou {clipe['rotulo']} "
+                    f"somando {total:.1f}s, fora do limite de {min_s:.0f}–{max_s:.0f}s.",
+                    sugestao=(
+                        "isto não é erro do modelo nem seu. Guarde o out/<slug>/ e o "
+                        "clipper.log e abra um issue."
+                    ),
+                )
+        else:
+            _conferir_encaixe(
+                fronteiras, clipe["inicio"], clipe["fim"], min_s, max_s, "a validação"
+            )
+
     for anterior, seguinte in zip(resultado, resultado[1:]):
-        if seguinte["inicio"] < anterior["fim"] - _EPS:
+        comum = _cruzam(intervalos_do_clipe(anterior), intervalos_do_clipe(seguinte))
+        if comum is not None:
             raise ErroClipper(
-                "bug interno do clipper: a validação devolveu clipes sobrepostos "
-                f"({mmss(anterior['inicio'])}–{mmss(anterior['fim'])} e "
-                f"{mmss(seguinte['inicio'])}–{mmss(seguinte['fim'])}).",
+                "bug interno do clipper: a validação devolveu clipes que "
+                f"compartilham material ({mmss(comum[0])}–{mmss(comum[1])}): "
+                f"{_faixas(intervalos_do_clipe(anterior))} e "
+                f"{_faixas(intervalos_do_clipe(seguinte))}.",
                 sugestao=(
                     "isto não é erro do modelo nem seu. Guarde o out/<slug>/ e o "
                     "clipper.log e abra um issue."
@@ -1168,6 +1633,9 @@ def _preparar(
         n=n,
         min_s=MIN_CLIPE_S,
         max_s=MAX_CLIPE_S,
+        max_seg=MAX_SEGMENTOS,
+        max_desc=MAX_DESCRICAO_CHARS,
+        max_concl=MAX_CONCLUSAO_CHARS,
     )
     saida.criar_dirs()
     if _gravar_prompt(saida.prompt_selecao_txt, prompt, forcar):
@@ -1307,7 +1775,31 @@ def _preparar(
 
 
 def _para_esquema(indice: int, clipe: dict[str, Any]) -> dict[str, Any]:
-    """Um clipe validado no esquema exato que a F3 consome."""
+    """Um clipe validado no esquema exato que a F3 consome.
+
+    `inicio` e `fim` sao o SPAN (min e max da uniao), nao o corte: num clipe
+    v2 o material entre dois segmentos foi removido de proposito. Quem
+    renderiza le `segmentos`; o span serve para ordenar, nomear e situar.
+    Num clipe v1 os dois coincidem, e o campo `segmentos` nao existe -- e o
+    que mantem o esquema do v1 igual byte a byte.
+    """
+    extras: dict[str, Any] = {}
+    if clipe.get("segmentos"):
+        extras["segmentos"] = [
+            {
+                "inicio": round(float(s["inicio"]), 3),
+                "fim": round(float(s["fim"]), 3),
+                "duracao": round(float(s["duracao"]), 3),
+                "inicio_mmss": mmss(s["inicio"]),
+                "fim_mmss": mmss(s["fim"]),
+            }
+            for s in clipe["segmentos"]
+        ]
+        extras["span_inicio"] = round(float(clipe["inicio"]), 3)
+        extras["span_fim"] = round(float(clipe["fim"]), 3)
+    for campo in _CAMPOS_OPCIONAIS:
+        if clipe.get(campo) is not None:
+            extras[campo] = clipe[campo]
     return {
         "id": indice,
         "inicio": round(float(clipe["inicio"]), 3),
@@ -1327,4 +1819,5 @@ def _para_esquema(indice: int, clipe: dict[str, Any]) -> dict[str, Any]:
         "ajuste_inicio": round(float(clipe["ajuste_inicio"]), 3),
         "ajuste_fim": round(float(clipe["ajuste_fim"]), 3),
         "energia_media": round(float(clipe["energia_media"]), 3),
+        **extras,
     }

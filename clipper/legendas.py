@@ -469,6 +469,43 @@ def _bloco_palavra(preset: Preset, k: int, t0_ms: int, *, destacar: bool = True)
     )
 
 
+def resincronizar(
+    palavras: Iterable[dict[str, Any]], segmentos: Sequence[dict[str, Any]]
+) -> tuple[list[dict[str, Any]], float]:
+    """Leva as palavras do tempo da FONTE para o tempo do clipe concatenado.
+
+    Num clipe de varios trechos, a palavra que estava em 03:12 da fonte pode
+    cair em 00:08 do clipe -- ou em lugar nenhum, se estava na gordura
+    removida. Palavra fora dos segmentos mantidos SOME: legenda de fala que
+    foi cortada e legenda mentindo.
+
+    Palavra que atravessa a borda de um segmento e APARADA na borda, nao
+    descartada: ela foi parcialmente dita no clipe, e o karaoke precisa de um
+    tempo valido para ela.
+
+    Devolve (palavras_no_tempo_do_clipe, duracao_total).
+    """
+    saida: list[dict[str, Any]] = []
+    decorrido = 0.0
+    for s in segmentos:
+        ini, fim = float(s["inicio"]), float(s["fim"])
+        for p in palavras:
+            try:
+                p_ini, p_fim = float(p["inicio"]), float(p["fim"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if p_fim <= ini + 1e-6 or p_ini >= fim - 1e-6:
+                continue
+            novo_ini = decorrido + (max(p_ini, ini) - ini)
+            novo_fim = decorrido + (min(p_fim, fim) - ini)
+            if novo_fim <= novo_ini:
+                novo_fim = novo_ini + 0.06  # o mesmo piso de 60 ms da F1
+            saida.append({**p, "inicio": round(novo_ini, 3), "fim": round(novo_fim, 3)})
+        decorrido += fim - ini
+    saida.sort(key=lambda p: (float(p["inicio"]), float(p["fim"])))
+    return saida, round(decorrido, 3)
+
+
 def montar_ass(
     palavras: Iterable[dict[str, Any]],
     *,
@@ -477,13 +514,22 @@ def montar_ass(
     fim: float,
     largura: int = 1080,
     altura: int = 1920,
+    segmentos: Sequence[dict[str, Any]] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     """Monta o texto ASS de um clipe e um resumo do que foi gerado.
 
     'palavras' vem com tempos ABSOLUTOS (os de transcricao.json); aqui eles
     viram tempos relativos ao inicio do clipe, que e onde o corte comeca.
+
+    Com `segmentos`, o clipe e multi-trecho: as palavras sao primeiro levadas
+    para o tempo do clipe CONCATENADO e o resto do caminho segue igual, com
+    inicio 0 e fim na duracao somada. Sem `segmentos`, nada muda -- e o que
+    mantem o clipe v1 gerando o mesmo ASS de antes.
     """
     lista = [p for p in palavras if str(p.get("texto") or "").strip()]
+    if segmentos:
+        lista, total = resincronizar(lista, segmentos)
+        inicio, fim = 0.0, total
     duracao = max(0.0, float(fim) - float(inicio))
     medidor = _medidor(preset)
     teto = teto_de_largura(preset, largura) if medidor is not None else 0.0
@@ -586,5 +632,6 @@ def montar_ass(
         "destaques_pulados": destaques_pulados,
         "menor_bloco_palavras": min((len(l) for l in linhas), default=0),
         "maior_bloco_palavras": max((len(l) for l in linhas), default=0),
+        "segmentos": len(segmentos) if segmentos else 0,
     }
     return _cabecalho(preset, largura, altura) + "\n".join(eventos) + "\n", resumo

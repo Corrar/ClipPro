@@ -201,6 +201,16 @@ class Composicao:
     gancho_fade_saida_s: float
     gancho_y: int
 
+    # conclusao: overlay dos ultimos segundos (F6/P2)
+    conclusao_duracao_s: float
+    conclusao_fade_s: float
+    conclusao_y: int
+
+    # Crossfade de AUDIO nas juncoes de um clipe multi-segmento. O video corta
+    # seco (jump cut e idiomatico em Shorts); o audio NAO pode, porque emenda
+    # de forma de onda vira clique audivel.
+    juncao_crossfade_s: float
+
     # zona segura da UI do Shorts. Os numeros saem da interface do app
     # (coluna de botoes a direita, descricao e handle na base) e sao
     # AJUSTAVEIS: quando a UI mudar, muda-se aqui, nao no codigo que desenha.
@@ -377,6 +387,14 @@ def de_preset(dados: Any, nome: str) -> Composicao | None:
         # filtergraph ja nasce dentro da zona segura. Aparar no carregador e
         # o que faz a regra valer para todo modelo futuro de graca.
         gancho_y=max(zona_topo, int(_num(comp, "gancho.y", zona_topo))),
+        conclusao_duracao_s=max(0.5, _num(comp, "conclusao.duracao_s", 2.0)),
+        conclusao_fade_s=max(0.0, _num(comp, "conclusao.fade_s", 0.3)),
+        # 1040 + a altura da pilula (~108) fecha em 1148, ACIMA do bloco de
+        # legenda, que com margem_inferior 500-520 e corpo 84-92 ocupa de
+        # ~1180 a ~1420. Sobrepor a legenda nos ultimos segundos esconderia
+        # justamente a frase que fecha o clipe.
+        conclusao_y=int(_num(comp, "conclusao.y", 1040)),
+        juncao_crossfade_s=max(0.0, _num(comp, "juncao.crossfade_audio_s", 0.015)),
         zona_topo=zona_topo,
         zona_base=zona_base,
         progresso_ativo=_flag(comp, "progresso.ativo", True),
@@ -421,6 +439,34 @@ def de_preset(dados: Any, nome: str) -> Composicao | None:
 # ==========================================================================
 # Punch-in: quais picos do audio viram soco de zoom
 # ==========================================================================
+
+
+def remapear_tempos(
+    tempos: Sequence[float], segmentos: Sequence[dict[str, Any]]
+) -> list[float]:
+    """Leva instantes do tempo da FONTE para o tempo do clipe concatenado.
+
+    Um punch nasce de um pico de energia medido no audio original. Com o clipe
+    montado de trechos nao contiguos, o instante 03:12 da fonte pode estar em
+    qualquer lugar do clipe -- ou em lugar nenhum, se caiu na gordura removida.
+
+    Instante fora dos segmentos mantidos MORRE. Nao se aproxima para a borda
+    mais perto: um soco de zoom no lugar errado e pior que soco nenhum, porque
+    o espectador sente o movimento sem o motivo.
+    """
+    if not segmentos:
+        return [float(t) for t in tempos]
+    saida: list[float] = []
+    for t in tempos:
+        t = float(t)
+        decorrido = 0.0
+        for s in segmentos:
+            ini, fim = float(s["inicio"]), float(s["fim"])
+            if ini - 1e-6 <= t <= fim + 1e-6:
+                saida.append(round(decorrido + (t - ini), 3))
+                break
+            decorrido += fim - ini
+    return sorted(saida)
 
 
 def escolher_punches(
@@ -912,7 +958,12 @@ def pilula_titulo(comp: Composicao, titulo: str, destino: Path) -> dict[str, Any
 
 
 def gerar_ativos(
-    comp: Composicao, titulo: str, trabalho: Path, *, gancho: str = ""
+    comp: Composicao,
+    titulo: str,
+    trabalho: Path,
+    *,
+    gancho: str = "",
+    conclusao: str = "",
 ) -> dict[str, Any]:
     """Gera (ou reaproveita) os PNG desta composicao e devolve os caminhos.
 
@@ -928,6 +979,7 @@ def gerar_ativos(
     trabalho = Path(trabalho)
     trabalho.mkdir(parents=True, exist_ok=True)
     marca = comp.marca_desenho()
+    fecho: dict[str, Any] | None = None
 
     mascara = trabalho / f"cartao_{marca}_mascara.png"
     atras = trabalho / f"cartao_{marca}_atras.png"
@@ -960,6 +1012,16 @@ def gerar_ativos(
         if texto_do_topo:
             alvo = trabalho / f"titulo_{marca}_{_marca_texto(texto_do_topo)}.png"
             pilula = pilula_titulo(comp, texto_do_topo, alvo)
+
+        # A conclusao usa a MESMA pilula do gancho: mesma fonte, mesmo fundo,
+        # mesmos cantos. Sao a abertura e o fecho do mesmo clipe e leem como
+        # par; inventar um segundo estilo aqui so criaria mais um numero para
+        # manter em sincronia.
+        fecho = None
+        texto_fecho = str(conclusao or "").strip()
+        if texto_fecho:
+            alvo_f = trabalho / f"conclusao_{marca}_{_marca_texto(texto_fecho)}.png"
+            fecho = pilula_titulo(comp, texto_fecho, alvo_f)
         _limpar_ativos_antigos(trabalho, marca)
     except ImportError as exc:  # Pillow ausente
         raise ErroRender(
@@ -982,7 +1044,13 @@ def gerar_ativos(
             ),
         ) from exc
 
-    return {"mascara": mascara, "atras": atras, "frente": frente, "pilula": pilula}
+    return {
+        "mascara": mascara,
+        "atras": atras,
+        "frente": frente,
+        "pilula": pilula,
+        "conclusao": fecho,
+    }
 
 
 def _limpar_ativos_antigos(trabalho: Path, marca: str) -> None:
@@ -1040,6 +1108,7 @@ def montar(
     filtro_legenda: str | None,
     tem_audio: bool,
     pitch: bool,
+    entradas_video: int = 1,
 ) -> Montagem:
     """Monta o filter_complex inteiro e a lista de entradas extras do ffmpeg.
 
@@ -1056,7 +1125,10 @@ def montar(
             # imagem que ele mesmo joga fora; mais baixa degrada o fade.
             entradas.extend(["-loop", "1", "-framerate", str(fps)])
         entradas.extend(["-i", str(Path(caminho).resolve())])
-        return len(indices) + 1
+        # Os PNG entram DEPOIS das entradas de video. Num clipe v2 a fonte
+        # ocupa os indices 0..N-1 (uma entrada por segmento, cada uma com o
+        # seu -ss/-t), entao a primeira mascara e N, nao 1.
+        return len(indices) + max(1, int(entradas_video))
 
     indices["mascara"] = _entrada(ativos["mascara"])
     indices["atras"] = _entrada(ativos["atras"])
@@ -1068,6 +1140,10 @@ def montar(
         # 19x menor, sem pilula nenhuma). A mascara e a sombra NAO precisam --
         # o framesync repete o ultimo quadro sozinho (provado em 40s de clipe).
         indices["pilula"] = _entrada(ativos["pilula"]["arquivo"], loop=True)
+    if ativos.get("conclusao"):
+        # Mesmo motivo do '-loop 1' da pilula: sem ele o fade nao tem em que
+        # interpolar e a conclusao nunca aparece.
+        indices["conclusao"] = _entrada(ativos["conclusao"]["arquivo"], loop=True)
 
     cl, ca = comp.cartao_largura, comp.cartao_altura
     pre_l = _par(cl * comp.kenburns_prescale)
@@ -1079,8 +1155,24 @@ def montar(
     # timestamp da primeira imagem (0,0165s medido com -ss 200) e as expressoes
     # de overlay leem 't', que e esse timestamp. Sem zerar, a barra de progresso
     # e o deslize do titulo comecam com um atraso que MUDA a cada clipe.
+    # Concatenacao dos segmentos, ANTES do crop. Depois daqui o grafo inteiro
+    # nao sabe que o clipe foi montado de pedacos -- e por isso que o v1
+    # continua saindo byte a byte igual: com uma entrada so, nada deste bloco
+    # e emitido e a fonte segue sendo [0:v].
+    n_seg = max(1, int(entradas_video))
+    fonte_v = "0:v"
+    if n_seg > 1:
+        # setpts POR SEGMENTO antes de juntar: cada entrada carrega o residuo
+        # de timestamp do seu proprio '-ss', e o filtro concat exige que cada
+        # trecho comece em zero. Sem isso os trechos entram com buracos de
+        # tempo entre si e a duracao de saida sai errada.
+        for i in range(n_seg):
+            partes.append(f"[{i}:v]setpts=PTS-STARTPTS[s{i}v]")
+        rotulos = "".join(f"[s{i}v]" for i in range(n_seg))
+        partes.append(f"{rotulos}concat=n={n_seg}:v=1:a=0[vcat]")
+        fonte_v = "vcat"
     partes.append(
-        f"[0:v]crop={recorte['largura']}:{recorte['altura']}:{recorte['x']}:{recorte['y']},"
+        f"[{fonte_v}]crop={recorte['largura']}:{recorte['altura']}:{recorte['x']}:{recorte['y']},"
         "setpts=PTS-STARTPTS,split=2[bgsrc][cardsrc]"
     )
     # Fundo: borrar em miniatura e reampliar sai 7,7x mais barato que borrar em
@@ -1200,6 +1292,26 @@ def montar(
         )
         ultimo = "compt"
 
+    if "conclusao" in indices:
+        c = ativos["conclusao"]
+        # Comeca `conclusao_duracao_s` antes do fim e vai ate o fim do clipe.
+        # O piso em 0 protege o clipe curto demais: sem ele o 'between' sairia
+        # com inicio negativo e o overlay valeria o clipe inteiro.
+        inicio_c = max(0.0, float(duracao) - float(comp.conclusao_duracao_s))
+        ramo_c = ["format=rgba"]
+        if comp.conclusao_fade_s > 0:
+            # A mesma guarda do d=0 de sempre: 'fade' com d=0 nao e desligado,
+            # cai no padrao de 25 quadros.
+            fade_c = min(float(comp.conclusao_fade_s), float(comp.conclusao_duracao_s))
+            ramo_c.append(f"fade=t=in:st={inicio_c:.3f}:d={fade_c:g}:alpha=1")
+        partes.append(f"[{indices['conclusao']}:v]" + ",".join(ramo_c) + "[concl]")
+        partes.append(
+            f"[{ultimo}][concl]overlay=x=(W-w)/2:y={int(comp.conclusao_y)}"
+            f":enable='between(t,{inicio_c:.3f},{float(duracao):.3f})'"
+            ":format=yuv420[compc]"
+        )
+        ultimo = "compc"
+
     cauda = []
     if filtro_legenda:
         # O filtro vem PRONTO de ffmpeg_utils.opcao_subtitles(), que e o unico
@@ -1214,7 +1326,38 @@ def montar(
 
     rotulo_audio = None
     if tem_audio:
-        partes.append(f"[0:a]{cadeia_audio(comp, duracao, pitch=pitch)}[aout]")
+        fonte_a = "0:a"
+        if n_seg > 1:
+            for i in range(n_seg):
+                partes.append(f"[{i}:a]asetpts=PTS-STARTPTS[s{i}a]")
+            # O video corta seco (jump cut e idiomatico em Shorts); o audio
+            # NAO pode -- emenda de forma de onda vira clique audivel. O
+            # crossfade e curto de proposito: 15 ms nao se ouve como transicao,
+            # so mata o estalo.
+            #
+            # Efeito colateral conhecido e aceito: cada acrossfade ENCURTA o
+            # audio pela duracao do fade. Com 15 ms e no maximo duas juncoes
+            # sao 30 ms no pior caso -- dentro da tolerancia de +-0,5s da prova
+            # de duracao, e o '-t' de saida fecha o arquivo de qualquer jeito.
+            d = max(0.001, float(comp.juncao_crossfade_s))
+            atual = "s0a"
+            for i in range(1, n_seg):
+                destino = "acat" if i == n_seg - 1 else f"ax{i}"
+                partes.append(
+                    f"[{atual}][s{i}a]acrossfade=d={d:g}:c1=tri:c2=tri[{destino}]"
+                )
+                atual = destino
+            fonte_a = atual
+        # O loudnorm roda no resultado JA CONCATENADO: medir cada segmento
+        # sozinho e normalizar depois daria degraus de volume nas juncoes.
+        #
+        # SEMENTE F7 (narracao/TTS) -- ponto de juncao, nao implementacao:
+        # uma trilha de narracao entraria como mais uma entrada de audio e se
+        # juntaria a esta cadeia com 'amix' AQUI, entre `fonte_a` e a
+        # cadeia_audio(), para que o loudnorm normalize a MISTURA e nao a voz
+        # e o ambiente em separado. Nada disso esta implementado, e nao deve
+        # ser implementado sem pedido explicito.
+        partes.append(f"[{fonte_a}]{cadeia_audio(comp, duracao, pitch=pitch)}[aout]")
         rotulo_audio = "[aout]"
 
     return Montagem(
