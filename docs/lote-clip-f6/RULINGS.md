@@ -41,6 +41,7 @@ substituir os dois — é um commit.
 | 1.6 | CORREÇÃO DO ARQUITETO — ATO 0 | 12/09 |
 | **D1** | **COLAGEM B — triagem do P1 + liberação P2–P4** (§9) | 13/09 |
 | **D2** | **Triagem do relatório final + checklist de merge** (§10) | 13/09 |
+| **D3** | **Conserto do `conclusao.y`** (§11) | 13/09 |
 
 **Convenção a partir da D1:** diretivas do arquiteto são **numeradas e
 autossuficientes**. Cada uma é transcrita aqui inteira, como seção própria.
@@ -546,3 +547,64 @@ Três documentos foram dados como enviados sem ter chegado a esta sessão:
 
 A correção da nº 3 vale como padrão: **artefato que o arquiteto precisa
 revisar não viaja só pelo chat — é gravado no branch.**
+
+
+---
+
+## 11. D3 — conserto do `conclusao.y`
+
+Recebida em 13/09. Transcrição verbatim.
+
+```
+D3 — CONSERTO DO conclusao.y (CLIP-F6)
+
+Primeiro ato: append desta D3 inteira ao docs/lote-clip-f6/RULINGS.md +
+commit [CLIP-F6], conforme a regra vigente.
+
+REGISTRO: a E-C4 encontrou colisão real (cortes: vão −50 px;
+cortes-editorial: +4 px, abaixo do mínimo de 24 px). A aprovação do
+y=1040 na D2 §2 repousou em aritmética incompleta (titulo_altura nominal
+de 108 px, ignorando altura_pilula = max(...) que dá 152 px em 2 linhas —
+e 90 chars fazem 2 linhas ser o caso comum). Erro compartilhado: o
+executor calculou, o arquiteto aprovou sem exigir o caso extremo. Lição
+gravada como regra do RULINGS: valor geométrico só é aprovado com o caso
+extremo calculado junto.
+
+AUTORIZADO: conclusao.y 1040 → 960 nos DOIS presets compostos. UM commit
+[CLIP-F6], nada além dele. Em seguida:
+1. Rerodar a suíte estrutural inteira — esperado: TODAS verdes, incluindo
+   E-C4 (vãos calculados: cortes 30 px, cortes-editorial 84 px).
+2. Confirmar no reporte que o conserto não toca as exceções E1–E3 da
+   regressão (conclusão é pós-baseline; "ausente ⇒ 0 etapas" tem que
+   seguir de pé).
+3. PARE no reporte curto: SHA do commit + placar da suíte. O checklist de
+   merge da D2 segue valendo; este conserto fecha o item novo que a E-C4
+   abriu.
+```
+
+### 11.1 REGRA PERMANENTE — valor geométrico e caso extremo
+
+**Um valor geométrico só é aprovado com o caso extremo calculado junto.**
+
+Vale para quem propõe e para quem aprova. Não basta a conta do caso comum:
+a proposta tem de trazer o pior caso que os PARÂMETROS permitem, não o que
+costuma acontecer.
+
+Como isto nasceu: `conclusao.y = 1040` foi proposto com a altura NOMINAL da
+pílula (`titulo_altura`, 108 px) e aprovado assim. A altura real é
+`max(titulo_altura, altura_linha * linhas + 2 * respiro)`
+(`composicao.py:902`), que dá **152 px em duas linhas** — e como a conclusão
+vai até 90 caracteres, duas linhas é o caso COMUM, não o extremo. O vão
+prometido de +32 px era, na verdade, −50 px.
+
+O que a regra exige na prática:
+
+- ao propor um Y, uma altura ou uma margem, calcular com o maior valor que a
+  fórmula pode produzir, não com o campo nominal;
+- quando a fórmula for um `max(...)` ou tiver ramo condicional, dizer qual
+  ramo foi usado;
+- e, de preferência, deixar o cálculo numa PROVA, onde ele não pode
+  envelhecer calado — foi a E-C4 que pegou este erro, não a releitura.
+
+Erro compartilhado, registrado como tal: o executor calculou errado, o
+arquiteto aprovou sem exigir o extremo.
