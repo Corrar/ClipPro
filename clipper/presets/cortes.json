@@ -83,6 +83,9 @@
       "fade_saida_s": 0.4,
       "y": 196
     },
+    "conclusao": {
+      "y": 960
+    },
     "zona_segura": {
       "topo": 180,
       "base": 1420

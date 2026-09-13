@@ -389,11 +389,18 @@ def de_preset(dados: Any, nome: str) -> Composicao | None:
         gancho_y=max(zona_topo, int(_num(comp, "gancho.y", zona_topo))),
         conclusao_duracao_s=max(0.5, _num(comp, "conclusao.duracao_s", 2.0)),
         conclusao_fade_s=max(0.0, _num(comp, "conclusao.fade_s", 0.3)),
-        # 1040 + a altura da pilula (~108) fecha em 1148, ACIMA do bloco de
-        # legenda, que com margem_inferior 500-520 e corpo 84-92 ocupa de
-        # ~1180 a ~1420. Sobrepor a legenda nos ultimos segundos esconderia
-        # justamente a frase que fecha o clipe.
-        conclusao_y=int(_num(comp, "conclusao.y", 1040)),
+        # 960, e nao 1040. O 1040 saiu de uma conta com a altura NOMINAL da
+        # pilula (titulo_altura, 108 px) e estava errado: `pilula_titulo`
+        # calcula max(titulo_altura, altura_linha * linhas + 2 * respiro)
+        # (linha ~902 deste arquivo), que da 152 px em DUAS linhas -- e como a
+        # conclusao vai ate 90 caracteres, duas linhas e o caso comum. Com
+        # 1040 a pilula fechava em 1192 contra um bloco de legenda que comeca
+        # em ~1142: 50 px DENTRO da legenda.
+        #
+        # Com 960 o pior caso fecha em 1112 e sobram 30 px no `cortes` e 84 no
+        # `cortes-editorial`. Quem guarda esse limite e a prova E-C4, nao este
+        # comentario.
+        conclusao_y=int(_num(comp, "conclusao.y", 960)),
         juncao_crossfade_s=max(0.0, _num(comp, "juncao.crossfade_audio_s", 0.015)),
         zona_topo=zona_topo,
         zona_base=zona_base,
