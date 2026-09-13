@@ -1285,6 +1285,83 @@ def f_conclusao_no_frame(raiz: Path) -> None:
     print(f"    >>> frames da conclusão: {frames['meio']}  e  {frames['fim']}")
 
 
+
+
+# Quanto de altura uma linha de texto ocupa, em multiplos do corpo da fonte.
+# `pilula_titulo` usa ascendente+descendente do Pillow (composicao.py:892), que
+# exige a fonte instalada -- e as fontes do preset sao do Windows. Numa prova
+# ESTRUTURAL nao ha fonte, entao a altura e estimada, e a estimativa e
+# DELIBERADAMENTE alta: 1,35 em cobre com folga as familias que os presets
+# usam (Impact, Segoe UI Black), e errar para cima e o lado seguro -- superestimar
+# a altura ENCOLHE o vao calculado, entao a prova reprova antes de o pixel
+# encostar, nunca depois.
+_FATOR_ALTURA_LINHA = 1.35
+
+
+def _altura_pilula(comp: Any, linhas: int) -> int:
+    """Altura da pílula com `linhas` linhas, pela fórmula de composicao.py:902."""
+    altura_linha = int(comp.titulo_tamanho * _FATOR_ALTURA_LINHA)
+    respiro = max(16, int(altura_linha * 0.30))
+    bruto = max(int(comp.titulo_altura), altura_linha * linhas + 2 * respiro)
+    return bruto - (bruto % 2)  # _par(): o H.264 4:2:0 exige par
+
+
+def _topo_do_bloco_de_legenda(preset: Any, altura_canvas: int = 1920) -> float:
+    """Y do topo do bloco de legenda no pior caso de linhas.
+
+    No ASS com Alignment 2, MarginV é a distância da BASE do texto até a base
+    do quadro, e o texto cresce para CIMA. O contorno e a sombra são tinta
+    além do glifo e também sobem.
+    """
+    altura_linha = preset.tamanho * _FATOR_ALTURA_LINHA
+    linhas = max(1, int(preset.max_linhas_bloco))
+    altura_bloco = altura_linha * linhas + float(preset.contorno) + float(preset.sombra)
+    return altura_canvas - float(preset.margem_inferior) - altura_bloco
+
+
+# Vão mínimo entre a base da pílula de conclusão e o topo do bloco de legenda.
+# Abaixo disto os dois leem como um bloco só, e a conclusão deixa de ser um
+# fecho para virar uma terceira linha de legenda.
+VAO_MINIMO_PX = 24
+
+
+def e_conclusao_nao_encosta_na_legenda(_: Path) -> None:
+    """E-C4: vão ≥ 24 px entre a conclusão e o bloco de legenda.
+
+    Calculado do MODELO, no pior caso que os parâmetros permitem: pílula de
+    conclusão de duas linhas (o texto vai até 90 caracteres e não cabe em uma
+    só) contra bloco de legenda de duas linhas (`max_linhas_bloco`). Testar o
+    caso feliz — uma linha de cada — daria um vão confortável e falso.
+    """
+    from clipper.modelo import Modelo
+
+    for nome in MODELOS_COMPOSTOS:
+        m = Modelo.de_fabrica(nome)
+        comp, preset = m.composicao, m.legenda
+
+        altura = _altura_pilula(comp, 2)
+        base_pilula = comp.conclusao_y + altura
+        topo_legenda = _topo_do_bloco_de_legenda(preset)
+        vao = topo_legenda - base_pilula
+
+        confere(
+            comp.conclusao_y >= comp.zona_topo,
+            f"{nome}: a conclusão começa abaixo do topo da zona segura",
+            f"y={comp.conclusao_y} >= {comp.zona_topo}",
+        )
+        confere(
+            base_pilula <= comp.zona_base,
+            f"{nome}: a conclusão termina acima da base da zona segura",
+            f"base={base_pilula} <= {comp.zona_base}",
+        )
+        confere(
+            vao >= VAO_MINIMO_PX,
+            f"{nome}: vão ≥ {VAO_MINIMO_PX} px entre conclusão e legenda",
+            f"pílula {comp.conclusao_y}..{base_pilula} (2 linhas, {altura} px), "
+            f"legenda a partir de {topo_legenda:.0f} -> vão {vao:.0f} px",
+        )
+
+
 # ==========================================================================
 # Registro
 # ==========================================================================
@@ -1314,6 +1391,7 @@ ESTRUTURAIS: dict[str, tuple[str, Callable[[Path], None]]] = {
     "E-P2": ("P3: limites de descricao e conclusao", e_opcionais_limites),
     "E-P3": ("P3: publicacao.md com título, gancho e checklist", e_publicacao_md),
     "E-P4": ("P4: o prompt v2 ensina segmentos, gancho e payoff", e_prompt_v2),
+    "E-C4": ("P2: vão ≥ 24 px entre a conclusão e o bloco de legenda", e_conclusao_nao_encosta_na_legenda),
 }
 
 FISICAS: dict[str, tuple[str, Callable[[Path], None]]] = {
