@@ -39,6 +39,10 @@ substituir os dois — é um commit.
 | 1.4 | ADENDO WEB AO BRIEFING v2 | — |
 | 1.5 | RULINGS DO ARQUITETO — destrava Emenda 1 + P1 | — |
 | 1.6 | CORREÇÃO DO ARQUITETO — ATO 0 | 12/09 |
+| **D1** | **COLAGEM B — triagem do P1 + liberação P2–P4** (§9) | 13/09 |
+
+**Convenção a partir da D1:** diretivas do arquiteto são **numeradas e
+autossuficientes**. Cada uma é transcrita aqui inteira, como seção própria.
 
 Documentos **citados mas nunca recebidos**: "briefing v2" (citado em 1.4 e 1.5
 como portador das respostas Q1–Q6, que acabaram vindo em 1.5) e "GOVERNANÇA
@@ -358,3 +362,107 @@ git fetch && git checkout lote/clip-f6
   (`video_de_teste`, 8 s) e `provas/gerar_clipe_curto.py` (40 s). Não
   conflitam; consolidar em lote futuro.
 - **Repo sem CI, sem `LICENSE`, sem `pyproject.toml`.**
+
+
+---
+
+## 9. D1 — triagem do P1 + liberação P2–P4
+
+Recebida em 13/09. Transcrição verbatim.
+
+```
+COLAGEM B (D1) — TRIAGEM DO P1 + LIBERAÇÃO P2–P4
+
+Convenção nova: diretivas do arquiteto agora são numeradas (esta é a D1) e
+autossuficientes. Primeiro ato: append desta diretiva inteira ao
+docs/lote-clip-f6/RULINGS.md + commit [CLIP-F6], conforme a regra vigente.
+
+REGISTROS:
+1. ATO 0 @ 2ed96f2 ACEITO. A reconstrução declarada do RULINGS.md/CLAUDE.md
+   vira texto CANÔNICO — sem commit de substituição; a auditoria do texto
+   fica para o relatório final. A falha de transporte foi do canal
+   (documentos citados que não chegaram), não do executor.
+2. P1 VALIDADO EM PIXELS pelo Bruno (12/09, noite). As 14 provas rodaram
+   VERDES no Windows dele — reprodução independente das 12 estruturais +
+   F-G1/F-G2 físicas (Python 3.13 + ffmpeg instalados, .venv no clone).
+   Frames inspecionados e aprovados: t=1s pílula com gancho em 2 linhas,
+   acentos corretos, barra de acento mantida, y=196; t=4s topo limpo.
+   "p1 ok" CONCEDIDO — o envio desta colagem é o ato.
+3. Fixtures reais do job wetyO2gOOeU: a cópia de trabalho do painel ainda
+   não foi localizada no Windows. Decisão do arquiteto: as fixtures deixam
+   de travar o P2 e passam a travar SOMENTE o relatório final e o merge.
+   Quando chegarem pelo branch, rode as duas provas de material real e
+   reporte, como já combinado.
+
+LIBERAÇÃO: P2 → P3 → P4, conforme os rulings já persistidos em
+docs/lote-clip-f6/RULINGS.md. Lembretes vinculantes:
+
+P2 — contrato v2: segmentos (1–3), fronteiras em bloco da transcrição,
+ordem crescente, sem sobreposição interna, soma 20–90 s, não-sobreposição
+ENTRE clipes pela UNIÃO; inicio/fim + segmentos juntos = rejeição no padrão
+f"{rotulo}: ..."; select materializa inicio/fim derivados como SPAN
+(documentado como "span, não o corte"); o validador do render IMPORTA a
+checagem de segmentos do select (sem duplicar); ESQUEMA_JSON estendido
+(segmentos, descricao, capa_ts, conclusao — opcionais) mantendo
+additionalProperties: False, com prova no caminho --api. Render v2: N
+entradas -ss/-t + concat ANTES do crop; setpts=PTS-STARTPTS por segmento
+antes do concat; montar() recebe a contagem de entradas de vídeo; PNGs
+renumerados a partir de N; crossfade de ÁUDIO ~15 ms nas junções (vídeo em
+jump cut seco); montar_ass re-sincroniza legendas por segmento; punches e
+barra de progresso remapeados da FONTE para a timeline concatenada (punch
+fora dos segmentos mantidos morre; corrida = duração total concatenada);
+loudnorm no resultado CONCATENADO (-14 LUFS). conclusao (≤90 chars):
+overlay nos últimos ~2 s, estilo do gancho, dentro da zona segura; ausente
+⇒ grafo idêntico. Documentar em comentário o ponto de junção [aout] onde um
+amix futuro (semente F7) entraria — SEM implementar. Fades novos com a
+guarda do d=0.
+
+P3 — descricao (≤200 chars) e capa_ts ("mm:ss", dentro de algum segmento;
+fora = rejeição na validação); capa.jpg (default: frame 1 s após o início
+do 1º segmento); publicacao.md por clipe, dentro de clips/, com título,
+descrição, gancho e o checklist do RULINGS; escrita utf-8, newline \n.
+
+P4 — prompt_selecao v2: gancho = promessa VERIFICÁVEL; payoff identificado
+e o clipe fecha nele; segmentos para remover gordura interna preservando
+sentido e sequência; descricao/capa_ts quando houver confiança; regras
+duras reescritas para cobrir o v2. O texto INTEGRAL do prompt v2 vai no
+relatório para revisão do arquiteto.
+
+PROVAS — estenda prova_f6.py: estruturais novas do P2/P3 (v2 válida passa;
+as 8 mordidas com asserção que discrimina; conclusao ausente ⇒ filtergraph
+idêntico; capa_ts fora ⇒ rejeição; publicacao.md gerado; fixture v1
+sintética até a real chegar) e físicas novas no --fisicas (duração do MP4 =
+soma dos segmentos ±0,5 s; -14 LUFS ±1 no arquivo final; capa.jpg bate com
+capa_ts) — para o Bruno rodar tudo num comando só no Windows.
+
+PARE no relatório final: o que mudou por arquivo, provas com números,
+prompt v2 na íntegra, dívidas/sementes, perguntas em aberto. Sem git fora
+de lote/clip-f6; master intocado; merge só com a palavra explícita do
+Bruno.
+```
+
+### 9.1 Efeitos imediatos da D1
+
+- **`CLAUDE.md` e este arquivo viram texto CANÔNICO.** A ressalva de
+  "reconstrução declarada" no topo dos dois permanece como registro histórico,
+  mas **não há commit de substituição pendente** — a auditoria do texto fica
+  para o relatório final.
+- **O PARE do P1 caiu.** P2 → P3 → P4 liberados em sequência. O próximo PARE é
+  o **relatório final**.
+- **As fixtures reais deixaram de travar o P2.** Passam a travar apenas o
+  relatório final e o merge.
+
+### 9.2 Checklist estático do `publicacao.md`
+
+Conteúdo fixo, do briefing original (1.1), a ser gravado em cada
+`clips/<clipe>.publicacao.md`:
+
+```
+- [ ] Autorização/licença do material confirmada
+- [ ] Contribuição editorial perceptível sem ler a descrição
+- [ ] O 1º segundo promete exatamente o que o clipe entrega
+- [ ] Começo, progressão e payoff presentes
+- [ ] Legendas legíveis, fora da UI, sem cobrir rosto/ação
+- [ ] Título representa o que ocorreu (sem sensacionalismo falso)
+- [ ] Substancialmente diferente dos outros clipes do canal
+```
