@@ -1,0 +1,6 @@
+# Fixtures sao BYTES, nao texto: nenhum clone pode converter fim de linha.
+# A resposta real do painel e CRLF e o baseline e LF; com core.autocrlf=true
+# (padrao do Git no Windows) um `git add` comum trocaria os bytes, e a prova de
+# material real deixaria de ser sobre o material real. Padrao amplo, pela mesma
+# licao da excecao do .gitignore: nome literal protege um arquivo so (D5 Q9).
+provas/fixtures/** -text
