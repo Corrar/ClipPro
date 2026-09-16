@@ -1284,7 +1284,11 @@ def _medir_lufs(caminho: Path) -> float | None:
     from clipper import ffmpeg_utils
 
     saida = ffmpeg_utils.rodar(
-        ["-hide_banner", "-i", str(caminho),
+        # ffmpeg_utils.rodar ja prefixa "-loglevel error", e o loudnorm publica
+        # o JSON em nivel INFO: sem repetir a opcao aqui (a ultima ocorrencia
+        # vence -- o mesmo caso do cropdetect em render.py) a saida vem vazia
+        # e a F-V2 pulava em qualquer build do ffmpeg (D5 Q8).
+        ["-hide_banner", "-loglevel", "info", "-i", str(caminho),
          "-af", "loudnorm=I=-14:TP=-1.5:LRA=11:print_format=json",
          "-f", "null", "-"],
         descricao=f"medição de loudness de {caminho.name}", timeout=300.0,
@@ -1319,7 +1323,8 @@ def f_v2_lufs(raiz: Path) -> None:
     mp4, _ = _render_v2(raiz, segmentos)
     lufs = _medir_lufs(mp4)
     if lufs is None:
-        raise Pulou("não consegui ler o input_i do loudnorm nesta build do ffmpeg")
+        raise Pulou("o loudnorm não publicou o bloco JSON com input_i na saída do ffmpeg "
+                    "(confira se a medição roda com -loglevel info)")
     confere(abs(lufs - (-14.0)) <= 1.0, "-14 LUFS ±1 no arquivo concatenado",
             f"medido {lufs:.2f} LUFS")
 
