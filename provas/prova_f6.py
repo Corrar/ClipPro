@@ -324,15 +324,51 @@ def e_regressao_ass(_: Path) -> None:
         difs_cab = [(x, y) for x, y in zip(cab_a, cab_b) if x != y]
         for x, y in difs_cab:
             print(f"      cabeçalho:\n        - {x}\n        + {y}")
-        so_estilo = all(x.startswith("Style:") and y.startswith("Style:") for x, y in difs_cab)
+        # D5 (menor): a linha Style inteira não é exceção -- só o MarginV é.
+        # Cor, fonte ou contorno mudando no cabeçalho é regressão, e a versão
+        # anterior desta prova aceitava qualquer delta numa linha Style.
+        so_margin_v = all(_so_margin_v_mudou(x, y) for x, y in difs_cab)
         confere(
-            len(cab_a) == len(cab_b) and so_estilo,
-            f"{nome}: no cabeçalho, só a linha Style muda (E2)",
+            len(cab_a) == len(cab_b) and so_margin_v,
+            f"{nome}: no cabeçalho, só o MarginV da linha Style muda (E2)",
             EXCECOES["E2"] if difs_cab else "cabeçalho intacto",
         )
         confere(len(lb) <= len(la), f"{nome}: o E3 não criou bloco novo",
-                f"{la.count('') + sum(1 for x in la if x.startswith('Dialogue:'))} -> "
+                f"{sum(1 for x in la if x.startswith('Dialogue:'))} -> "
                 f"{sum(1 for x in lb if x.startswith('Dialogue:'))} blocos")
+
+    # Controle que morde: o comparador precisa RECUSAR uma cor trocada e
+    # aceitar só o MarginV. Sem este controle, um comparador frouxo passaria
+    # verde para sempre.
+    estilo = next(l for l in ler_baseline("legenda-cortes-editorial.ass").splitlines()
+                  if l.startswith("Style:"))
+    campos = estilo[len("Style:"):].split(",")
+    cor_trocada = list(campos)
+    cor_trocada[3] = "&H00123456&" if campos[3].strip() != "&H00123456&" else "&H00654321&"
+    margem_trocada = list(campos)
+    margem_trocada[_INDICE_MARGIN_V] = str(int(campos[_INDICE_MARGIN_V]) + 7)
+    confere(not _so_margin_v_mudou(estilo, "Style:" + ",".join(cor_trocada)),
+            "controle: o comparador recusa uma cor trocada na linha Style")
+    confere(_so_margin_v_mudou(estilo, "Style:" + ",".join(margem_trocada)),
+            "controle: e aceita só o MarginV")
+
+
+# Formato do ASS (legendas.py): Name, Fontname, Fontsize, PrimaryColour,
+# SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline,
+# StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow,
+# Alignment, MarginL, MarginR, MarginV, Encoding.
+_INDICE_MARGIN_V = 21
+
+
+def _so_margin_v_mudou(x: str, y: str) -> bool:
+    """Duas linhas Style que diferem, no maximo, no campo MarginV."""
+    if not (x.startswith("Style:") and y.startswith("Style:")):
+        return False
+    fa, fb = x[len("Style:"):].split(","), y[len("Style:"):].split(",")
+    if len(fa) != len(fb) or len(fa) <= _INDICE_MARGIN_V:
+        return False
+    return all(a.strip() == b.strip()
+               for i, (a, b) in enumerate(zip(fa, fb)) if i != _INDICE_MARGIN_V)
 
 
 def _blocos_do_ass(texto: str) -> list[str]:
@@ -870,9 +906,18 @@ def e_v1_intacto_no_validador(_: Path) -> None:
             "no v1 a duração continua sendo fim - inicio")
 
 
-def e_esquema_api_aceita_v2(_: Path) -> None:
-    """O caminho --api aceita v2 sem afrouxar additionalProperties."""
+def e_esquema_api_aceita_v2(raiz: Path) -> None:
+    """Q3 (D-C): o que o esquema deixa o modelo mandar, o validador aceita.
+
+    A versão anterior desta prova só lia a FORMA do dicionário -- e ainda
+    exigia que `required` não mudasse, o que prendia o defeito no lugar. Agora
+    ela cruza as duas metades: cada exemplo é conferido contra o esquema E
+    passado pelo validador. E fecha pelo ponto de entrada real: `clipper select
+    --api` com o SDK de verdade falando com uma API falsa local que obedece ao
+    esquema que recebeu, como o structured outputs obriga o modelo real.
+    """
     from clipper.pipeline import select
+    from provas import entrada_real as ER
 
     item = select.ESQUEMA_JSON["properties"]["clipes"]["items"]
     confere(item["additionalProperties"] is False,
@@ -885,8 +930,78 @@ def e_esquema_api_aceita_v2(_: Path) -> None:
             f"{seg['maxItems']}")
     confere(seg["items"]["additionalProperties"] is False,
             "um segmento também não aceita campo extra")
-    confere(set(item["required"]) == set(select._CAMPOS_OBRIGATORIOS),
-            "os obrigatórios do esquema não mudaram")
+
+    fr, energia = _cenario()
+    v1 = _clipe_v1(fr, 0, 7)
+    v2 = _clipe_v2(fr, [(0, 3), (20, 24)])
+    hibrido = {**v2, "inicio": v1["inicio"], "fim": v1["fim"]}
+    sem_forma = dict(_BASE_CLIPE)
+
+    erros = ER.conforme(item, v1)
+    confere(not erros, "um clipe v1 cabe no esquema", "; ".join(erros))
+    ok, probs = select.validar([v1], fr, energia, n=5)
+    confere(len(ok) == 1 and not probs, "… e o validador aceita o v1")
+
+    erros = ER.conforme(item, v2)
+    confere(not erros, "um clipe v2 PURO (sem inicio/fim) cabe no esquema", "; ".join(erros))
+    ok, probs = select.validar([v2], fr, energia, n=5)
+    confere(len(ok) == 1 and not probs, "… e o validador aceita o v2 puro")
+
+    erros = ER.conforme(item, hibrido)
+    confere(not erros, "o híbrido também cabe no esquema", "; ".join(erros))
+    _, probs = select.validar([hibrido], fr, energia, n=5)
+    confere(any("UMA das duas formas" in p for p in probs),
+            "… mas o validador recusa o híbrido pelo motivo certo")
+
+    erros = ER.conforme(item, sem_forma)
+    confere(not erros, "um clipe sem nenhuma das duas formas cabe no esquema",
+            "; ".join(erros))
+    _, probs = select.validar([sem_forma], fr, energia, n=5)
+    confere(any("inicio" in p and "segmentos" in p for p in probs),
+            "… e o validador recusa dizendo as duas formas possíveis",
+            (probs[0] if probs else "")[:110])
+
+    try:
+        import anthropic  # noqa: F401
+    except ImportError as exc:
+        raise Pulou(f"sem o pacote anthropic para a metade ponta a ponta ({exc})")
+
+    R = _p5_raiz(raiz, "e-v5")
+    trans = _p5_transcricao()
+    frs = ER.frases(trans)
+    entrada, saida = ER.semear(R, "e-v5", trans)
+    conformidade: list[list[str]] = []
+
+    def responder(esquema: dict[str, Any]) -> list[dict[str, Any]]:
+        itens = ((esquema.get("properties") or {}).get("clipes") or {}).get("items") or {}
+        clipe = ER.item(segmentos=[_p5_seg(frs, 0, 2), _p5_seg(frs, 6, 8)])
+        if "inicio" in (itens.get("required") or []):
+            # Obrigado pelo esquema a mandar inicio/fim, o modelo manda o span.
+            clipe["inicio"] = clipe["segmentos"][0]["inicio"]
+            clipe["fim"] = clipe["segmentos"][-1]["fim"]
+        conformidade.append(ER.conforme(esquema, {"clipes": [clipe]}))
+        return [clipe]
+
+    with ER.api_falsa(responder) as (url, pedidos):
+        env = ER.ambiente({
+            "ANTHROPIC_BASE_URL": url,
+            "ANTHROPIC_API_KEY": "chave-falsa-da-prova",
+            "NO_PROXY": "127.0.0.1,localhost",
+        })
+        proc = ER.cli("select", entrada, "--out", R, "--api", "--force", env=env)
+
+    confere(bool(conformidade) and all(not e for e in conformidade),
+            "toda resposta da API falsa obedeceu ao esquema que chegou na requisição")
+    confere(proc.returncode == 0, "`clipper select --api` com resposta v2 termina bem",
+            f"rc={proc.returncode} " + ER.saida_do_cli(proc).strip()[-160:])
+    clipes = json.loads(saida.selecao_json.read_text(encoding="utf-8")).get("clipes") or []
+    confere(len(clipes) == 1 and len(clipes[0].get("segmentos") or []) == 2,
+            "o selecao.json veio da API com os 2 segmentos")
+    chamadas = sum(1 for p in pedidos if p["caminho"].rstrip("/").endswith("/v1/messages"))
+    confere(chamadas == 1, "uma chamada só — sem rodada de conserto cobrada",
+            f"{chamadas} chamada(s)")
+    print("    nota  `maxItems` no structured outputs real: NÃO VERIFICADO "
+          "(exige chave; D5 Q3 — não bloqueia merge)")
 
 
 def e_conclusao_ausente_grafo_identico(_: Path) -> None:
@@ -1363,6 +1478,621 @@ def e_conclusao_nao_encosta_na_legenda(_: Path) -> None:
 
 
 # ==========================================================================
+# P5 — integracao v2 pelo ponto de entrada real (RULINGS §13, D5)
+# ==========================================================================
+#
+# Regra do §13.1: as provas desta secao atravessam o CLI (`python -m clipper`)
+# e o caminho do painel (ui/jobs.py). Nenhuma monta a linha do ffmpeg a mao.
+# O apoio (semear a pasta, chamar o CLI, a fila do painel, a API falsa) vive
+# em provas/entrada_real.py.
+
+
+def _p5_raiz(raiz: Path, nome: str) -> Path:
+    import shutil
+
+    alvo = Path(raiz) / "p5" / nome
+    shutil.rmtree(alvo, ignore_errors=True)
+    alvo.mkdir(parents=True, exist_ok=True)
+    return alvo
+
+
+def _p5_videos(raiz: Path) -> Path:
+    alvo = Path(raiz) / "p5-videos"
+    alvo.mkdir(parents=True, exist_ok=True)
+    return alvo
+
+
+def _p5_transcricao() -> dict[str, Any]:
+    """Frases de 3,9 s; entre frases consecutivas a lacuna e de 0,05 s.
+
+    Uma pausa REAL de 7,15 s separa a frase 15 (59,00-62,85 s) da 16 (70,0 s):
+    e ela que distingue "blocos consecutivos" de "blocos colados".
+    """
+    from provas import entrada_real as ER
+
+    return ER.transcricao_sintetica(140.0, pausas=((60.0, 70.0),))
+
+
+def _p5_seg(frases_: Any, a: int, b: int) -> dict[str, str]:
+    from clipper.fronteiras import mmss
+
+    return {"inicio": mmss(frases_[a].inicio), "fim": mmss(frases_[b].fim)}
+
+
+def _p5_rc(proc: Any) -> str:
+    """rc e a cauda da saida do CLI -- SO para dados sinteticos (C.11)."""
+    from provas import entrada_real as ER
+
+    cauda = " ".join(ER.saida_do_cli(proc).split())[-180:]
+    return f"rc={proc.returncode} {cauda}"
+
+
+def _p5_validador_do_render_aceita(clipes: list[dict[str, Any]], caminho: Path) -> tuple[bool, str]:
+    from clipper.pipeline import render
+
+    try:
+        render._validar_clipes(clipes, caminho)
+    except Exception as exc:  # noqa: BLE001 - a prova relata o motivo
+        return False, str(getattr(exc, "mensagem", exc))[:140]
+    return True, ""
+
+
+def e_p5_selecao_v2_passa_no_render(raiz: Path) -> None:
+    """Q1 (D-B): o selecao.json v2 que o CLI grava passa no portão do render."""
+    from provas import entrada_real as ER
+
+    R = _p5_raiz(raiz, "e-i1")
+    trans = _p5_transcricao()
+    fr = ER.frases(trans)
+    entrada, saida = ER.semear(R, "e-i1", trans)
+    resp = ER.gravar_resposta(R, "resp", [
+        ER.item(segmentos=[_p5_seg(fr, 0, 2), _p5_seg(fr, 6, 8)]),
+    ])
+    proc = ER.cli("select", entrada, "--out", R, "--resposta", resp)
+    confere(proc.returncode == 0, "`clipper select` com resposta v2 termina bem", _p5_rc(proc))
+
+    clipes = json.loads(saida.selecao_json.read_text(encoding="utf-8")).get("clipes") or []
+    confere(len(clipes) == 1 and len(clipes[0].get("segmentos") or []) == 2,
+            "o selecao.json tem 1 clipe com 2 segmentos")
+    chaves = sorted({k for s in clipes[0]["segmentos"] for k in s})
+    confere(chaves == ["fim", "inicio"],
+            "cada segmento gravado carrega só `inicio` e `fim`", ", ".join(chaves))
+    aceito, motivo = _p5_validador_do_render_aceita(clipes, saida.selecao_json)
+    confere(aceito, "o validador do render aceita o selecao.json que o select gravou", motivo)
+
+
+def e_p5_sobreposicao_tres_clipes(raiz: Path) -> None:
+    """Q2 (D-A): sobreposição entre clipes NÃO adjacentes é recusada.
+
+    A (v2) tem um segmento no começo e outro depois de C começar; B fica no
+    meio. Ordenados pelo span, C só era comparado com B -- e passava.
+    """
+    from clipper.fronteiras import Fronteiras
+    from clipper.pipeline import select
+    from provas import entrada_real as ER
+
+    R = _p5_raiz(raiz, "e-i2")
+    trans = _p5_transcricao()
+    fr = ER.frases(trans)
+    entrada, saida = ER.semear(R, "e-i2", trans)
+    a = ER.item(titulo="A", segmentos=[_p5_seg(fr, 0, 2), _p5_seg(fr, 20, 22)])
+    b = ER.item(titulo="B", **_p5_seg(fr, 8, 13))
+    c = ER.item(titulo="C", **_p5_seg(fr, 21, 26))
+    resp = ER.gravar_resposta(R, "resp", [a, b, c])
+    proc = ER.cli("select", entrada, "--out", R, "--resposta", resp)
+    texto = ER.saida_do_cli(proc)
+    linhas = [l for l in texto.splitlines()
+              if "compartilham material" in l and "clipe 1" in l and "clipe 3" in l]
+    confere(proc.returncode != 0, "`clipper select` recusa a resposta", f"rc={proc.returncode}")
+    confere(bool(linhas), "a recusa aponta o par não adjacente (clipe 1 × clipe 3)",
+            (linhas[0].strip() if linhas else texto.strip()[-120:])[:120])
+
+    # Mesmo furo por outros caminhos: ordem de entrada, C em v2, quatro clipes.
+    fronteiras = Fronteiras.de_transcricao(trans)
+    c_v2 = ER.item(titulo="C", segmentos=[_p5_seg(fr, 21, 26)])
+    d = ER.item(titulo="D", **_p5_seg(fr, 27, 32))
+    for rotulo, dados, aprovados_esperados in (
+        ("ordem C, B, A", [c, b, a], 2),
+        ("C em v2", [a, b, c_v2], 2),
+        ("quatro clipes (A, B, C, D)", [a, b, c, d], 3),
+    ):
+        ok, probs = select.validar(dados, fronteiras, {}, n=5)
+        achou = [p for p in probs if "compartilham material" in p]
+        confere(len(achou) == 1 and len(ok) == aprovados_esperados,
+                f"{rotulo}: um problema de material compartilhado, o resto aprovado",
+                f"{len(ok)} aprovados, {len(probs)} problema(s)")
+
+
+def e_p5_aviso_de_ajuste_v2(raiz: Path) -> None:
+    """Q10 (P01): encaixe de ≥3 s num segmento avisa, como já avisava no v1."""
+    from clipper.fronteiras import mmss
+    from provas import entrada_real as ER
+
+    R = _p5_raiz(raiz, "e-i3")
+    trans = _p5_transcricao()
+    fr = ER.frases(trans)
+    entrada, saida = ER.semear(R, "e-i3", trans)
+    # O fim pedido (01:06) cai no silêncio; a fronteira mais próxima é o fim da
+    # frase 15, 3,15 s antes. O segmento 1 encaixa com menos de 1 s.
+    seg2 = {"inicio": mmss(fr[10].inicio), "fim": mmss(66.0)}
+    resp = ER.gravar_resposta(R, "resp", [ER.item(segmentos=[_p5_seg(fr, 0, 2), seg2])])
+    proc = ER.cli("select", entrada, "--out", R, "--resposta", resp)
+    confere(proc.returncode == 0, "`clipper select` aceita o clipe", _p5_rc(proc))
+
+    clipes = json.loads(saida.selecao_json.read_text(encoding="utf-8")).get("clipes") or []
+    fim_seg2 = float(clipes[0]["segmentos"][1]["fim"])
+    confere(abs(fim_seg2 - fr[15].fim) < 0.01,
+            "o segmento 2 foi mesmo encaixado ≥3 s antes do pedido",
+            f"pedido 66,00 s, entregue {fim_seg2:.2f} s")
+    texto = ER.saida_do_cli(proc)
+    avisos_2 = [l for l in texto.splitlines() if "atenção" in l and "segmento 2" in l]
+    avisos_1 = [l for l in texto.splitlines() if "atenção" in l and "segmento 1" in l]
+    confere(bool(avisos_2), "o ajuste ≥3 s do segmento 2 gera aviso",
+            (avisos_2[0].strip() if avisos_2 else "nenhum aviso")[:120])
+    confere(not avisos_1, "e o ajuste pequeno do segmento 1 não gera")
+
+
+def e_p5_segmentos_colados_fundidos(raiz: Path) -> None:
+    """Q10 (P03): segmentos colados viram um só, com nota; pausa real não funde."""
+    from provas import entrada_real as ER
+
+    R = _p5_raiz(raiz, "e-i4")
+    trans = _p5_transcricao()
+    fr = ER.frases(trans)
+
+    entrada, saida = ER.semear(R, "e-i4-colados", trans)
+    resp = ER.gravar_resposta(R, "colados", [
+        ER.item(segmentos=[_p5_seg(fr, 0, 2), _p5_seg(fr, 3, 6)]),
+    ])
+    proc = ER.cli("select", entrada, "--out", R, "--resposta", resp)
+    confere(proc.returncode == 0, "colados: `clipper select` aceita", _p5_rc(proc))
+    clipe = (json.loads(saida.selecao_json.read_text(encoding="utf-8")).get("clipes") or [{}])[0]
+    segs = clipe.get("segmentos") or []
+    confere(len(segs) == 1, "colados (lacuna de 0,05 s): os dois segmentos viram um só",
+            f"{len(segs)} segmento(s)")
+    confere(abs(float(segs[0]["inicio"]) - fr[0].inicio) < 0.01
+            and abs(float(segs[0]["fim"]) - fr[6].fim) < 0.01,
+            "o fundido vai do início do 1º ao fim do 2º")
+    notas = clipe.get("notas") or []
+    confere(any("fundid" in n for n in notas), "a fusão fica registrada como nota do clipe",
+            (notas[0] if notas else "sem nota")[:110])
+
+    entrada2, saida2 = ER.semear(R, "e-i4-pausa", trans)
+    resp2 = ER.gravar_resposta(R, "pausa", [
+        ER.item(segmentos=[_p5_seg(fr, 12, 15), _p5_seg(fr, 16, 18)]),
+    ])
+    proc2 = ER.cli("select", entrada2, "--out", R, "--resposta", resp2)
+    confere(proc2.returncode == 0, "pausa: `clipper select` aceita", _p5_rc(proc2))
+    clipe2 = (json.loads(saida2.selecao_json.read_text(encoding="utf-8")).get("clipes") or [{}])[0]
+    confere(len(clipe2.get("segmentos") or []) == 2,
+            "blocos consecutivos com pausa real (7,15 s) no meio seguem separados — "
+            "a pausa é gordura removida")
+    confere(not clipe2.get("notas"), "e sem nota de fusão")
+
+
+def e_p5_v2_sem_composicao_recusado(raiz: Path) -> None:
+    """Q4 (D-D): v2 de 2+ segmentos em preset sem composição é recusado."""
+    from provas import entrada_real as ER
+
+    R = _p5_raiz(raiz, "e-i5")
+    trans = _p5_transcricao()
+    fr = ER.frases(trans)
+    entrada, saida = ER.semear(R, "e-i5", trans)
+    resp = ER.gravar_resposta(R, "resp", [
+        ER.item(segmentos=[_p5_seg(fr, 0, 2), _p5_seg(fr, 6, 8)]),
+    ])
+    proc = ER.cli("select", entrada, "--out", R, "--resposta", resp)
+    confere(proc.returncode == 0, "`clipper select` aceita o v2", _p5_rc(proc))
+
+    proc = ER.cli("render", saida.slug, "--out", R, "--preset", "bold-amarelo")
+    texto = ER.saida_do_cli(proc)
+    if "não encontrei o executável" in texto:
+        raise Pulou("o render deste ambiente não acha o ffmpeg antes de chegar à recusa")
+    confere(proc.returncode != 0, "`clipper render --preset bold-amarelo` recusa",
+            f"rc={proc.returncode}")
+    confere("não tem composição" in texto and "segmentos" in texto,
+            "a recusa diz o motivo: preset sem composição não junta segmentos",
+            " ".join(texto.split())[-140:])
+    confere(not ER.clipes_mp4(saida, "bold-amarelo"), "nenhum MP4 saiu pela metade")
+
+
+FIXTURE_REAL = DIR_FIXTURES / "wetyO2gOOeU"
+
+# Bytes dos arquivos reais como sairam do painel (commit 638fa69). A prova de
+# material real so vale se o arquivo for o real.
+_SHA256_FIXTURES_REAIS = {
+    "resposta-v1.json": "ae5f52683dcaa0e46e0fb02ca3b61136c126bd65a511c8a14b7a516b618f8760",
+    "transcricao.json": "8676f82ecdcfa5eb6b5bb2b8fb041b399e7a42451bce55a567c14e70199c1056",
+}
+
+
+def _fixture_real(nome: str) -> Path:
+    alvo = FIXTURE_REAL / nome
+    if not alvo.is_file():
+        raise Pulou(f"falta a fixture real {alvo.name} — ela chega pelo branch")
+    return alvo
+
+
+def e_material_real_validador(raiz: Path) -> None:
+    """E-X1 (Q7): a resposta v1 REAL passa pelo `clipper select`, sem edição.
+
+    Régua C.11: nada do conteúdo sai na tela -- nem a saída do CLI, que cita
+    títulos. Só contagens.
+    """
+    import shutil
+
+    from provas import entrada_real as ER
+
+    resposta = _fixture_real("resposta-v1.json")
+    trans = json.loads(_fixture_real("transcricao.json").read_text(encoding="utf-8"))
+    R = _p5_raiz(raiz, "e-x1")
+    entrada, saida = ER.semear(R, "e-x1", trans)
+    copia = R / "_entradas" / "resposta-v1.json"
+    shutil.copyfile(resposta, copia)
+    confere(copia.read_bytes() == resposta.read_bytes(),
+            "a resposta vai ao CLI byte a byte, sem edição", f"{copia.stat().st_size} bytes")
+
+    proc = ER.cli("select", entrada, "--out", R, "--resposta", copia)
+    confere(proc.returncode == 0, "`clipper select` aceita a resposta real",
+            f"rc={proc.returncode}")
+    clipes = json.loads(saida.selecao_json.read_text(encoding="utf-8")).get("clipes") or []
+    confere(len(clipes) == 5, "os 5 clipes da resposta real foram aprovados",
+            f"{len(clipes)} clipe(s)")
+    confere(all(not c.get("segmentos") for c in clipes), "os 5 seguem v1 (contrato congelado)")
+    confere(all(20.0 - 1e-6 <= float(c["duracao"]) <= 90.0 + 1e-6 for c in clipes),
+            "todas as durações dentro de 20–90 s",
+            f"soma {sum(float(c['duracao']) for c in clipes):.1f} s")
+    aceito, _ = _p5_validador_do_render_aceita(clipes, saida.selecao_json)
+    confere(aceito, "o validador do render aceita o selecao.json real")
+    avisos = sum(1 for l in ER.saida_do_cli(proc).splitlines() if "atenção" in l)
+    print(f"    nota  avisos de ajuste ≥3 s na resposta real: {avisos}")
+
+
+def e_material_real_quebrador(raiz: Path) -> None:
+    """E-X2 (Q7): o quebrador de legenda sobre a transcrição REAL.
+
+    Nenhum bloco com mais de 7 palavras nem mais de 2 linhas, em todo bloco,
+    nos 4 presets, na transcrição inteira e nos 5 trechos reais. Só contagens.
+    Prova de UNIDADE do quebrador (mesma via da E-L1); a contraparte de
+    integração é a legenda queimada no render real da inspeção.
+    """
+    from clipper import legendas as L
+    from clipper.fronteiras import Fronteiras
+    from clipper.modelo import Modelo
+    from clipper.pipeline import select
+
+    trans = json.loads(_fixture_real("transcricao.json").read_text(encoding="utf-8"))
+    dados = json.loads(_fixture_real("resposta-v1.json").read_text(encoding="utf-8"))
+    fr = Fronteiras.de_transcricao(trans)
+    ok, probs = select.validar(dados, fr, {}, n=5)
+    confere(len(ok) == 5 and not probs, "os 5 trechos reais saem do validador",
+            f"{len(ok)} trecho(s), {len(probs)} problema(s)")
+
+    escopos = [(0.0, fr.duracao)] + [(float(c["inicio"]), float(c["fim"])) for c in ok]
+    for nome in TODOS_OS_MODELOS:
+        preset = Modelo.de_fabrica(nome).legenda
+        blocos_total = maior_palavras = maior_linhas = de_uma = 0
+        palavras_lidas = palavras_esperadas = 0
+        for inicio, fim in escopos:
+            lista = [p for p in fr.palavras_entre(inicio, fim)
+                     if str(p.get("texto") or "").strip()]
+            texto, _ = L.montar_ass(lista, preset=preset, inicio=inicio, fim=fim)
+            blocos = _blocos_do_ass(texto)
+            contagens = [len(_palavras_do_bloco(b)) for b in blocos]
+            blocos_total += len(blocos)
+            maior_palavras = max([maior_palavras, *contagens])
+            maior_linhas = max([maior_linhas, *(b.count("\\N") + 1 for b in blocos)])
+            de_uma += sum(1 for n in contagens if n == 1)
+            palavras_lidas += sum(contagens)
+            palavras_esperadas += len(lista)
+        confere(maior_palavras <= 7 and maior_palavras <= preset.max_palavras_linha,
+                f"{nome}: nenhum bloco passa de 7 palavras nem do teto do preset",
+                f"{blocos_total} blocos, maior {maior_palavras}, teto {preset.max_palavras_linha}")
+        confere(maior_linhas <= 2, f"{nome}: nenhum bloco passa de 2 linhas",
+                f"maior {maior_linhas}")
+        confere(palavras_lidas == palavras_esperadas,
+                f"{nome}: nenhuma palavra perdida nem inventada",
+                f"{palavras_lidas}/{palavras_esperadas}; blocos de 1 palavra: {de_uma}")
+
+
+def e_fixtures_sem_conversao_de_linha(raiz: Path) -> None:
+    """Q9: `provas/fixtures/** -text` — nenhum clone converte fim de linha."""
+    import hashlib
+    import shutil
+    import subprocess
+
+    git = shutil.which("git")
+    if not git or not (RAIZ / ".git").exists():
+        raise Pulou("sem git ou fora de um clone git")
+    regras = RAIZ / ".gitattributes"
+    linhas = regras.read_text(encoding="utf-8").splitlines() if regras.is_file() else []
+    confere(any(l.split() == ["provas/fixtures/**", "-text"] for l in linhas),
+            "`.gitattributes` tem a regra no padrão amplo `provas/fixtures/** -text`",
+            "presente" if regras.is_file() else "arquivo ausente")
+    alvos = [
+        "provas/fixtures/wetyO2gOOeU/resposta-v1.json",
+        "provas/fixtures/wetyO2gOOeU/transcricao.json",
+        "provas/fixtures/sintetica/palavras.json",
+        "provas/fixtures/baseline/legenda-cortes.ass",
+    ]
+    proc = subprocess.run([git, "check-attr", "text", "--", *alvos], cwd=RAIZ,
+                          capture_output=True, text=True)
+    for alvo in alvos:
+        linha = next((l for l in proc.stdout.splitlines() if l.startswith(alvo + ":")), "")
+        confere(linha.endswith(": unset"), f"{alvo}: atributo `text` desligado",
+                linha.rsplit(": ", 1)[-1] if linha else "sem resposta do git")
+    for nome, esperado in _SHA256_FIXTURES_REAIS.items():
+        obtido = hashlib.sha256(_fixture_real(nome).read_bytes()).hexdigest()
+        confere(obtido == esperado, f"{nome}: bytes idênticos aos do painel", obtido[:16])
+
+
+_GANCHO_LONGO = (
+    "DESCOBRIMOS EXATAMENTE QUANTO CUSTA MANTER ESSA MÁQUINA "
+    "FUNCIONANDO DURANTE UM ANO INTEIRO"
+)
+# Letras largas de proposito: a conclusao continua podendo ser cortada (so o
+# gancho ganhou "nunca truncar"), e quando for, o render tem de avisar.
+_CONCLUSAO_LARGA = "WWWWW MMMMM WWWWW MMMMM WWWWW MMMMM WWWWW MMMMM WWWWW MMMMM WWWWW MMMMM WWWWW MMMMM WWWWW"
+
+
+def f_p5_v2_ponta_a_ponta(raiz: Path) -> None:
+    """Q1 (D-B) física: select → render de um v2 pelo CLI e pelo painel.
+
+    Mais três menores da D5 no mesmo render: o log mostra a soma e não o span;
+    o gancho de 90 caracteres vai para 3 linhas e o relatório avisa; a
+    conclusão cortada gera aviso.
+    """
+    from provas import entrada_real as ER
+
+    R = _p5_raiz(raiz, "f-i1")
+    video = ER.video_lavfi(_p5_videos(raiz) / "fonte-p5.mp4", 70.0)
+    trans = ER.transcricao_sintetica(68.0)
+    fr = ER.frases(trans)
+    entrada, saida = ER.semear(R, "f-i1", trans, video=video)
+    resp = ER.gravar_resposta(R, "resp", [ER.item(
+        titulo="Clipe de prova", segmentos=[_p5_seg(fr, 0, 2), _p5_seg(fr, 6, 8)],
+        gancho_sugerido=_GANCHO_LONGO, conclusao=_CONCLUSAO_LARGA,
+    )])
+    proc = ER.cli("select", entrada, "--out", R, "--resposta", resp)
+    confere(proc.returncode == 0, "`clipper select` aceita o v2", _p5_rc(proc))
+    clipe = json.loads(saida.selecao_json.read_text(encoding="utf-8"))["clipes"][0]
+    soma = sum(float(s["fim"]) - float(s["inicio"]) for s in clipe["segmentos"])
+    span = float(clipe["fim"]) - float(clipe["inicio"])
+
+    proc = ER.cli("render", saida.slug, "--out", R, "--preset", "cortes")
+    texto = ER.saida_do_cli(proc)
+    confere(proc.returncode == 0, "CLI: `clipper render` renderiza o clipe v2", _p5_rc(proc))
+    mp4s = ER.clipes_mp4(saida, "cortes")
+    confere(len(mp4s) == 1, "CLI: saiu um MP4")
+    medida = ER.duracao_medida(mp4s[0])
+    confere(abs(medida - soma) <= 0.5, "CLI: duração do MP4 = soma dos segmentos ±0,5 s",
+            f"soma {soma:.2f} s, medido {medida:.2f} s")
+
+    linha = next((l for l in texto.splitlines() if "clipe 1 —" in l), "")
+    confere(f"{soma:.0f}s" in linha and f"{span:.0f}s" not in linha,
+            "o log do render mostra a soma, não o span",
+            f"soma {soma:.0f}s, span {span:.0f}s: {linha.strip()[-60:]}")
+    avisos_gancho = [l for l in texto.splitlines() if "gancho" in l and "linhas" in l]
+    confere(bool(avisos_gancho), "o gancho de 90 caracteres passou de 2 linhas e o log avisa",
+            (avisos_gancho[0].strip() if avisos_gancho else "sem aviso")[:110])
+    avisos_concl = [l for l in texto.splitlines() if "conclusão" in l and "cortad" in l]
+    confere(bool(avisos_concl), "a conclusão cortada gera aviso",
+            (avisos_concl[0].strip() if avisos_concl else "sem aviso")[:110])
+    relatorio = saida.relatorio_md.read_text(encoding="utf-8")
+    trecho = relatorio.split("**Avisos:**", 1)[1][:300] if "**Avisos:**" in relatorio else ""
+    confere("gancho" in trecho and "conclusão" in trecho,
+            "o relatorio.md avisa do gancho em 3+ linhas e da conclusão cortada",
+            " ".join(trecho.split())[:110] or "sem seção de avisos")
+
+    job = ER.job_do_painel(R, saida.slug, entrada, comando="render",
+                           somente=("render",), preset="cortes", forcar=True)
+    confere(job.get("status") == "concluido", "painel: o job de render termina concluído",
+            f"status {job.get('status')}; erro {str((job.get('erro') or {}).get('mensagem'))[:80]}")
+    medida = ER.duracao_medida(ER.clipes_mp4(saida, "cortes")[0])
+    confere(abs(medida - soma) <= 0.5, "painel: duração do MP4 = soma dos segmentos ±0,5 s",
+            f"soma {soma:.2f} s, medido {medida:.2f} s")
+
+
+def f_p5_v2_um_segmento_sem_composicao(raiz: Path) -> None:
+    """Q4 física: sem composição, v2 de 1 segmento renderiza inteiro; 2+ é recusado."""
+    from provas import entrada_real as ER
+
+    R = _p5_raiz(raiz, "f-i2")
+    video = ER.video_lavfi(_p5_videos(raiz) / "fonte-p5.mp4", 70.0)
+    trans = ER.transcricao_sintetica(68.0)
+    fr = ER.frases(trans)
+    entrada, saida = ER.semear(R, "f-i2", trans, video=video)
+
+    resp = ER.gravar_resposta(R, "um", [ER.item(titulo="Um trecho", segmentos=[_p5_seg(fr, 0, 5)])])
+    proc = ER.cli("select", entrada, "--out", R, "--resposta", resp)
+    confere(proc.returncode == 0, "`clipper select` aceita o v2 de 1 segmento", _p5_rc(proc))
+    clipe = json.loads(saida.selecao_json.read_text(encoding="utf-8"))["clipes"][0]
+    esperado = float(clipe["segmentos"][0]["fim"]) - float(clipe["segmentos"][0]["inicio"])
+    proc = ER.cli("render", saida.slug, "--out", R, "--preset", "bold-amarelo")
+    confere(proc.returncode == 0, "1 segmento: `clipper render --preset bold-amarelo` renderiza",
+            _p5_rc(proc))
+    mp4s = ER.clipes_mp4(saida, "bold-amarelo")
+    confere(len(mp4s) == 1, "1 segmento: saiu um MP4")
+    medida = ER.duracao_medida(mp4s[0])
+    confere(abs(medida - esperado) <= 0.5, "1 segmento: o MP4 tem o trecho inteiro",
+            f"esperado {esperado:.2f} s, medido {medida:.2f} s")
+    marca = mp4s[0].stat().st_mtime_ns
+
+    time.sleep(1.1)  # a assinatura do render usa o mtime do selecao.json em segundos
+    resp = ER.gravar_resposta(R, "dois", [ER.item(
+        titulo="Um trecho", segmentos=[_p5_seg(fr, 0, 2), _p5_seg(fr, 6, 8)])])
+    proc = ER.cli("select", entrada, "--out", R, "--resposta", resp)
+    confere(proc.returncode == 0, "`clipper select` aceita o v2 de 2 segmentos", _p5_rc(proc))
+    proc = ER.cli("render", saida.slug, "--out", R, "--preset", "bold-amarelo")
+    texto = ER.saida_do_cli(proc)
+    confere(proc.returncode != 0 and "não tem composição" in texto,
+            "2 segmentos: o render recusa com o motivo", f"rc={proc.returncode}")
+    confere(all(p.stat().st_mtime_ns == marca for p in ER.clipes_mp4(saida, "bold-amarelo")),
+            "2 segmentos: nenhum MP4 foi escrito")
+
+
+def f_p5_capa_regenerada(raiz: Path) -> None:
+    """Q5 (D-E): capa e publicacao.md acompanham o MP4, sempre, pelo CLI."""
+    from clipper import ffmpeg_utils
+    from PIL import Image, ImageChops, ImageStat
+    from provas import entrada_real as ER
+
+    R = _p5_raiz(raiz, "f-i3")
+    video = ER.video_lavfi(_p5_videos(raiz) / "fonte-p5.mp4", 70.0)
+    trans = ER.transcricao_sintetica(68.0)
+    fr = ER.frases(trans)
+    entrada, saida = ER.semear(R, "f-i3", trans, video=video)
+
+    def selecionar(capa_ts: str) -> float:
+        time.sleep(1.1)  # a assinatura do render usa o mtime do selecao.json em segundos
+        resp = ER.gravar_resposta(R, f"capa-{capa_ts.replace(':', '')}", [
+            ER.item(titulo="Capa", capa_ts=capa_ts, **_p5_seg(fr, 1, 6)),
+        ])
+        proc = ER.cli("select", entrada, "--out", R, "--resposta", resp)
+        confere(proc.returncode == 0, f"`clipper select` com capa_ts {capa_ts}", _p5_rc(proc))
+        clipe = json.loads(saida.selecao_json.read_text(encoding="utf-8"))["clipes"][0]
+        return float(clipe["capa_ts"]) - float(clipe["inicio"])
+
+    def renderizar(*extra: str) -> tuple[Path, Path, Path]:
+        proc = ER.cli("render", saida.slug, "--out", R, "--preset", "cortes", *extra)
+        confere(proc.returncode == 0, "`clipper render " + " ".join(extra) + "` termina bem",
+                _p5_rc(proc))
+        mp4 = ER.clipes_mp4(saida, "cortes")[0]
+        return mp4, mp4.with_suffix(".capa.jpg"), mp4.with_suffix(".publicacao.md")
+
+    def bate(capa: Path, mp4: Path, instante: float, rotulo: str) -> None:
+        confere(capa.is_file(), f"{rotulo}: capa.jpg existe")
+        ref = R / "_entradas" / "referencia.jpg"
+        ffmpeg_utils.rodar(["-ss", f"{instante:.3f}", "-i", str(mp4), "-frames:v", "1",
+                            "-q:v", "3", "-y", str(ref)], descricao="quadro de referência")
+        a, b = Image.open(capa).convert("L"), Image.open(ref).convert("L")
+        d = ImageStat.Stat(ImageChops.difference(a, b)).mean[0] if a.size == b.size else 999.0
+        confere(d < 1.0, f"{rotulo}: a capa é o quadro do capa_ts atual",
+                f"instante {instante:.2f} s, diferença média {d:.3f}")
+
+    instante = selecionar("00:08")
+    mp4, capa, pub = renderizar()
+    bate(capa, mp4, instante, "1ª rodada")
+
+    instante = selecionar("00:20")
+    mp4, capa, pub = renderizar()
+    bate(capa, mp4, instante, "capa_ts novo, sem --force")
+
+    marca_mp4 = mp4.stat().st_mtime_ns
+    capa.unlink()
+    pub.unlink()
+    mp4, capa, pub = renderizar()
+    confere(capa.is_file() and pub.is_file(),
+            "capa e publicacao.md apagadas voltam sem --force")
+    confere(mp4.stat().st_mtime_ns == marca_mp4, "… sem re-encodar o MP4")
+    bate(capa, mp4, instante, "capa regenerada no reaproveitamento")
+
+    marca_capa = capa.stat().st_mtime_ns
+    time.sleep(1.1)
+    mp4, capa, pub = renderizar("--force")
+    confere(mp4.stat().st_mtime_ns > marca_mp4 and capa.stat().st_mtime_ns > marca_capa,
+            "`--force` re-encoda e regrava a capa")
+    bate(capa, mp4, instante, "depois do --force")
+
+
+def f_p5_reframe_dentro_dos_segmentos(raiz: Path) -> None:
+    """Q6 (D-F): o reframe amostra só DENTRO dos segmentos mantidos.
+
+    Espião não-invasivo em ffmpeg_utils.rodar: registra -ss/-t das chamadas de
+    amostragem e de detecção de tarja e repassa sem mudar nada. O render roda
+    por clipper.cli.main -- a mesma função do `python -m clipper`.
+    """
+    from clipper import ffmpeg_utils
+    from provas import entrada_real as ER
+
+    R = _p5_raiz(raiz, "f-i4")
+    video = ER.video_lavfi(_p5_videos(raiz) / "fonte-p5.mp4", 70.0)
+    trans = ER.transcricao_sintetica(68.0)
+    fr = ER.frases(trans)
+    entrada, saida = ER.semear(R, "f-i4", trans, video=video)
+    resp = ER.gravar_resposta(R, "resp", [ER.item(
+        titulo="Reframe", segmentos=[_p5_seg(fr, 0, 2), _p5_seg(fr, 12, 14)])])
+    proc = ER.cli("select", entrada, "--out", R, "--resposta", resp)
+    confere(proc.returncode == 0, "`clipper select` aceita o v2", _p5_rc(proc))
+    clipe = json.loads(saida.selecao_json.read_text(encoding="utf-8"))["clipes"][0]
+    trechos = [(float(s["inicio"]), float(s["fim"])) for s in clipe["segmentos"]]
+
+    original = ffmpeg_utils.rodar
+    janelas: list[tuple[str, float, float]] = []
+
+    def espiao(args: list[str], *a: Any, **k: Any) -> Any:
+        descricao = str(k.get("descricao") or "")
+        if descricao.startswith(("amostragem de frames", "detecção de tarja")) and "-ss" in args:
+            ss = float(args[args.index("-ss") + 1])
+            t = float(args[args.index("-t") + 1])
+            janelas.append((descricao.split(" ")[0], ss, ss + t))
+        return original(args, *a, **k)
+
+    ffmpeg_utils.rodar = espiao
+    try:
+        rc = ER.cli_em_processo(["render", saida.slug, "--out", str(R), "--preset", "cortes",
+                                 "--force"])
+    finally:
+        ffmpeg_utils.rodar = original
+    confere(rc == 0, "`clipper render` termina bem", f"rc={rc}")
+    confere(any(t == "amostragem" for t, _, _ in janelas), "o reframe amostrou quadros",
+            f"{len(janelas)} janela(s)")
+
+    def dentro(a: float, b: float) -> bool:
+        return any(a >= s0 - 0.05 and b <= s1 + 0.05 for s0, s1 in trechos)
+
+    for tipo, a, b in janelas:
+        confere(dentro(a, b), f"janela de {tipo} {a:.2f}–{b:.2f} s cai dentro de um segmento",
+                " | ".join(f"{s0:.2f}–{s1:.2f}" for s0, s1 in trechos))
+    s0, s1 = trechos[-1]
+    confere(any(t == "amostragem" and a >= s0 - 0.05 and b <= s1 + 0.05 for t, a, b in janelas),
+            "o último segmento também é amostrado")
+
+
+def f_p5_gancho_real_nunca_truncado(raiz: Path) -> None:
+    """Q10 (P07/P16): os ganchos REAIS saem inteiros. Só contagens (C.11).
+
+    Mede também o caso extremo que o §11.1 exige ver junto: 90 caracteres de
+    letras largas e uma palavra única sem espaço.
+    """
+    from clipper import composicao as C
+    from clipper.modelo import Modelo
+
+    dados = json.loads(_fixture_real("resposta-v1.json").read_text(encoding="utf-8"))
+    trabalho = _p5_raiz(raiz, "f-g3")
+    extremos = {
+        "PT caixa alta, 90": _GANCHO_LONGO,
+        "W/M, 89": _CONCLUSAO_LARGA,
+        "palavra única de 90 W": "W" * 90,
+    }
+    for nome in MODELOS_COMPOSTOS:
+        comp = Modelo.de_fabrica(nome).composicao
+        truncados, incompletos, linhas = 0, 0, []
+        for i, clipe in enumerate(dados, 1):
+            gancho = str(clipe["gancho_sugerido"])
+            pil = C.gerar_ativos(comp, "título", trabalho / nome / f"real-{i}", gancho=gancho)["pilula"]
+            esperado = " ".join(gancho.split())
+            if comp.titulo_maiusculas:
+                esperado = esperado.upper()
+            desenhado = "".join(pil.get("texto_linhas") or [])
+            truncados += 1 if pil.get("truncado") else 0
+            incompletos += 0 if desenhado.replace(" ", "") == esperado.replace(" ", "") else 1
+            linhas.append(int(pil.get("linhas") or 0))
+        confere(truncados == 0, f"{nome}: nenhum dos {len(dados)} ganchos reais sai truncado",
+                f"truncados: {truncados}; linhas por gancho: {linhas}")
+        confere(incompletos == 0, f"{nome}: cada gancho desenhado é o texto inteiro",
+                f"incompletos: {incompletos}")
+
+        for rotulo, texto in extremos.items():
+            pil = C.gerar_ativos(comp, "título", trabalho / nome / "extremo", gancho=texto)["pilula"]
+            base = int(comp.gancho_y) + int(pil["altura"])
+            confere(not pil.get("truncado"),
+                    f"{nome}: caso extremo ({rotulo}) também sai inteiro",
+                    f"{pil['linhas']} linhas @ {pil['tamanho']} px, altura {pil['altura']} px, "
+                    f"base em y={base}")
+
+
+# ==========================================================================
 # Registro
 # ==========================================================================
 
@@ -1372,7 +2102,7 @@ ESTRUTURAIS: dict[str, tuple[str, Callable[[Path], None]]] = {
     "E-M3": ("Emenda 1: chave desconhecida avisa e não rejeita", e_modelo_avisa_chave_desconhecida),
     "E-M4": ("Emenda 1: preset sem composição segue no caminho F3", e_modelo_sem_composicao),
     "E-R1": ("Regressão: filtergraph x baseline 12fc1e2b (delta só em E1)", e_regressao_filtergraph),
-    "E-R2": ("Regressão: .ass x baseline 12fc1e2b (delta só em E2/E3)", e_regressao_ass),
+    "E-R2": ("Regressão: .ass x baseline 12fc1e2b (delta só em E2/E3; Style só MarginV)", e_regressao_ass),
     "E-L1": ("E3: conformidade — ≤7 palavras e ≤2 linhas em TODOS os blocos", e_legenda_conformidade),
     "E-L2": ("E3: destaque nunca cai em palavra de ≤2 letras", e_legenda_destaque_pula_curtas),
     "E-L3": ("E3: a guarda de lacuna impede fusão através de pausa longa", e_legenda_guarda_de_lacuna),
@@ -1383,7 +2113,7 @@ ESTRUTURAIS: dict[str, tuple[str, Callable[[Path], None]]] = {
     "E-V2": ("P2: as 8 mordidas, cada uma discriminando o motivo", e_v2_mordidas),
     "E-V3": ("P2: não-sobreposição é pela UNIÃO, não pelo span", e_v2_uniao_nao_span),
     "E-V4": ("P2: o contrato v1 segue intacto no validador", e_v1_intacto_no_validador),
-    "E-V5": ("P2: o caminho --api aceita v2 sem afrouxar o esquema", e_esquema_api_aceita_v2),
+    "E-V5": ("Q3 D-C: esquema × validador; `select --api` pelo CLI aceita v2", e_esquema_api_aceita_v2),
     "E-C1": ("P2: sem conclusão, grafo idêntico; com ela, 2 etapas", e_conclusao_ausente_grafo_identico),
     "E-C2": ("P2: concat antes do crop, PNGs renumerados, crossfade", e_concat_v2_no_grafo),
     "E-C3": ("P2: punches e legendas remapeados para a timeline", e_remapeamento_de_tempos),
@@ -1392,6 +2122,14 @@ ESTRUTURAIS: dict[str, tuple[str, Callable[[Path], None]]] = {
     "E-P3": ("P3: publicacao.md com título, gancho e checklist", e_publicacao_md),
     "E-P4": ("P4: o prompt v2 ensina segmentos, gancho e payoff", e_prompt_v2),
     "E-C4": ("P2: vão ≥ 24 px entre a conclusão e o bloco de legenda", e_conclusao_nao_encosta_na_legenda),
+    "E-I1": ("Q1 D-B: o selecao.json v2 do CLI passa no portão do render", e_p5_selecao_v2_passa_no_render),
+    "E-I2": ("Q2 D-A: sobreposição entre 3 clipes não adjacentes, pelo CLI", e_p5_sobreposicao_tres_clipes),
+    "E-I3": ("Q10 P01: aviso de ajuste ≥3 s também no v2, pelo CLI", e_p5_aviso_de_ajuste_v2),
+    "E-I4": ("Q10 P03: segmentos colados fundidos com nota; pausa real não", e_p5_segmentos_colados_fundidos),
+    "E-I5": ("Q4 D-D: v2 de 2+ segmentos sem composição é recusado, pelo CLI", e_p5_v2_sem_composicao_recusado),
+    "E-X1": ("Q7: resposta v1 REAL passa pelo `clipper select` (contagens)", e_material_real_validador),
+    "E-X2": ("Q7: quebrador sobre a transcrição REAL (contagens)", e_material_real_quebrador),
+    "E-F1": ("Q9: provas/fixtures/** é -text; bytes reais intactos", e_fixtures_sem_conversao_de_linha),
 }
 
 FISICAS: dict[str, tuple[str, Callable[[Path], None]]] = {
@@ -1401,6 +2139,11 @@ FISICAS: dict[str, tuple[str, Callable[[Path], None]]] = {
     "F-V2": ("P2 física: -14 LUFS ±1 no áudio concatenado", f_v2_lufs),
     "F-P1": ("P3 física: capa.jpg sai do instante certo", f_v2_capa),
     "F-C1": ("P2 física: a conclusão aparece no fim, não no meio", f_conclusao_no_frame),
+    "F-I1": ("Q1 D-B física: select → render v2 pelo CLI e pelo painel; MP4 = soma", f_p5_v2_ponta_a_ponta),
+    "F-I2": ("Q4 física: sem composição, 1 segmento renderiza e 2+ é recusado", f_p5_v2_um_segmento_sem_composicao),
+    "F-I3": ("Q5 D-E: capa e publicacao.md acompanham o MP4, pelo CLI", f_p5_capa_regenerada),
+    "F-I4": ("Q6 D-F: o reframe amostra dentro dos segmentos, pelo CLI", f_p5_reframe_dentro_dos_segmentos),
+    "F-G3": ("Q10 P07: ganchos reais e caso extremo nunca truncados (contagens)", f_p5_gancho_real_nunca_truncado),
 }
 
 
