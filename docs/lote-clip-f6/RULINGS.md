@@ -45,6 +45,7 @@ substituir os dois — é um commit.
 | **D4** | **Retomada local — esta máquina assume o fechamento** (§12) | 16/09 |
 | **D5** | **Triagem do D4 + P5 "integração v2"** (§13) | 16/09 |
 | **D6** | **P5 aceito; decisões; inspeção do Bruno** (§14) | 16/09 |
+| **D7** | **Merge do CLIP-F6 ("f6 ok" do Bruno)** (§15) | 16/09 |
 
 **Convenção a partir da D1:** diretivas do arquiteto são **numeradas e
 autossuficientes**. Cada uma é transcrita aqui inteira, como seção própria.
@@ -894,3 +895,61 @@ nenhum conserto neste lote.
 | 5 | Palavra explícita do Bruno ("f6 ok") | **pendente** |
 
 Depois do "f6 ok": PARE aguardando a D7 (procedimento de merge).
+
+
+---
+
+## 15. D7 — merge do CLIP-F6 (palavra do Bruno: "f6 ok")
+
+Recebida em 16/09. Transcrição verbatim.
+
+```
+D7 — MERGE DO CLIP-F6 (palavra do Bruno: "f6 ok")
+
+Primeiro ato: append ao RULINGS + commit no branch (último commit antes do
+merge). Depois, nesta ordem, com medida a cada passo:
+
+1. PRÉ-VOO: git fetch; confirmar origin/master ainda em 12fc1e2b (ninguém
+   andou) e origin/lote/clip-f6 no tip esperado (e580d21 ou o commit da
+   D7). Suíte completa uma última vez no worktree: esperado 44/44.
+2. MERGE em master: fast-forward se possível (a cadeia é linear desde
+   12fc1e2b); se não for, merge commit — NUNCA rebase (SHAs citados nos
+   registros não podem ficar órfãos). Push de master. Reportar o SHA novo
+   de origin/master.
+3. CÓPIA DO PAINEL (C:\Users\Micro\Desktop\ClipPro): git status antes
+   (tem de estar limpa fora de out/ e do briefing solto); git pull;
+   confirmar HEAD == origin/master. NÃO recriar o .venv — o lockfile
+   ainda está sem fastapi/uvicorn (CLIP-F6.1); o ambiente atual serve.
+4. INVALIDAÇÃO ESPERADA: VERSAO 3 faz os 5 clipes da GT3RS re-renderizarem
+   na próxima passada do painel — avisar o Bruno que é esperado, não
+   defeito. Antes disso, fechar qualquer player com MP4 aberto (o bug do
+   re-render com arquivo aberto ainda existe até o F6.1).
+5. SMOKE PÓS-MERGE, pelo painel real: subir o painel na cópia, abrir o job
+   da GT3RS, re-renderizar um clipe e confirmar que sai com gancho no topo
+   e sem caixa permanente. É a única prova que atravessa o deploy de
+   verdade.
+6. BRANCH: lote/clip-f6 fica no remoto por 7 dias como referência dos
+   SHAs, depois apaga; o worktree ClipPro-clip-f6 pode ser removido após
+   o passo 5 (desfazer junction de node_modules/.venv antes, se houver).
+7. RELATÓRIO CURTO: SHAs (master antes/depois), placar da suíte, resultado
+   do smoke do passo 5, e o que ficou para o CLIP-F6.1.
+
+Fila do ClipPro depois do pouso: CLIP-F6.1 (higiene: lockfile, 2 bugs do
+painel, log, README/--help, provas F1–F4, _trabalho/) → F8a (modelos) →
+F8b (horizontal) → F8c (referência). F7 (narração) segue guardada.
+PARE no relatório.
+```
+
+### 15.1 Efeitos imediatos da D7
+
+- **Palavra do Bruno dada ("f6 ok").** Checklist de merge (§14.4) completo:
+  inspeção visual e palavra do Bruno registradas pela própria D7.
+- **Este é o último commit do lote antes do merge.** O merge em `master` é
+  fast-forward a partir de `12fc1e2b` (cadeia linear), nunca rebase: todo SHA
+  citado neste arquivo e nos relatórios continua alcançável a partir de
+  `master`.
+- **Branch `lote/clip-f6`:** fica no remoto por 7 dias como referência dos
+  SHAs (até 23/09/2026) e depois é apagado.
+- **Fila do ClipPro depois do pouso:** CLIP-F6.1 (higiene — §12.2 e §14.3) →
+  F8a (modelos) → F8b (horizontal) → F8c (referência). F7 (narração) segue
+  guardada.
