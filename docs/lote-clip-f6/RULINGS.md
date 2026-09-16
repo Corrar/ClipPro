@@ -42,6 +42,7 @@ substituir os dois — é um commit.
 | **D1** | **COLAGEM B — triagem do P1 + liberação P2–P4** (§9) | 13/09 |
 | **D2** | **Triagem do relatório final + checklist de merge** (§10) | 13/09 |
 | **D3** | **Conserto do `conclusao.y`** (§11) | 13/09 |
+| **D4** | **Retomada local — esta máquina assume o fechamento** (§12) | 16/09 |
 
 **Convenção a partir da D1:** diretivas do arquiteto são **numeradas e
 autossuficientes**. Cada uma é transcrita aqui inteira, como seção própria.
@@ -608,3 +609,91 @@ O que a regra exige na prática:
 
 Erro compartilhado, registrado como tal: o executor calculou errado, o
 arquiteto aprovou sem exigir o extremo.
+
+
+---
+
+## 12. D4 — retomada local (esta máquina assume o fechamento)
+
+Recebida em 16/09. Transcrição verbatim.
+
+```
+D4 — CLIP-F6: RETOMADA LOCAL (esta máquina assume o fechamento)
+
+Correção de premissa: o F6 NÃO é só briefing. Está em origin/lote/clip-f6
+(commits [CLIP-F6] a partir de 12fc1e2b), com CLAUDE.md e
+docs/lote-clip-f6/RULINGS.md dentro do branch. master está em 12fc1e2b por
+regra (merge só com palavra do Bruno).
+
+0. git fetch origin. Listar os commits de origin/lote/clip-f6 e LER
+   CLAUDE.md + docs/lote-clip-f6/RULINGS.md do branch ANTES de qualquer
+   pergunta: as 18 que você juntou se resolvem quase todas ali (Q1-Q6,
+   D1-D2, exceções E1-E3, R2/R4/A2/A3, etc.). O que sobrar depois da
+   leitura, liste com a referência do RULINGS conferida.
+1. NÃO fazer checkout do branch nesta cópia (é a do painel, em uso;
+   VERSAO 3 invalidaria o cache). Criar WORKTREE separado para
+   lote/clip-f6 e trabalhar nele, com out/ próprio.
+2. P0.5 — FIXTURES (urgente: o painel sobrescreve resposta.json a cada
+   colagem). Copiar byte a byte, sem editar:
+   out/<job wetyO2gO…>/resposta.json    → provas/fixtures/wetyO2gOOeU/resposta-v1.json
+   out/<job wetyO2gO…>/transcricao.json → provas/fixtures/wetyO2gOOeU/transcricao.json
+   git add (a exceção !provas/fixtures/** já está no branch), commit
+   "[CLIP-F6] fixtures reais do job wetyO2gOOeU", push. Reportar bytes e
+   sha256 dos dois — NÃO o conteúdo.
+3. Verificar se a D3 pousou: conclusao.y 1040 → 960 nos dois presets
+   compostos e E-C4 verde. Se NÃO pousou, aplicar agora exatamente isto
+   (um commit): y = 960 em cortes e cortes-editorial; rerodar a suíte
+   estrutural inteira; confirmar que as exceções E1–E3 da regressão não
+   são tocadas (conclusão é pós-baseline; ausente ⇒ 0 etapas). Lição já
+   gravada: valor geométrico só aprovado com o caso extremo calculado.
+4. Rodar no worktree: provas/prova_f6.py --fisicas (estruturais + físicas,
+   incluindo as 2 de material real que a fixture destrava). Esperado: tudo
+   verde. Salvar os PNGs do gancho (t=1s/t=4s), os da conclusão e o
+   capa.jpg em pasta nomeada para inspeção do Bruno.
+5. Colar no relatório, na íntegra, docs/lote-clip-f6/prompt-v2.txt — a
+   revisão do arquiteto sobre ele é item de merge.
+6. PARE com o CHECKLIST DE MERGE (da D2 do RULINGS): [ ] prompt-v2
+   revisado [ ] físicas verdes + inspeção visual do Bruno [ ] fixtures +
+   provas de material real verdes [ ] palavra do Bruno. Nada de merge.
+
+FORA deste lote, REGISTRAR como CLIP-F6.1 (higiene, depois do merge): os
+2 bugs do painel (reprocessa pastas do terminal com opções padrão;
+re-render falha com mp4 aberto no Windows), lockfile sem
+fastapi/uvicorn/python-multipart (recriar o ambiente pelo lock mata o
+painel — defeito do F5), clipper.log inexistente, README/--help
+desatualizados, provas F1-F4 nunca versionadas, _trabalho/ com 1,76 GB
+de baixado.mp4 repetido. Nenhum conserto agora.
+.git/lost-found: pode remover.
+Régua C.11 vale aqui também: relatório e commit não carregam conteúdo de
+fixture nem dado pessoal — só bytes, hashes e contagens.
+```
+
+### 12.1 Efeitos imediatos da D4
+
+- **A execução do lote passa para o Windows do Bruno.** Worktree separado em
+  `C:\Users\Micro\Desktop\ClipPro-clip-f6` (branch local `lote/clip-f6`
+  rastreando `origin/lote/clip-f6`), com `out/` e `_teste/` próprios. A cópia
+  `C:\Users\Micro\Desktop\ClipPro` é a do painel: segue em `master` e não
+  recebe checkout.
+- **Paridade conferida na retomada (16/09):** `origin/master` = `12fc1e2b`;
+  `origin/lote/clip-f6` = `7e903ab` (D3), o último commit que este arquivo
+  descreve. Nada andou.
+- **Régua C.11:** o identificador "C.11" não aparece neste arquivo nem no
+  `CLAUDE.md` — não chegou a este canal. Vale pela definição dada na própria
+  D4: relatório e commit não carregam conteúdo de fixture nem dado pessoal;
+  só bytes, hashes e contagens.
+
+### 12.2 CLIP-F6.1 — lote de higiene, depois do merge
+
+Registro. **Nenhum conserto neste lote.** Referências de linha são de `master`
+(`12fc1e2b`), medidas no levantamento de 16/09.
+
+| # | Item | Evidência |
+|---|---|---|
+| 1 | Ao subir, o painel enfileira sozinho pasta feita no terminal que não chegou ao render, e roda `run` com as opções PADRÃO (whisper `medium`, `n=5`), ignorando as do terminal: re-transcreve e invalida o prompt já levado ao chat | `ui/server.py:636-652` não confere `do_terminal`; `ui/jobs.py:168-172` deduz `na_fila`; reproduzido em pasta sintética |
+| 2 | Re-renderizar falha no Windows com o mp4 aberto: `parcial.replace(destino)` → `PermissionError [WinError 5]`; um handle do streaming do próprio painel basta | `clipper/pipeline/render.py:1500`; ocorreu no job real em 11/09; mecanismo reproduzido |
+| 3 | `requirements.lock.txt` (da F0) sem `fastapi`, `uvicorn[standard]`, `python-multipart` e 6 transitivas: recriar o ambiente pelo lock mata o painel — defeito do F5 | `requirements.txt:31-33` x lock |
+| 4 | Jobs do painel não gravam `clipper.log`, mas a mensagem de erro inesperado manda procurar o traceback nele | `ui/jobs.py:489-497`; `registro.configurar` só é chamado no CLI |
+| 5 | README e `--help` desatualizados: epílogo cita `cortes-feed`; README usa o executável `clipper`, que não existe (só `python -m clipper`); README diz "recusa" onde o validador encaixa | `clipper/cli.py:48,63`; `README.md:12,85-87,118-124` |
+| 6 | Provas de F1–F4 nunca foram versionadas (só existem nas mensagens de commit) | `git log --all --name-only` |
+| 7 | `_trabalho/` guarda `baixado.mp4` repetido: ~1,76 GB somando os dois jobs | `du` em `out/*/_trabalho/` |
