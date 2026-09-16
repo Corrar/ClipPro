@@ -2082,6 +2082,48 @@ def _titulo_do_video(saida: Saida) -> str:
     return saida.slug
 
 
+def _recusar_v2_sem_composicao(
+    escolhidos: list[dict[str, Any]], preset: str, saida: Saida
+) -> None:
+    """Recusa clipe v2 de 2+ segmentos num preset sem composicao (D5 Q4).
+
+    Sem composicao o encode e um '-vf' sobre N entradas, sem concat, sem '-map'
+    e sem '-t' de saida: o ffmpeg escolhe sozinho o video da primeira entrada
+    e o MP4 sai so com o 1o segmento -- enquanto a legenda, o metadado e o
+    publicacao.md anunciam a soma. Isso nao pode sair em silencio. Juntar
+    segmentos no ramo sem composicao e semente registrada ("v2 no F3").
+
+    Um v2 de UM segmento e um trecho continuo e renderiza inteiro nesse ramo:
+    nao ha o que juntar, entao passa.
+    """
+    afetados = [
+        (int(c.get("id", i + 1)), len(c.get("segmentos") or []))
+        for i, c in enumerate(escolhidos)
+        if len(c.get("segmentos") or []) > 1
+    ]
+    if not afetados:
+        return
+    compostos: list[str] = []
+    for nome in _presets_disponiveis():
+        try:
+            if carregar_composicao(nome) is not None:
+                compostos.append(nome)
+        except ErroClipper:
+            continue
+    quais = ", ".join(f"clipe {id_clipe} ({n} segmentos)" for id_clipe, n in afetados)
+    alvo = PRESET_PADRAO if PRESET_PADRAO in compostos else (compostos[0] if compostos else PRESET_PADRAO)
+    raise ErroRender(
+        f"o preset '{preset}' não tem composição e não sabe juntar segmentos: "
+        f"{quais}. Sem composição o clipe sairia só com o primeiro trecho, então "
+        "nenhum clipe foi renderizado.",
+        sugestao=(
+            "renderize com um preset que tem composição"
+            + (f" ({', '.join(compostos)})" if compostos else "")
+            + f":  clipper render \"{saida.slug}\" --preset {alvo}{_sufixo_out(saida)}"
+        ),
+    )
+
+
 def _arquivos_no_lugar(saida: Saida, preset: str, ids: list[int]) -> bool:
     """Confere se os mp4 descritos no metadados ainda existem em clips/.
 
@@ -2214,6 +2256,10 @@ def renderizar(
     # Antes de qualquer encode: um campo torto nao pode aparecer no meio da
     # fila, depois de minutos gastos nos clipes anteriores.
     _validar_clipes(escolhidos, saida.selecao_json)
+    if comp is None:
+        # Antes do atalho de estagio concluido: um MP4 pela metade de uma
+        # rodada anterior nao pode ser "reaproveitado" em silencio.
+        _recusar_v2_sem_composicao(escolhidos, preset, saida)
     ids = sorted(int(c.get("id", i + 1)) for i, c in enumerate(escolhidos))
 
     # A assinatura NAO guarda quais clipes foram pedidos: isso e a forma do
