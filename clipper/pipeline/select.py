@@ -629,6 +629,15 @@ def _encaixar_segmentos(
     if problemas:
         return None, problemas, info
 
+    # O aviso de ajuste >=3 s (D5 Q10/P01) sai por segmento PEDIDO, com a
+    # numeracao do modelo, ANTES da fusao: quando e o proprio encaixe que
+    # deixa dois segmentos colados, a costura some na fusao -- e o material que
+    # o pedido cortava volta ao clipe. Esse e exatamente o ajuste que o usuario
+    # precisa ver (achado da revisao do P5).
+    for i, seg in enumerate(encaixados, 1):
+        if max(abs(seg["ajuste_inicio"]), abs(seg["ajuste_fim"])) >= _AVISO_AJUSTE_S:
+            info["ajustes"].append((f"segmento {i}", seg))
+
     # Fusao de segmentos COLADOS (D5 Q10/P03), depois da ordem e da
     # sobreposicao -- as mensagens de la numeram os segmentos como o modelo
     # mandou -- e ANTES da soma: a soma tem de ser a do que vai ser cortado.
@@ -654,24 +663,24 @@ def _encaixar_segmentos(
             juntos.append(dict(b))
             grupos.append([i + 1])
 
+    # A fusao devolve a lacuna ao clipe. Se isso passar do teto, nao funde: a
+    # fusao e conveniencia (uma junta a menos), e um pedido valido nao pode ser
+    # reprovado por causa dela -- com uma mensagem de "somam 90s" que nao bate
+    # com os segmentos que o modelo mandou (achado da revisao do P5).
+    if len(juntos) < len(encaixados) and sum(s["duracao"] for s in juntos) > max_s + _EPS:
+        juntos = [dict(s) for s in encaixados]
+        grupos = [[i] for i in range(1, len(encaixados) + 1)]
+
     limite_txt = f"{LACUNA_MAXIMA_FUSAO_S:.1f}".replace(".", ",")
     for grupo, seg in zip(grupos, juntos):
         if len(grupo) > 1:
+            numeros = [str(g) for g in grupo]
+            lista = ", ".join(numeros[:-1]) + " e " + numeros[-1]
             info["notas"].append(
-                f"segmentos {' e '.join(str(g) for g in grupo)} eram colados (blocos "
-                f"consecutivos, lacuna de até {limite_txt} s) e foram fundidos num "
-                f"trecho só: {mmss(seg['inicio'])}–{mmss(seg['fim'])}"
+                f"segmentos {lista} eram colados (blocos consecutivos, lacuna de até "
+                f"{limite_txt} s) e foram fundidos num trecho só: "
+                f"{mmss(seg['inicio'])}–{mmss(seg['fim'])}"
             )
-        # O aviso olha as bordas que SOBREVIVERAM: a costura interna de um
-        # grupo fundido deixou de existir, e avisar sobre ela seria ruido.
-        maior = max(abs(seg["ajuste_inicio"]), abs(seg["ajuste_fim"]))
-        if maior >= _AVISO_AJUSTE_S:
-            nome = (
-                f"segmento {grupo[0]}"
-                if len(grupo) == 1
-                else f"segmentos {' e '.join(str(g) for g in grupo)} (fundidos)"
-            )
-            info["ajustes"].append((nome, seg))
 
     total = sum(s["duracao"] for s in juntos)
     if total < min_s - _EPS:

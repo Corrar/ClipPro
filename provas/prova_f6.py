@@ -1486,10 +1486,16 @@ def e_conclusao_nao_encosta_na_legenda(_: Path) -> None:
 # P5 — integracao v2 pelo ponto de entrada real (RULINGS §13, D5)
 # ==========================================================================
 #
-# Regra do §13.1: as provas desta secao atravessam o CLI (`python -m clipper`)
-# e o caminho do painel (ui/jobs.py). Nenhuma monta a linha do ffmpeg a mao.
-# O apoio (semear a pasta, chamar o CLI, a fila do painel, a API falsa) vive
-# em provas/entrada_real.py.
+# Regra do §13.1: a parte de INTEGRACAO destas provas atravessa o CLI
+# (`python -m clipper`) e o caminho do painel (ui/jobs.py). Nenhuma monta a
+# linha do ffmpeg a mao. O apoio (semear a pasta, chamar o CLI, a fila do
+# painel, a API falsa) vive em provas/entrada_real.py.
+#
+# Declarado, e nao escondido: algumas conferencias sao de UNIDADE e chamam a
+# funcao direto -- as variantes de ordem da E-I2 e a primeira metade da E-V5
+# (select.validar), o portao do render na E-I1 e na E-X1
+# (render._validar_clipes), a E-X2 (quebrador) e a F-G3 (pilula). Cada uma
+# tem a sua contraparte pelo ponto de entrada na mesma prova ou numa fisica.
 
 
 def _p5_raiz(raiz: Path, nome: str) -> Path:
@@ -1636,6 +1642,40 @@ def e_p5_aviso_de_ajuste_v2(raiz: Path) -> None:
             (avisos_2[0].strip() if avisos_2 else "nenhum aviso")[:120])
     confere(not avisos_1, "e o ajuste pequeno do segmento 1 não gera")
 
+    # Costura interna (achado da revisão do P5): o fim pedido do segmento 1 cai
+    # no meio de uma frase longa, o encaixe o empurra +5,3 s até o fim dela, e
+    # ISSO deixa os dois segmentos colados -- eles são fundidos. O material que
+    # o pedido cortava voltou ao clipe; o aviso não pode sumir junto com a costura.
+    longa = _p5_transcricao_longa()
+    frl = ER.frases(longa)
+    entrada2, saida2 = ER.semear(R, "e-i3-costura", longa)
+    seg1 = {"inicio": mmss(30.0), "fim": mmss(55.0)}
+    resp2 = ER.gravar_resposta(R, "costura", [ER.item(segmentos=[seg1, _p5_seg(frl, 2, 2)])])
+    proc2 = ER.cli("select", entrada2, "--out", R, "--resposta", resp2)
+    confere(proc2.returncode == 0, "costura: `clipper select` aceita o clipe", _p5_rc(proc2))
+    clipe2 = (json.loads(saida2.selecao_json.read_text(encoding="utf-8")).get("clipes") or [{}])[0]
+    confere(len(clipe2.get("segmentos") or []) == 1,
+            "costura: o encaixe deixou os segmentos colados e eles foram fundidos",
+            f"{len(clipe2.get('segmentos') or [])} segmento(s)")
+    avisos_costura = [l for l in ER.saida_do_cli(proc2).splitlines()
+                      if "atenção" in l and "segmento 1" in l]
+    confere(bool(avisos_costura), "costura: o ajuste ≥3 s que sumiu na fusão também avisa",
+            (avisos_costura[0].strip() if avisos_costura else "nenhum aviso")[:120])
+
+
+def _p5_transcricao_longa() -> dict[str, Any]:
+    """Frases de 29,4 s (19 palavras) com 1,0 s de lacuna entre elas.
+
+    Frase 0: 0,5-29,9 · 1: 30,9-60,3 · 2: 61,3-90,7 · 3: 91,7-121,1. A lacuna
+    de 1,0 s fica abaixo do limite de fusão (1,2 s): blocos consecutivos aqui
+    são COLADOS. E dois segmentos 0-1 e 2 somam 89,2 s, mas fundidos dariam
+    90,2 s -- a lacuna entra na soma.
+    """
+    from provas import entrada_real as ER
+
+    return ER.transcricao_sintetica(200.0, palavras_por_frase=19, passo=1.6,
+                                    duracao_palavra=0.6)
+
 
 def e_p5_segmentos_colados_fundidos(raiz: Path) -> None:
     """Q10 (P03): segmentos colados viram um só, com nota; pausa real não funde."""
@@ -1673,6 +1713,38 @@ def e_p5_segmentos_colados_fundidos(raiz: Path) -> None:
             "blocos consecutivos com pausa real (7,15 s) no meio seguem separados — "
             "a pausa é gordura removida")
     confere(not clipe2.get("notas"), "e sem nota de fusão")
+
+    # Fusão que estouraria o teto (achado da revisão do P5): dois segmentos que
+    # SOMAM 89,2 s, colados por 1,0 s de lacuna. Fundidos dariam 90,2 s. O pedido
+    # é válido e tem de passar -- a fusão é conveniência, não pode reprovar.
+    longa = _p5_transcricao_longa()
+    frl = ER.frases(longa)
+    entrada4, saida4 = ER.semear(R, "e-i4-teto", longa)
+    resp4 = ER.gravar_resposta(R, "teto", [
+        ER.item(segmentos=[_p5_seg(frl, 0, 1), _p5_seg(frl, 2, 2)]),
+    ])
+    proc4 = ER.cli("select", entrada4, "--out", R, "--resposta", resp4)
+    confere(proc4.returncode == 0, "teto: dois segmentos somando 89,2 s são aceitos",
+            _p5_rc(proc4))
+    clipe4 = (json.loads(saida4.selecao_json.read_text(encoding="utf-8")).get("clipes") or [{}])[0]
+    soma4 = sum(float(s["fim"]) - float(s["inicio"]) for s in clipe4.get("segmentos") or [])
+    confere(len(clipe4.get("segmentos") or []) == 2 and not clipe4.get("notas"),
+            "teto: sem fusão quando fundir estouraria 90 s — a costura fica",
+            f"{len(clipe4.get('segmentos') or [])} segmento(s), soma {soma4:.1f} s")
+
+    # Três colados: a nota tem de ler como português ("1, 2 e 3").
+    entrada3, saida3 = ER.semear(R, "e-i4-tres", trans)
+    resp3 = ER.gravar_resposta(R, "tres", [
+        ER.item(segmentos=[_p5_seg(fr, 0, 2), _p5_seg(fr, 3, 5), _p5_seg(fr, 6, 8)]),
+    ])
+    proc3 = ER.cli("select", entrada3, "--out", R, "--resposta", resp3)
+    confere(proc3.returncode == 0, "três colados: `clipper select` aceita", _p5_rc(proc3))
+    clipe3 = (json.loads(saida3.selecao_json.read_text(encoding="utf-8")).get("clipes") or [{}])[0]
+    notas3 = clipe3.get("notas") or []
+    confere(len(clipe3.get("segmentos") or []) == 1
+            and any("segmentos 1, 2 e 3" in n for n in notas3),
+            "três colados viram um, e a nota diz \"segmentos 1, 2 e 3\"",
+            (notas3[0] if notas3 else "sem nota")[:90])
 
 
 def e_p5_v2_sem_composicao_recusado(raiz: Path) -> None:
