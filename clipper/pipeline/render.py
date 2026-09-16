@@ -1071,25 +1071,97 @@ def _instante_da_capa(
 
 
 def _gravar_capa(clipe_mp4: Path, instante: float, destino: Path) -> Path | None:
-    """Extrai um quadro do clipe pronto. Nunca derruba o render se falhar."""
+    """Extrai um quadro do clipe pronto. Nunca derruba o render se falhar.
+
+    Atomica, como o encode: escreve em <capa>.parcial e so entao renomeia. A
+    capa agora SOBRESCREVE a anterior quando o mp4 muda (D5 Q5), e uma extracao
+    interrompida no meio nao pode deixar um jpg truncado passando por capa.
+    '-f image2' e obrigatorio: a extensao .parcial nao diz o formato ao ffmpeg.
+    """
+    destino = Path(destino)
+    parcial = destino.with_name(destino.name + ".parcial")
     try:
+        _apagar_silencioso(parcial)
         ffmpeg_utils.rodar(
             [
                 "-ss", f"{instante:.3f}",
                 "-i", str(clipe_mp4),
                 "-frames:v", "1",
                 "-q:v", "3",
-                "-y", str(destino),
+                "-f", "image2",
+                "-y", str(parcial),
             ],
             descricao=f"capa de {clipe_mp4.name}",
             timeout=120.0,
         )
-    except ErroClipper as exc:
+        if not _arquivo_cheio(parcial):
+            raise ErroRender("a extração do quadro da capa terminou sem gerar arquivo.")
+        parcial.replace(destino)
+    except (ErroClipper, OSError) as exc:
+        _apagar_silencioso(parcial)
         obter().warning(
             f"      aviso:  não consegui gravar a capa de {clipe_mp4.name}: {exc}"
         )
         return None
     return destino if destino.is_file() else None
+
+
+def _arquivo_cheio(caminho: Path) -> bool:
+    try:
+        return caminho.is_file() and caminho.stat().st_size > 0
+    except OSError:
+        return False
+
+
+def _caminhos_publicacao(mp4: Path) -> tuple[Path, Path]:
+    """(capa.jpg, publicacao.md) de um clipe. Um lugar so para o render e para
+    a checagem de arquivos no lugar nunca divergirem."""
+    return mp4.with_suffix(".capa.jpg"), mp4.with_suffix(".publicacao.md")
+
+
+def _pacote_publicacao(
+    *,
+    destino: Path,
+    clipe: dict[str, Any],
+    titulo: str,
+    duracao: float,
+    segmentos: list[dict[str, Any]],
+    regenerar: bool,
+) -> None:
+    """P3: capa.jpg e publicacao.md acompanham o mp4 (D5 Q5).
+
+    regenerar=True -- o mp4 acabou de ser (re)encodado: a capa e extraida de
+    novo POR CIMA da anterior e o publicacao.md e reescrito. Uma capa velha ao
+    lado de um mp4 novo e quadro de um video que nao existe mais; se a
+    extracao falhar, a velha sai do disco -- sem capa e melhor que capa errada.
+
+    regenerar=False -- o mp4 foi reaproveitado: so o que faltar e gerado, sem
+    reencodar nada. E o que faz uma capa apagada voltar na proxima rodada.
+    """
+    log = obter()
+    capa, publicacao = _caminhos_publicacao(destino)
+    capa_faltava = not _arquivo_cheio(capa)
+    if regenerar or capa_faltava:
+        gravada = _gravar_capa(destino, _instante_da_capa(clipe, segmentos, duracao), capa)
+        if gravada is None and regenerar:
+            _apagar_silencioso(capa)
+    capa_rel = f"clips/{capa.name}" if _arquivo_cheio(capa) else None
+
+    if regenerar or capa_faltava or not _arquivo_cheio(publicacao):
+        try:
+            _escrever_texto(
+                publicacao,
+                montar_publicacao(
+                    clipe,
+                    titulo=titulo,
+                    arquivo_mp4=f"clips/{destino.name}",
+                    capa=capa_rel,
+                    duracao=duracao,
+                    segmentos=segmentos,
+                ),
+            )
+        except OSError as exc:
+            log.warning(f"      aviso:  não consegui gravar {publicacao.name}: {exc}")
 
 
 def montar_publicacao(
@@ -1468,6 +1540,11 @@ def _renderizar_clipe(
             segundos_antes = float(antigo_render.get("segundos_encode") or 0.0)
         except (TypeError, ValueError):
             segundos_antes = 0.0
+        # O mp4 foi poupado; capa e publicacao.md que faltarem voltam agora.
+        _pacote_publicacao(
+            destino=destino, clipe=clipe, titulo=titulo, duracao=duracao,
+            segmentos=segmentos, regenerar=False,
+        )
         return _item_metadado(
             clipe=clipe,
             id_clipe=id_clipe,
@@ -1742,29 +1819,12 @@ def _renderizar_clipe(
     )
 
     # ---- pacote de publicacao (P3) ------------------------------------
-    # Roda TAMBEM para clipe reaproveitado: quem apagou a capa sem apagar o
-    # mp4 recebe a capa de volta na proxima rodada, sem reencodar um minuto
-    # de video para isso.
-    capa_destino = destino.with_suffix(".capa.jpg")
-    if not capa_destino.is_file():
-        _gravar_capa(destino, _instante_da_capa(clipe, segmentos, duracao), capa_destino)
-    capa_rel = f"clips/{capa_destino.name}" if capa_destino.is_file() else None
-
-    publicacao = destino.with_suffix(".publicacao.md")
-    try:
-        _escrever_texto(
-            publicacao,
-            montar_publicacao(
-                clipe,
-                titulo=titulo,
-                arquivo_mp4=f"clips/{destino.name}",
-                capa=capa_rel,
-                duracao=duracao,
-                segmentos=segmentos,
-            ),
-        )
-    except OSError as exc:
-        log.warning(f"      aviso:  não consegui gravar {publicacao.name}: {exc}")
+    # Com encode, capa e publicacao.md sao refeitos por cima; com o mp4
+    # reaproveitado (sem metadado anterior), so o que faltar e gerado.
+    _pacote_publicacao(
+        destino=destino, clipe=clipe, titulo=titulo, duracao=duracao,
+        segmentos=segmentos, regenerar=pronto is None,
+    )
 
     return _item_metadado(
         clipe=clipe,
@@ -2130,6 +2190,10 @@ def _arquivos_no_lugar(saida: Saida, preset: str, ids: list[int]) -> bool:
     Os artefatos declarados sao metadados.json e relatorio.md, mas apagar um
     clipe de clips/ e repetir o comando tem que reproduzi-lo -- senao o
     usuario fica preso num estado "concluido" sem o arquivo.
+
+    A capa e o publicacao.md contam como parte do clipe (D5 Q5): sem eles o
+    atalho nao pula, o laco roda, o mp4 e reaproveitado e so o que falta e
+    gerado -- sem reencode.
     """
     dados = _metadados_anteriores(saida)
     clipes = dados.get("clipes")
@@ -2145,7 +2209,9 @@ def _arquivos_no_lugar(saida: Saida, preset: str, ids: list[int]) -> bool:
         if not item:
             return False
         alvo = saida.base / str(item.get("arquivo") or "")
-        if not alvo.is_file() or alvo.stat().st_size == 0:
+        if not _arquivo_cheio(alvo):
+            return False
+        if not all(_arquivo_cheio(p) for p in _caminhos_publicacao(alvo)):
             return False
     return True
 
@@ -2297,7 +2363,8 @@ def renderizar(
             }
         log.info(
             "   o estado diz que o render está feito, mas falta arquivo em "
-            f"{saida.clips_dir.name}/ — vou refazer os clipes."
+            f"{saida.clips_dir.name}/ (mp4, capa ou publicação) — vou conferir clipe a "
+            "clipe; o que estiver pronto é reaproveitado."
         )
 
     _limpar_parciais(saida)
