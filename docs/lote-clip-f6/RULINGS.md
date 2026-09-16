@@ -44,6 +44,7 @@ substituir os dois — é um commit.
 | **D3** | **Conserto do `conclusao.y`** (§11) | 13/09 |
 | **D4** | **Retomada local — esta máquina assume o fechamento** (§12) | 16/09 |
 | **D5** | **Triagem do D4 + P5 "integração v2"** (§13) | 16/09 |
+| **D6** | **P5 aceito; decisões; inspeção do Bruno** (§14) | 16/09 |
 
 **Convenção a partir da D1:** diretivas do arquiteto são **numeradas e
 autossuficientes**. Cada uma é transcrita aqui inteira, como seção própria.
@@ -805,3 +806,91 @@ de desenho da prova.
 | 3 | Fixtures reais commitadas + 2 provas de material real verdes | fixtures ✅ `638fa69`; E-X1/E-X2 no P5 |
 | 4 | Palavra explícita do Bruno | pendente |
 | 5 | Bloqueadores D-A…D-F + Q7–Q10 + menores (P5) | pendente |
+
+
+---
+
+## 14. D6 — P5 aceito; decisões; inspeção do Bruno
+
+Recebida em 16/09. Transcrição verbatim.
+
+```
+D6 — P5 ACEITO; DECISÕES; INSPEÇÃO DO BRUNO
+
+Primeiro ato: append ao RULINGS + commit. AUTORIZADO gravar
+docs/lote-clip-f6/relatorio-p5.md (C.11: contagens, hashes, sem conteúdo).
+
+P5 ACEITO (7585e1b): 44/44, integração pelo ponto de entrada real (CLI e
+ui/jobs.py), render real do GT3RS em 2 segmentos, revisão adversarial com
+mutação por conserto. Régua §13.1 confirmada como permanente.
+
+DECISÕES:
+1. Gancho: APROVADO como está — nunca truncado, sem teto de linhas no
+   render. SEMENTE registrada para o F8: teto de linhas (4) aplicado na
+   SELEÇÃO (validador v2 recusa e o selecionador reescreve), nunca no
+   render. Contrato v1 segue congelado.
+2. VERSAO permanece 3 (R7). CONDIÇÃO: apagar do out/ do worktree todo
+   render anterior a 7585e1b (os únicos em VERSAO 3 com gancho cortado),
+   com confirmação por listagem. Produção nunca viu a 3.
+3. Leituras §3 1–4 CONFIRMADAS: recusa só para v2 com 2+ segmentos;
+   "colado" = consecutivo com lacuna ≤ 1,2 s (mesmo valor do Q2); sem
+   fusão se estourar 90 s; gancho sem teto, palavra mais larga que a caixa
+   quebra dentro dela.
+Limites de baixa gravidade (§5) → CLIP-F6.1, registrados.
+
+CHECKLIST DE MERGE: falta SÓ a inspeção visual do Bruno e a palavra dele.
+Após o "f6 ok" do Bruno, PARE aguardando a D7 com o procedimento de merge
+(fast-forward de master, pull na cópia do painel, invalidação de cache
+esperada, F4b já fechada com cortes como padrão).
+```
+
+### 14.1 Efeitos imediatos da D6
+
+- **P5 aceito em `7585e1b`.** A regra do §13.1 (prova de integração atravessa
+  o ponto de entrada real) fica permanente.
+- **Gancho (§11.1):** o caso extremo medido no P5 está APROVADO como está —
+  `cortes` até 9 linhas / 446 px / base y=642 com 90 caracteres adversariais;
+  `cortes-editorial` até 7 linhas / base y=458. Nunca truncado, sem teto no
+  render.
+- **VERSAO = 3** (R7), com a condição de limpar os renders anteriores a
+  `7585e1b` do `out/` do worktree. Execução e listagem no relatório do P5
+  (`docs/lote-clip-f6/relatorio-p5.md`, seção da D6).
+- **Leituras do executor no P5, agora rulings:**
+  1. a recusa do Q4 vale só para v2 com 2+ segmentos (v2 de 1 segmento
+     renderiza inteiro no ramo sem composição);
+  2. "colado" = blocos consecutivos com lacuna ≤ 1,2 s
+     (`LACUNA_MAXIMA_FUSAO_S`, o mesmo valor da guarda de lacuna do Q2);
+  3. sem fusão quando fundir estouraria 90 s;
+  4. gancho sem teto de linhas; palavra mais larga que a caixa quebra dentro
+     dela.
+
+### 14.2 Semente F8 — teto de linhas do gancho na SELEÇÃO
+
+Teto de 4 linhas para o gancho, aplicado no validador v2 (recusa, e o
+selecionador reescreve o gancho), **nunca no render**. O render continua
+nunca truncando. O contrato v1 segue congelado: a regra é só do v2.
+
+### 14.3 CLIP-F6.1 — itens acrescentados pela D6 (limites do P5 §5)
+
+Somam-se aos sete itens do §12.2. Todos de baixa gravidade, pós-merge,
+nenhum conserto neste lote.
+
+| # | Item | Onde |
+|---|---|---|
+| 8 | Capa ou publicacao.md abertos por outro processo (sem FILE_SHARE_DELETE) durante o re-encode ficam velhos com rc 0, e o atalho de estágio os sela nas rodadas seguintes; o publicacao.md deixa um .tmp órfão | `render.py` `_gravar_capa`, `_pacote_publicacao`, `_arquivos_no_lugar`; `_escrever_texto` |
+| 9 | `capa_ts` no último intervalo de quadro de fonte abaixo de 20 fps: a capa nunca é extraída e o estágio deixa de pular (sem re-encode, mas refaz o laço a cada rodada) | `render.py` `_instante_da_capa` (limite `duracao - 0.05`) + `_arquivos_no_lugar` |
+| 10 | Recusa por material compartilhado depois do conserto v1×v1 mostra o início já deslocado, sem dizer que houve deslocamento | `select.py`, laço de sobreposição de `validar` |
+| 11 | Mensagens de "clipe solto" e de item que não é objeto só conhecem a forma v1 (anterior ao P5) | `select.py` `validar` (`um_clipe_solto`) |
+| 12 | E-C4 estima 152 px para a pílula de 2 linhas do `cortes`; a medida com a fonte real dá 156 px (vão real 26 px, ainda ≥ 24) | `provas/prova_f6.py` `_FATOR_ALTURA_LINHA` |
+
+### 14.4 Checklist de merge — estado
+
+| | Item | Estado |
+|---|---|---|
+| 1 | `prompt-v2.txt` revisado e aprovado | ✅ aprovado (D5), condição do P5 cumprida (D6) |
+| 2 | Físicas verdes + inspeção visual do Bruno | físicas ✅ 11/11 em `7585e1b`; **inspeção do Bruno pendente** |
+| 3 | Fixtures reais + 2 provas de material real verdes | ✅ `638fa69`; E-X1/E-X2 verdes |
+| 4 | Bloqueadores do P5 | ✅ P5 aceito (D6) |
+| 5 | Palavra explícita do Bruno ("f6 ok") | **pendente** |
+
+Depois do "f6 ok": PARE aguardando a D7 (procedimento de merge).
