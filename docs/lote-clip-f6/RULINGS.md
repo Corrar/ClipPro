@@ -43,6 +43,7 @@ substituir os dois — é um commit.
 | **D2** | **Triagem do relatório final + checklist de merge** (§10) | 13/09 |
 | **D3** | **Conserto do `conclusao.y`** (§11) | 13/09 |
 | **D4** | **Retomada local — esta máquina assume o fechamento** (§12) | 16/09 |
+| **D5** | **Triagem do D4 + P5 "integração v2"** (§13) | 16/09 |
 
 **Convenção a partir da D1:** diretivas do arquiteto são **numeradas e
 autossuficientes**. Cada uma é transcrita aqui inteira, como seção própria.
@@ -697,3 +698,110 @@ Registro. **Nenhum conserto neste lote.** Referências de linha são de `master`
 | 5 | README e `--help` desatualizados: epílogo cita `cortes-feed`; README usa o executável `clipper`, que não existe (só `python -m clipper`); README diz "recusa" onde o validador encaixa | `clipper/cli.py:48,63`; `README.md:12,85-87,118-124` |
 | 6 | Provas de F1–F4 nunca foram versionadas (só existem nas mensagens de commit) | `git log --all --name-only` |
 | 7 | `_trabalho/` guarda `baixado.mp4` repetido: ~1,76 GB somando os dois jobs | `du` em `out/*/_trabalho/` |
+
+
+---
+
+## 13. D5 — triagem do D4 + P5 "integração v2"
+
+Recebida em 16/09. Transcrição verbatim.
+
+```
+D5 — TRIAGEM DO D4 + P5 "INTEGRAÇÃO v2" (bloqueadores de merge)
+
+Primeiro ato: append ao docs/lote-clip-f6/RULINGS.md + commit. Autorizado
+também commitar o relatório D4 em docs/lote-clip-f6/ (C.11 respeitada:
+contagens e hashes, nunca conteúdo de fixture).
+
+RELATÓRIO D4 ACEITO (638fa69). Fixtures, D3, 30/31 provas, inspeção e as
+2 execuções avulsas de material real registradas. prompt-v2.txt APROVADO
+como texto, sem alteração — condicionado ao P5 abaixo.
+
+RÉGUA NOVA, assumida pelo arquiteto como falha de desenho da prova:
+prova de integração atravessa o PONTO DE ENTRADA REAL (CLI `clipper
+render` e o caminho do painel, ui/jobs.py). Prova que monta o ffmpeg à
+mão não é prova do pipeline. Toda prova nova do P5 obedece.
+
+P5 — DECISÕES Q1–Q10 (todas com prova que morde, vermelho antes do verde):
+Q1 D-B — APROVADO: segmentos em selecao.json carregam só inicio/fim
+   (derivados saem do segmento); confirmar antes que nenhum consumidor lê
+   as chaves derivadas (grep + execução). Prova ponta a ponta:
+   selecionar → renderizar com v2 real, pelo CLI e pelo caminho do painel,
+   MP4 com duração = soma.
+Q2 D-A — APROVADO: cada clipe comparado com TODOS os já aceitos, no ramo
+   de união e na invariante final; prova com 3 clipes.
+Q3 D-C — APROVADO: inicio/fim saem de `required`; E-V5 vira prova que
+   cruza esquema × validador. maxItems no --api: só se houver chave real;
+   sem chave, registrar como não verificado — não bloqueia merge (o
+   painel só usa --api quando a chave existe).
+Q4 D-D — APROVADO: v2 em preset sem composição é RECUSADO com mensagem
+   clara (não sai MP4 pela metade em silêncio); "v2 no F3" vira semente.
+Q5 D-E — APROVADO: capa.jpg e publicacao.md regenerados sempre que o MP4
+   for (re)encodado ou faltarem, inclusive nos caminhos de reaproveitamento.
+Q6 D-F — APROVADO: amostragem do reframe DENTRO dos segmentos mantidos,
+   nunca no span.
+Q7 — APROVADO: E-X1 (validador sobre resposta-v1 real) e E-X2 (quebrador
+   sobre transcrição real) entram no harness, saída só de contagens. São
+   as "2 provas de material real" do checklist.
+Q8 F-V2 — APROVADO: -loglevel info em _medir_lufs; mensagem de "pulou"
+   corrigida.
+Q9 — APROVADO na forma ampla: .gitattributes com provas/fixtures/** -text
+   (padrão, não nome literal — a lição do gitignore).
+Q10 — P01/P03: avisar no v2 como no v1 quando o encaixe ajustar ≥3 s;
+   segmentos contíguos são FUNDIDOS com nota no relatório.
+   P07/P16: gancho NUNCA é truncado — reduz o corpo até o piso de
+   legibilidade; se 90 caracteres ainda não couberem em 2 linhas, vai
+   para 3, e o relatório avisa. Validador NÃO ganha limite (contrato v1
+   congelado); o prompt segue prometendo 90 e o render tem de cumprir.
+   Prova: os 2 ganchos reais que hoje saem truncados saem inteiros.
+   P05: fato registrado com os números reais; ruling (B) mantido — o
+   teto é parâmetro de modelo e volta no F8.
+Menores, entram: E-R2 aceita só a mudança de MarginV; log do render mostra
+soma, não span; conclusão truncada gera aviso.
+
+INSPEÇÃO PARA O BRUNO, no fim do P5: um render REAL do vídeo GT3RS desta
+máquina (um clipe v2 com segmentos, no preset cortes, COM legenda queimada
+e conclusão de 2 linhas) — é a prova ponta a ponta e o artefato de
+inspeção ao mesmo tempo. Frames em t=1s, meio, últimos 2s, mais capa.jpg,
+numa pasta nomeada. MP4 não é commitado.
+
+PARE no relatório do P5 com placar, SHAs e o checklist de merge
+atualizado. main intocado.
+```
+
+### 13.1 REGRA PERMANENTE — prova de integração atravessa o ponto de entrada real
+
+**Prova de integração atravessa o ponto de entrada real**: o CLI
+(`python -m clipper ...`) e o caminho do painel (`ui/jobs.py`). Uma prova que
+monta a linha do ffmpeg à mão, ou chama `composicao.montar()` direto, prova o
+filtergraph — não prova o pipeline.
+
+Como isto nasceu: as físicas v2 do P2/P3 (`_render_v2`) montavam o ffmpeg à
+mão com recorte fixo. Passaram verdes enquanto o render real recusava todo
+clipe v2 gerado pelo select (D-B), o `--api` não conseguia produzir v2 (D-C),
+o ramo sem composição entregava só o 1º segmento (D-D), a capa envelhecia
+(D-E) e o reframe amostrava a gordura (D-F). Nenhuma prova atravessava a
+costura `selecionar → renderizar`. A falha foi assumida pelo arquiteto como
+de desenho da prova.
+
+### 13.2 Efeitos imediatos da D5
+
+- **Relatório D4 aceito** e gravado em `docs/lote-clip-f6/relatorio-d4.md`.
+- **`prompt-v2.txt` aprovado como texto**, condicionado ao P5: o render tem de
+  cumprir o que o prompt promete (gancho de até 90 caracteres inteiro na tela;
+  `segmentos` utilizáveis de ponta a ponta; `--api` aceitando v2).
+- **P05 registrado.** Com a fixture real, blocos de 1 palavra caem de 36 para
+  18 (`cortes`) e de 39 para 17 (`cortes-editorial`), a maioria no MEIO do
+  clipe, travada pelo teto 3 dos dois lados — e não "o último bloco", como a
+  fixture sintética sugeria (§7, §10 D2 item 4). Ruling Q2 (B) mantido; o teto
+  é parâmetro de modelo e volta no F8.
+- **Semente registrada:** "v2 no F3" — concatenação no ramo sem composição.
+- **Checklist de merge (§10.1), com o que a D5 acrescenta:**
+
+| | Item | Estado |
+|---|---|---|
+| 1 | `prompt-v2.txt` revisado e aprovado pelo arquiteto | aprovado como texto, **condicionado ao P5** |
+| 2 | Físicas verdes no Windows + inspeção visual do Bruno | pendente (P5: inspeção sobre render real do GT3RS) |
+| 3 | Fixtures reais commitadas + 2 provas de material real verdes | fixtures ✅ `638fa69`; E-X1/E-X2 no P5 |
+| 4 | Palavra explícita do Bruno | pendente |
+| 5 | Bloqueadores D-A…D-F + Q7–Q10 + menores (P5) | pendente |
