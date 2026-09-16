@@ -1226,18 +1226,23 @@ def _item_metadado(
     segundos_encode: float,
     fronteiras: Fronteiras,
     estilo: dict[str, Any] | None = None,
+    avisos: Sequence[str] | None = None,
 ) -> dict[str, Any]:
     """A entrada de metadados.json de um clipe -- encodado agora ou reaproveitado.
 
     Uma funcao so para os dois caminhos: se o clipe reaproveitado descrevesse
     campos diferentes do recem-encodado, metadados.json passaria a depender de
     QUANDO cada linha foi escrita.
+
+    `notas` (da validacao, ex.: segmentos fundidos) e `avisos` (do render, ex.:
+    gancho em 3 linhas) so aparecem quando existem: e deles que o relatorio.md
+    tira a linha de aviso de cada clipe.
     """
     try:
         bytes_arquivo = int(destino.stat().st_size)
     except OSError:
         bytes_arquivo = 0
-    return {
+    item = {
         "id": int(id_clipe),
         "preset": preset_nome,
         "arquivo": f"clips/{destino.name}",
@@ -1262,6 +1267,13 @@ def _item_metadado(
             "segundos_encode": round(float(segundos_encode), 1),
         },
     }
+    notas = [str(n) for n in (clipe.get("notas") or []) if str(n).strip()]
+    if notas:
+        item["notas"] = notas
+    lista_avisos = [str(a) for a in (avisos or []) if str(a).strip()]
+    if lista_avisos:
+        item["avisos"] = lista_avisos
+    return item
 
 
 def impressao_legenda(preset_obj: Preset) -> str:
@@ -1566,6 +1578,9 @@ def _renderizar_clipe(
             estilo=(
                 anterior["estilo"] if isinstance(anterior.get("estilo"), dict) else {}
             ),
+            avisos=(
+                anterior["avisos"] if isinstance(anterior.get("avisos"), list) else None
+            ),
         )
 
     reframe = calcular_reframe(
@@ -1622,6 +1637,7 @@ def _renderizar_clipe(
         filtro_sub, cwd = ffmpeg_utils.opcao_subtitles(arquivo_ass)
 
     estilo: dict[str, Any] = {}
+    avisos: list[str] = []
     montagem: composicao.Montagem | None = None
     if comp is not None:
         if not fps_fracao:
@@ -1688,9 +1704,30 @@ def _renderizar_clipe(
                 f"      movimento: zoom 1,00→{comp.kenburns_ate:.2f} ao longo do clipe, "
                 "sem punch-in (nenhum pico de áudio elegível neste trecho)."
             )
-        if pilula.get("truncado"):
+        if comp.gancho_ativo:
+            # O gancho nunca e cortado (D5 Q10): quando passa de duas linhas, a
+            # pilula cresce -- e isso nao pode acontecer em silencio, porque
+            # uma pilula de tres linhas entra mais fundo no video.
+            linhas_gancho = int(pilula.get("linhas") or 0)
+            if linhas_gancho > 2:
+                avisos.append(
+                    f"gancho em {linhas_gancho} linhas (não coube em 2 nem no corpo "
+                    "mínimo; o gancho nunca é cortado)"
+                )
+                log.warning(
+                    f"      aviso:  o gancho não coube em 2 linhas e ocupou "
+                    f"{linhas_gancho} linhas — ele nunca é cortado; confira se a "
+                    "pílula não cobre o rosto."
+                )
+        elif pilula.get("truncado"):
             log.warning(
                 "      aviso:  o título não coube na barra e foi cortado com reticências."
+            )
+        if (ativos.get("conclusao") or {}).get("truncado"):
+            avisos.append("conclusão cortada com reticências (não coube em 2 linhas)")
+            log.warning(
+                "      aviso:  a conclusão não coube em 2 linhas e foi cortada com "
+                "reticências."
             )
     else:
         estilo = {"legenda_impressao": marca_legenda}
@@ -1848,6 +1885,7 @@ def _renderizar_clipe(
         segundos_encode=segundos_encode,
         fronteiras=fronteiras,
         estilo=estilo,
+        avisos=avisos,
     )
 
 
@@ -2058,6 +2096,12 @@ def _montar_relatorio(
             f"- **Trecho:** {item.get('inicio_mmss')}–{item.get('fim_mmss')} "
             f"({float(item.get('duracao') or 0.0):.1f}s)"
         )
+        notas = [str(n) for n in (item.get("notas") or [])]
+        if notas:
+            linhas.append(f"- **Notas da seleção:** {'; '.join(notas)}")
+        avisos_item = [str(a) for a in (item.get("avisos") or [])]
+        if avisos_item:
+            linhas.append(f"- **Avisos:** {'; '.join(avisos_item)}")
         gancho = item.get("gancho_sugerido")
         if gancho:
             linhas.append(f"- **Gancho sugerido:** “{gancho}”")
@@ -2447,9 +2491,19 @@ def renderizar(
             inicio = float(clipe["inicio"])
             fim = float(clipe["fim"])
             log.info("")
+            segs_log = clipe.get("segmentos") or []
+            if segs_log:
+                # Num v2, fim - inicio e o SPAN; o clipe dura a SOMA (D5, menor).
+                soma = sum(float(s["fim"]) - float(s["inicio"]) for s in segs_log)
+                trecho_log = (
+                    f"{len(segs_log)} segmento(s) entre {mmss(inicio)}–{mmss(fim)}, "
+                    f"{soma:.0f}s"
+                )
+            else:
+                trecho_log = f"{mmss(inicio)}–{mmss(fim)}, {fim - inicio:.0f}s"
             log.info(
                 f"   [{posicao}/{len(escolhidos)}] clipe {id_clipe} — {titulo} "
-                f"({mmss(inicio)}–{mmss(fim)}, {fim - inicio:.0f}s)"
+                f"({trecho_log})"
             )
             item = _renderizar_clipe(
                 saida=saida,

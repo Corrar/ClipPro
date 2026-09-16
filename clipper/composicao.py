@@ -855,12 +855,53 @@ def _quebrar_titulo(
     return (linhas or [""]), sobrou
 
 
-def pilula_titulo(comp: Composicao, titulo: str, destino: Path) -> dict[str, Any]:
+def _quebrar_sem_cortar(texto: str, fonte: Any, largura: int) -> list[str]:
+    """Quebra por largura medida SEM descartar nada, em quantas linhas precisar.
+
+    Uma palavra sozinha mais larga que a caixa quebra DENTRO dela: e o unico
+    jeito de cumprir "o gancho nunca e cortado" quando o texto nao tem onde
+    quebrar (um "KKKKKKKK..." de riso, por exemplo).
+    """
+    linhas: list[str] = []
+    atual = ""
+    for palavra in str(texto).split():
+        if fonte.getlength(palavra) > largura:
+            if atual:
+                linhas.append(atual)
+            pedaco = ""
+            for letra in palavra:
+                if pedaco and fonte.getlength(pedaco + letra) > largura:
+                    linhas.append(pedaco)
+                    pedaco = letra
+                else:
+                    pedaco += letra
+            atual = pedaco
+            continue
+        tentativa = f"{atual} {palavra}".strip()
+        if atual and fonte.getlength(tentativa) > largura:
+            linhas.append(atual)
+            atual = palavra
+        else:
+            atual = tentativa
+    if atual:
+        linhas.append(atual)
+    return linhas or [""]
+
+
+def pilula_titulo(
+    comp: Composicao, titulo: str, destino: Path, *, truncar: bool = True
+) -> dict[str, Any]:
     """Desenha a pilula do titulo e devolve a geometria que o overlay precisa.
 
     O texto ENCOLHE ate caber em no maximo duas linhas; se nem no menor corpo
     couber, a ultima linha ganha reticencias. Titulo de clipe e escrito por
     um modelo e ninguem garante o tamanho.
+
+    `truncar=False` e o caminho do GANCHO (D5 Q10/P07): o gancho e a promessa
+    verificavel do clipe e nunca e cortado. Ele encolhe ate o corpo minimo do
+    preset, como o titulo; se ainda nao couber em duas linhas, quebra no corpo
+    minimo em quantas linhas precisar, e quem chama avisa. A altura da pilula
+    acompanha as linhas -- o overlay ja le a altura real.
     """
     from PIL import Image, ImageDraw
 
@@ -884,6 +925,9 @@ def pilula_titulo(comp: Composicao, titulo: str, destino: Path) -> dict[str, Any
         linhas, sobrou = _quebrar_titulo(texto, fonte, util, 2)
 
     cortado = False
+    if sobrou and not truncar:
+        linhas = _quebrar_sem_cortar(texto, fonte, util)
+        sobrou = False
     if sobrou:
         # Nem no corpo minimo coube: a ultima linha perde caractere ate caber e
         # ganha reticencias. Titulo de clipe e escrito por um modelo e ninguem
@@ -961,6 +1005,9 @@ def pilula_titulo(comp: Composicao, titulo: str, destino: Path) -> dict[str, Any
         "linhas": len(linhas),
         "tamanho": tamanho,
         "truncado": cortado,
+        # O texto como foi desenhado, linha a linha: e o que deixa uma prova
+        # conferir "saiu inteiro" sem ler pixel.
+        "texto_linhas": list(linhas),
     }
 
 
@@ -1018,7 +1065,8 @@ def gerar_ativos(
             texto_do_topo = str(titulo or "").strip()
         if texto_do_topo:
             alvo = trabalho / f"titulo_{marca}_{_marca_texto(texto_do_topo)}.png"
-            pilula = pilula_titulo(comp, texto_do_topo, alvo)
+            # O gancho nunca e cortado (D5 Q10); o titulo do escape segue como era.
+            pilula = pilula_titulo(comp, texto_do_topo, alvo, truncar=not comp.gancho_ativo)
 
         # A conclusao usa a MESMA pilula do gancho: mesma fonte, mesmo fundo,
         # mesmos cantos. Sao a abertura e o fecho do mesmo clipe e leem como
