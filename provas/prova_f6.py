@@ -1800,7 +1800,12 @@ def e_material_real_validador(raiz: Path) -> None:
 
     from provas import entrada_real as ER
 
+    import hashlib
+
     resposta = _fixture_real("resposta-v1.json")
+    for nome, esperado in _SHA256_FIXTURES_REAIS.items():
+        obtido = hashlib.sha256(_fixture_real(nome).read_bytes()).hexdigest()
+        confere(obtido == esperado, f"{nome}: é o arquivo real (sha256)", obtido[:16])
     trans = json.loads(_fixture_real("transcricao.json").read_text(encoding="utf-8"))
     R = _p5_raiz(raiz, "e-x1")
     entrada, saida = ER.semear(R, "e-x1", trans)
@@ -1841,7 +1846,18 @@ def e_material_real_quebrador(raiz: Path) -> None:
     trans = json.loads(_fixture_real("transcricao.json").read_text(encoding="utf-8"))
     dados = json.loads(_fixture_real("resposta-v1.json").read_text(encoding="utf-8"))
     fr = Fronteiras.de_transcricao(trans)
-    ok, probs = select.validar(dados, fr, {}, n=5)
+    # C.11: dentro do processo, um aviso do validar sairia pelo lastResort do
+    # logging com o rótulo do clipe -- que carrega o TÍTULO real. Logger calado
+    # só durante esta chamada (achado de conformidade da revisão do P5).
+    import logging
+
+    logger = logging.getLogger("clipper")
+    calado_antes = logger.disabled
+    logger.disabled = True
+    try:
+        ok, probs = select.validar(dados, fr, {}, n=5)
+    finally:
+        logger.disabled = calado_antes
     confere(len(ok) == 5 and not probs, "os 5 trechos reais saem do validador",
             f"{len(ok)} trecho(s), {len(probs)} problema(s)")
 
@@ -1878,9 +1894,16 @@ def e_fixtures_sem_conversao_de_linha(raiz: Path) -> None:
     import shutil
     import subprocess
 
+    # O hash não depende de git: confere primeiro, para uma fixture editada
+    # não passar escondida atrás do "pulou" de uma cópia sem .git (achado da
+    # revisão do P5).
+    for nome, esperado in _SHA256_FIXTURES_REAIS.items():
+        obtido = hashlib.sha256(_fixture_real(nome).read_bytes()).hexdigest()
+        confere(obtido == esperado, f"{nome}: bytes idênticos aos do painel", obtido[:16])
+
     git = shutil.which("git")
     if not git or not (RAIZ / ".git").exists():
-        raise Pulou("sem git ou fora de um clone git")
+        raise Pulou("sem git ou fora de um clone git (o hash das fixtures já foi conferido)")
     regras = RAIZ / ".gitattributes"
     linhas = regras.read_text(encoding="utf-8").splitlines() if regras.is_file() else []
     confere(any(l.split() == ["provas/fixtures/**", "-text"] for l in linhas),
@@ -1898,9 +1921,6 @@ def e_fixtures_sem_conversao_de_linha(raiz: Path) -> None:
         linha = next((l for l in proc.stdout.splitlines() if l.startswith(alvo + ":")), "")
         confere(linha.endswith(": unset"), f"{alvo}: atributo `text` desligado",
                 linha.rsplit(": ", 1)[-1] if linha else "sem resposta do git")
-    for nome, esperado in _SHA256_FIXTURES_REAIS.items():
-        obtido = hashlib.sha256(_fixture_real(nome).read_bytes()).hexdigest()
-        confere(obtido == esperado, f"{nome}: bytes idênticos aos do painel", obtido[:16])
 
 
 _GANCHO_LONGO = (
@@ -1961,11 +1981,28 @@ def f_p5_v2_ponta_a_ponta(raiz: Path) -> None:
             "o relatorio.md avisa do gancho em 3+ linhas e da conclusão cortada",
             " ".join(trecho.split())[:110] or "sem seção de avisos")
 
+    # -14 LUFS medido no MP4 que o PIPELINE fez (§13.1): a F-V2 mede um render
+    # montado à mão, e a revisão do P5 apontou que nenhuma prova registrada
+    # media o áudio pelo ponto de entrada.
+    lufs = _medir_lufs(mp4s[0])
+    confere(lufs is not None and abs(lufs - (-14.0)) <= 1.0,
+            "CLI: -14 LUFS ±1 no MP4 do pipeline", f"medido {lufs} LUFS")
+
+    # O painel tem de RENDERIZAR, e não só achar o MP4 que o CLI deixou: sem
+    # esta conferência, um painel que não roda estágio nenhum passava verde
+    # (achado da revisão do P5, mutante confirmado).
+    marca = mp4s[0].stat().st_mtime_ns
     job = ER.job_do_painel(R, saida.slug, entrada, comando="render",
                            somente=("render",), preset="cortes", forcar=True)
     confere(job.get("status") == "concluido", "painel: o job de render termina concluído",
             f"status {job.get('status')}; erro {str((job.get('erro') or {}).get('mensagem'))[:80]}")
-    medida = ER.duracao_medida(ER.clipes_mp4(saida, "cortes")[0])
+    render_painel = (job.get("estagios") or {}).get("render") or {}
+    novo = ER.clipes_mp4(saida, "cortes")[0]
+    confere(render_painel.get("reaproveitado") is False and novo.stat().st_mtime_ns > marca,
+            "painel: o estágio de render rodou de verdade (não reaproveitou o MP4 do CLI)",
+            f"reaproveitado={render_painel.get('reaproveitado')}, "
+            f"{render_painel.get('segundos')} s")
+    medida = ER.duracao_medida(novo)
     confere(abs(medida - soma) <= 0.5, "painel: duração do MP4 = soma dos segmentos ±0,5 s",
             f"soma {soma:.2f} s, medido {medida:.2f} s")
 
@@ -2126,11 +2163,35 @@ def f_p5_reframe_dentro_dos_segmentos(raiz: Path) -> None:
             "o último segmento também é amostrado")
 
 
+def _texto_inteiro(linhas: list[str], esperado: str) -> bool:
+    """As linhas desenhadas reconstroem EXATAMENTE o texto.
+
+    Entre uma linha e a seguinte cabe um espaço só (quebra entre palavras) ou
+    nenhum (palavra partida por não caber na caixa). Qualquer caractere a mais,
+    a menos ou trocado -- inclusive um espaço sumido no MEIO de uma linha --
+    reprova. A versão anterior comparava sem espaços e deixava passar um gancho
+    desenhado sem espaço nenhum (achado da revisão do P5).
+    """
+    pos = 0
+    for linha in linhas:
+        if not esperado.startswith(linha, pos):
+            return False
+        pos += len(linha)
+        if pos < len(esperado) and esperado[pos] == " ":
+            pos += 1
+    return pos == len(esperado)
+
+
 def f_p5_gancho_real_nunca_truncado(raiz: Path) -> None:
     """Q10 (P07/P16): os ganchos REAIS saem inteiros. Só contagens (C.11).
 
-    Mede também o caso extremo que o §11.1 exige ver junto: 90 caracteres de
-    letras largas e uma palavra única sem espaço.
+    Prova de UNIDADE da pílula (gerar_ativos direto); a contraparte pelo ponto
+    de entrada é a F-I1 (gancho de 90 caracteres renderizado pelo CLI).
+
+    Mede também o caso extremo que o §11.1 exige ver junto. Os dois últimos
+    textos são o PIOR caso de até 90 caracteres achado na revisão do P5 por
+    busca exaustiva (palavras longas de W alternadas com uma letra solta):
+    eles, e não os textos "realistas", dão o número de linhas máximo.
     """
     from clipper import composicao as C
     from clipper.modelo import Modelo
@@ -2141,6 +2202,8 @@ def f_p5_gancho_real_nunca_truncado(raiz: Path) -> None:
         "PT caixa alta, 90": _GANCHO_LONGO,
         "W/M, 89": _CONCLUSAO_LARGA,
         "palavra única de 90 W": "W" * 90,
+        "pior caso cortes, 85": " ".join(["W"] + ["W" * 20] * 4),
+        "pior caso editorial, 82": " ".join(["W"] + ["W" * 26] * 3),
     }
     for nome in MODELOS_COMPOSTOS:
         comp = Modelo.de_fabrica(nome).composicao
@@ -2151,9 +2214,8 @@ def f_p5_gancho_real_nunca_truncado(raiz: Path) -> None:
             esperado = " ".join(gancho.split())
             if comp.titulo_maiusculas:
                 esperado = esperado.upper()
-            desenhado = "".join(pil.get("texto_linhas") or [])
             truncados += 1 if pil.get("truncado") else 0
-            incompletos += 0 if desenhado.replace(" ", "") == esperado.replace(" ", "") else 1
+            incompletos += 0 if _texto_inteiro(list(pil.get("texto_linhas") or []), esperado) else 1
             linhas.append(int(pil.get("linhas") or 0))
         confere(truncados == 0, f"{nome}: nenhum dos {len(dados)} ganchos reais sai truncado",
                 f"truncados: {truncados}; linhas por gancho: {linhas}")
@@ -2163,7 +2225,8 @@ def f_p5_gancho_real_nunca_truncado(raiz: Path) -> None:
         for rotulo, texto in extremos.items():
             pil = C.gerar_ativos(comp, "título", trabalho / nome / "extremo", gancho=texto)["pilula"]
             base = int(comp.gancho_y) + int(pil["altura"])
-            confere(not pil.get("truncado"),
+            confere(not pil.get("truncado")
+                    and _texto_inteiro(list(pil.get("texto_linhas") or []), texto),
                     f"{nome}: caso extremo ({rotulo}) também sai inteiro",
                     f"{pil['linhas']} linhas @ {pil['tamanho']} px, altura {pil['altura']} px, "
                     f"base em y={base}")
