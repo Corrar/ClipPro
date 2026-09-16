@@ -574,6 +574,7 @@ def calcular_reframe(
     altura_fonte: int,
     *,
     id_clipe: int | None = None,
+    trechos: Sequence[tuple[float, float]] | None = None,
 ) -> dict[str, Any]:
     """Decide o recorte 9:16 de um trecho: rosto quando da, centro quando nao.
 
@@ -585,6 +586,13 @@ def calcular_reframe(
     'id_clipe' e opcional so para manter a chamada curta em uso avulso; o
     estagio passa o id real para que as amostras de clipes diferentes nao se
     misturem na pasta de trabalho.
+
+    `trechos` (clipe v2) sao os segmentos MANTIDOS, em tempo da fonte. Com
+    eles a amostragem roda dentro de cada segmento e nunca no span (D5 Q6):
+    [inicio, inicio+duracao] num v2 e o comeco do span mais a SOMA, que
+    amostrava justamente a gordura removida e podia deixar segmentos inteiros
+    de fora -- o enquadramento do clipe saia decidido por imagem que nao esta
+    no clipe. Sem `trechos`, a chamada e exatamente a de antes.
     """
     log = obter()
     fonte = Path(fonte).resolve()
@@ -595,13 +603,20 @@ def calcular_reframe(
     prefixo = f"crop_{marca}_"
     _limpar_frames(trabalho, prefixo)
 
+    janelas = [
+        (float(a), float(b) - float(a)) for a, b in (trechos or ()) if float(b) > float(a)
+    ] or [(float(inicio), float(duracao))]
+
     # Fonte ja vertical (ou exatamente 9:16): o corte e em cima/embaixo e o
     # centro horizontal do rosto nao influencia nada. Amostrar e detectar
     # rosto aqui seria minuto de CPU para chegar no mesmo retangulo.
     # A tarja preta da fonte nao e imagem: o recorte 9:16 e calculado DENTRO do
     # retangulo com conteudo, senao o preto viaja para o clipe.
+    # O cropdetect le poucos segundos: no v2 eles saem do MAIOR segmento, o que
+    # menos chance tem de ser curto demais para os 4 s da amostra.
+    inicio_tarja, duracao_tarja = max(janelas, key=lambda j: j[1])
     conteudo = detectar_conteudo(
-        fonte, inicio, duracao, int(largura_fonte), int(altura_fonte)
+        fonte, inicio_tarja, duracao_tarja, int(largura_fonte), int(altura_fonte)
     )
 
     geo_vertical = _geometria(0.5, conteudo["largura"], conteudo["altura"])
@@ -629,21 +644,25 @@ def calcular_reframe(
     try:
         # A chamada do ffmpeg fica DENTRO do try: um Ctrl+C no meio da
         # amostragem deixaria dezenas de PNG de 1,4 MB em _trabalho/.
-        ffmpeg_utils.rodar(
-            [
-                "-ss", f"{float(inicio):.3f}",
-                "-i", str(fonte),
-                "-t", f"{float(duracao):.3f}",
-                "-vf", f"fps=1/{INTERVALO_AMOSTRA_S}",
-                "-q:v", "2",
-                str(trabalho / (prefixo + "%03d.png")),
-            ],
-            descricao=f"amostragem de frames do clipe {marca}",
-            sugestao=(
-                "confira se fonte.mp4 não está truncado (o download pode ter caído "
-                "no meio):  clipper ingest <entrada> " + _FLAG_FORCE
-            ),
-        )
+        for k, (ini_janela, dur_janela) in enumerate(janelas):
+            # Um trecho so (v1) mantem o nome de sempre; no v2 cada segmento
+            # ganha o seu, e a mediana sai de todos juntos.
+            padrao = prefixo + ("%03d.png" if len(janelas) == 1 else f"s{k}_%03d.png")
+            ffmpeg_utils.rodar(
+                [
+                    "-ss", f"{ini_janela:.3f}",
+                    "-i", str(fonte),
+                    "-t", f"{dur_janela:.3f}",
+                    "-vf", f"fps=1/{INTERVALO_AMOSTRA_S}",
+                    "-q:v", "2",
+                    str(trabalho / padrao),
+                ],
+                descricao=f"amostragem de frames do clipe {marca}",
+                sugestao=(
+                    "confira se fonte.mp4 não está truncado (o download pode ter caído "
+                    "no meio):  clipper ingest <entrada> " + _FLAG_FORCE
+                ),
+            )
         amostras = sorted(trabalho.glob(prefixo + "*.png"))
         for quadro_arquivo in amostras:
             quadro = _ler_rgb(quadro_arquivo)
@@ -1480,6 +1499,7 @@ def _renderizar_clipe(
         largura_fonte,
         altura_fonte,
         id_clipe=id_clipe,
+        trechos=[(s["inicio"], s["fim"]) for s in segmentos] or None,
     )
 
     if segmentos:
