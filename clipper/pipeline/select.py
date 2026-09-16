@@ -1785,13 +1785,16 @@ def _para_esquema(indice: int, clipe: dict[str, Any]) -> dict[str, Any]:
     """
     extras: dict[str, Any] = {}
     if clipe.get("segmentos"):
+        # So `inicio` e `fim` por segmento (D5 Q1). O render confere a forma
+        # de `segmentos` com a MESMA funcao que confere a resposta do modelo
+        # (conferir_forma_segmentos), e ela recusa chave extra: gravar aqui
+        # duracao/inicio_mmss/fim_mmss fazia o render recusar todo clipe v2
+        # que o proprio select tinha aprovado (D-B). Nenhum consumidor lia
+        # essas chaves do arquivo -- duracao e mm:ss saem de inicio/fim.
         extras["segmentos"] = [
             {
                 "inicio": round(float(s["inicio"]), 3),
                 "fim": round(float(s["fim"]), 3),
-                "duracao": round(float(s["duracao"]), 3),
-                "inicio_mmss": mmss(s["inicio"]),
-                "fim_mmss": mmss(s["fim"]),
             }
             for s in clipe["segmentos"]
         ]
