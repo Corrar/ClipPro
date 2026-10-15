@@ -1040,3 +1040,22 @@ Recebida em 15/10/2026. Transcrição verbatim.
   continua: a remoção é anunciada no log.
 - **Item 14 autorizado:** erro inesperado no início de um job do painel não
   pode deixar o job em `rodando` para sempre.
+
+
+---
+
+## 19. Posição do lote das provas F1–F4
+
+Recebida em 15/10/2026. Transcrição verbatim.
+
+```
+provas F1–F4 depois do F8c, antes do F9 — pode seguir
+```
+
+### 19.1 Efeitos
+
+- **Fila vigente:** CLIP-F6.1 (aguarda físicas no Windows + palavra do Bruno
+  para merge) → **F8a** (modelos) → **F8b** (horizontal) → **F8c**
+  (referência) → **provas F1–F4** (§18, item 6 = A) → **F9** "paridade". F7
+  (narração) segue guardada.
+- "pode seguir" = próximo da fila: **F8a**.
