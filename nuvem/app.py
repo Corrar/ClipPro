@@ -13,12 +13,15 @@ ao usuario em PT-BR com acentuacao correta.
 
 from __future__ import annotations
 
+import json
 import re
+import sys
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Mapping
 from urllib.parse import quote
 
+from nuvem import mercadopago as mp
 from nuvem import rest
 from nuvem.s3 import presignar_s3
 
@@ -49,7 +52,13 @@ def configuracao_publica(amb: Mapping[str, str]) -> Resposta:
     return 200, {
         "supabase_url": amb["SUPABASE_URL"].strip().rstrip("/"),
         "supabase_chave": amb["SUPABASE_PUBLISHABLE_KEY"].strip(),
+        # A loja so aparece com as vendas ligadas (RULINGS §29.5).
+        "compras": _compras_ativas(amb),
     }
+
+
+def _compras_ativas(amb: Mapping[str, str]) -> bool:
+    return (amb.get("COMPRAS_ATIVAS") or "").strip() == "1"
 
 
 def _usuario(amb: Mapping[str, str], token: str | None) -> dict[str, Any] | None:
@@ -157,3 +166,113 @@ def links_dos_clipes(amb: Mapping[str, str], token: str | None, trabalho_id: str
             "publicacao": assinar(arquivos["publicacao"]) if "publicacao" in arquivos else None,
         })
     return 200, {"status": "concluido", "clipes": clipes}
+
+
+# ==========================================================================
+# N-3: compra de creditos (RULINGS §29.5)
+# ==========================================================================
+
+_RE_PACOTE = re.compile(r"^[a-z0-9-]{1,32}$")
+
+
+def _mensagem_do_banco(exc: rest.ErroNuvem) -> str | None:
+    """A mensagem em portugues que a funcao SQL levantou (raise exception)."""
+    try:
+        dados = json.loads(exc.detalhe or "{}")
+    except json.JSONDecodeError:
+        return None
+    msg = dados.get("message") if isinstance(dados, dict) else None
+    return msg if isinstance(msg, str) and msg else None
+
+
+def iniciar_pagamento(amb: Mapping[str, str], token: str | None, corpo: Any) -> Resposta:
+    """Abre a compra no banco e devolve o link de pagamento do Mercado Pago."""
+    if not _compras_ativas(amb):
+        return _erro(503, "a compra de créditos abre no lançamento do ClipPro.")
+    if _faltando(amb, ("SUPABASE_URL", "SUPABASE_PUBLISHABLE_KEY", "MP_ACCESS_TOKEN", "APP_URL")):
+        return _erro(503, "a compra de créditos ainda não foi configurada.")
+    usuario = _usuario(amb, token)
+    if usuario is None:
+        return _erro(401, "entre na sua conta para comprar créditos.")
+    pacote = corpo.get("pacote") if isinstance(corpo, dict) else None
+    if not isinstance(pacote, str) or not _RE_PACOTE.match(pacote):
+        return _erro(400, "escolha um pacote.")
+    url, chave = amb["SUPABASE_URL"].strip(), amb["SUPABASE_PUBLISHABLE_KEY"].strip()
+    try:
+        compra_id = rest.rpc(url, chave, "iniciar_compra", {"p_pacote": pacote}, token=token)
+        linhas = rest.chamar(url, chave, "GET", f"/rest/v1/compras?id=eq.{compra_id}"
+                             "&select=id,pacote,minutos,preco_centavos", token=token)
+    except rest.ErroNuvem as exc:
+        mensagem = _mensagem_do_banco(exc)
+        if mensagem and exc.status == 400:
+            return _erro(400, mensagem)
+        return _erro(502, "não consegui abrir a compra agora; tente de novo.")
+    if not linhas:
+        return _erro(502, "não consegui abrir a compra agora; tente de novo.")
+    try:
+        pref = mp.criar_preferencia(amb["MP_ACCESS_TOKEN"].strip(), compra=linhas[0],
+                                    email=usuario.get("email"), app_url=amb["APP_URL"].strip(),
+                                    api=(amb.get("MP_API") or mp.API_PADRAO).strip())
+    except mp.ErroMercadoPago:
+        return _erro(502, "o Mercado Pago não respondeu; tente de novo em instantes.")
+    return 200, {"url": pref["init_point"], "compra": linhas[0]["id"]}
+
+
+def _log(texto: str) -> None:
+    # Vai para os logs da funcao na Vercel: e onde o Bruno ve o que o webhook
+    # recusou de proposito.
+    print(f"[mp_webhook] {texto}", file=sys.stderr, flush=True)
+
+
+def receber_webhook(amb: Mapping[str, str], consulta: Mapping[str, str],
+                    cabecalhos: Mapping[str, str], corpo: Any) -> Resposta:
+    """Aviso de pagamento do Mercado Pago.
+
+    200 = recebido (mesmo que ignorado: repetir nao muda nada).
+    401 = assinatura invalida. 500/502 = falha passageira: o Mercado Pago
+    tenta de novo sozinho, e a confirmacao e idempotente.
+    """
+    if not _compras_ativas(amb):
+        return 200, {"ignorado": "compras desligadas"}
+    if _faltando(amb, ("SUPABASE_URL", "SUPABASE_SECRET_KEY", "MP_ACCESS_TOKEN", "MP_WEBHOOK_SECRET")):
+        return _erro(500, "webhook não configurado.")
+    corpo = corpo if isinstance(corpo, dict) else {}
+    tipo = consulta.get("type") or corpo.get("type") or consulta.get("topic")
+    data_id = consulta.get("data.id") or (corpo.get("data") or {}).get("id")
+    if tipo != "payment" or not data_id:
+        return 200, {"ignorado": f"tipo {tipo!r}"}
+    if not mp.assinatura_valida(cabecalhos.get("x-signature"), cabecalhos.get("x-request-id"),
+                                str(data_id), amb["MP_WEBHOOK_SECRET"].strip()):
+        _log(f"assinatura inválida para o pagamento {data_id}")
+        return _erro(401, "assinatura inválida.")
+    try:
+        pag = mp.consultar_pagamento(amb["MP_ACCESS_TOKEN"].strip(), str(data_id),
+                                     api=(amb.get("MP_API") or mp.API_PADRAO).strip())
+    except mp.ErroMercadoPago as exc:
+        return _erro(502, exc.mensagem)
+
+    status = str(pag.get("status") or "")
+    compra = str(pag.get("external_reference") or "")
+    if status in ("pending", "in_process", "authorized", "in_mediation"):
+        return 200, {"aguardando": status}
+    if not _RE_UUID.match(compra):
+        _log(f"pagamento {data_id} sem compra do ClipPro (external_reference {compra!r})")
+        return 200, {"ignorado": "não é uma compra do ClipPro"}
+    if status in ("refunded", "charged_back"):
+        # Estorno no beta: registrado, sem debito automatico (§29.5).
+        _log(f"ESTORNO do pagamento {data_id} da compra {compra}: tratar à mão")
+        return 200, {"estorno": "registrado"}
+    aprovado = status == "approved" and pag.get("currency_id") == "BRL"
+    valor = round(float(pag.get("transaction_amount") or 0) * 100)
+    try:
+        resultado = rest.rpc(amb["SUPABASE_URL"].strip(), amb["SUPABASE_SECRET_KEY"].strip(),
+                             "confirmar_compra", {"p_compra": compra, "p_pagamento": str(data_id),
+                                                  "p_valor_centavos": valor, "p_aprovado": aprovado})
+    except rest.ErroNuvem as exc:
+        if exc.status in (400, 409):
+            # Permanente (valor diferente, pagamento reaproveitado): repetir
+            # nao conserta. Fica no log para o Bruno.
+            _log(f"compra {compra} NÃO creditada: {_mensagem_do_banco(exc) or exc.detalhe}")
+            return 200, {"recusado": _mensagem_do_banco(exc) or "recusado pelo banco"}
+        return _erro(500, "banco indisponível; o Mercado Pago tenta de novo.")
+    return 200, {"resultado": resultado}

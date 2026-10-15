@@ -272,8 +272,17 @@ def _servidor_do_app(amb: dict[str, str]) -> Iterator[str]:
             self.wfile.write(corpo)
 
         def do_POST(self) -> None:  # noqa: N802
-            if urlsplit(self.path).path == "/api/upload":
+            partes = urlsplit(self.path)
+            if partes.path == "/api/upload":
                 return responder(self, *app.pedir_upload(amb, token_de(self), ler_json(self)))
+            if partes.path == "/api/comprar":
+                return responder(self, *app.iniciar_pagamento(amb, token_de(self), ler_json(self)))
+            if partes.path == "/api/mp_webhook":
+                from urllib.parse import parse_qsl
+
+                cab = {k.lower(): v for k, v in self.headers.items()}
+                return responder(self, *app.receber_webhook(
+                    amb, dict(parse_qsl(partes.query)), cab, ler_json(self)))
             self.send_response(404)
             self.end_headers()
 
