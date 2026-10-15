@@ -1145,3 +1145,37 @@ salve na memoria as pendencias e continuamos depois
 - Pendências consolidadas em **`docs/PENDENCIAS.md`**: é o ponto de retomada
   da próxima sessão, junto com este arquivo.
 - Trabalho **parado** até a próxima mensagem do Bruno.
+
+---
+
+## 23. Pedido de 15/10 — "siga de onde parou"
+
+Recebido em 15/10/2026, numa sessão nova. Transcrição verbatim.
+
+```
+siga de onde parou
+```
+
+### 23.1 Estado no recebimento
+
+- `origin/master` = `aa958d0` (pouso do CLIP-F6), intocado — paridade
+  conferida.
+- `origin/claude/charming-euler-02p9cf` = `0295359` (§22), exatamente o ponto
+  de retomada que o `docs/PENDENCIAS.md` declara.
+- Desde o recon do F8a (`8254c75`) só `site/` e `docs/` mudaram: as
+  referências de linha do `recon-f8a-codigo.md` continuam valendo.
+
+### 23.2 Leitura do executor (declarada, não decisão)
+
+- **Branch.** Esta sessão só pode empurrar para
+  `claude/loving-newton-bykd21`. O branch foi avançado por fast-forward até
+  `0295359` (nenhum commit reescrito) e passa a ser o branch de trabalho. O
+  `claude/charming-euler-02p9cf` fica congelado em `0295359`, com o mesmo
+  código. Prefixo segue o lote: **`[CLIP-F8a]`** (§20.1).
+- **"De onde parou".** O §22 parou tudo esperando o Bruno. O próximo da fila
+  é o **F8a**, cujo recon (`8254c75`) terminou com colisões que precisam de
+  decisão. O pedido do site (§21) chegou antes de elas serem apresentadas
+  como perguntas — **"siga" não as responde.** Pelo CLAUDE.md §1, dúvida de
+  arquitetura volta como pergunta: o executor entrega as perguntas do F8a
+  consolidadas e **PARA** até a resposta. Nenhum código do F8a é escrito.
+- Site (S1, S5) e F6.1 no Windows (W1–W5) seguem com o Bruno, sem mudança.

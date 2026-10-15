@@ -3,8 +3,10 @@
 > Gravado a pedido do Bruno ("salve na memória as pendências e continuamos
 > depois"). Ponto de retomada da próxima sessão: **ler este arquivo e o
 > `docs/lote-clip-f6/RULINGS.md` (§16 em diante) antes de qualquer ação.**
-> Branch de trabalho: `claude/charming-euler-02p9cf`. `master` em `aa958d0`
-> (pouso do CLIP-F6), intocado desde então.
+> Branch de trabalho: `claude/loving-newton-bykd21` desde o RULINGS §23
+> (fast-forward do `claude/charming-euler-02p9cf`, que fica congelado em
+> `0295359` com o mesmo código). `master` em `aa958d0` (pouso do CLIP-F6),
+> intocado desde então.
 
 ## Fila (RULINGS §17, §19, §21)
 
@@ -38,7 +40,7 @@ Placar no Linux: `prova_f61.py --fisicas` 13/13; `prova_f6.py --fisicas`
 
 | # | Pendência | Quem |
 |---|---|---|
-| W1 | Rodar no Windows: `git fetch`, `git checkout claude/charming-euler-02p9cf`, `.venv\Scripts\python provas\prova_f61.py --fisicas` e `.venv\Scripts\python provas\prova_f6.py --fisicas` | Bruno |
+| W1 | Rodar no Windows: `git fetch`, `git checkout claude/loving-newton-bykd21`, `.venv\Scripts\python provas\prova_f61.py --fisicas` e `.venv\Scripts\python provas\prova_f6.py --fisicas` | Bruno |
 | W2 | Lockfile num venv novo: `py -3.13 -m venv _teste\venv-lock`, `_teste\venv-lock\Scripts\pip install -r requirements.lock.txt`, `_teste\venv-lock\Scripts\python -c "import fastapi, uvicorn, multipart; print('ok')"` | Bruno |
 | W3 | Item 2 no painel real: play, pausar, re-renderizar o mesmo clipe → tem de terminar sem `WinError 5` | Bruno |
 | W4 | Palavra explícita para o merge do F6.1 em `master` | Bruno |
