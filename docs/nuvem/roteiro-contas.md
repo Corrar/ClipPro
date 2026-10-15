@@ -92,3 +92,103 @@ Quando o app (N-2) estiver criando pedidos:
 
 Deixe o terminal aberto: o PC é o servidor do beta (G3). `Ctrl+C` devolve à
 fila o trabalho em andamento.
+
+---
+
+## 7. N-2: o app (login, pedidos, clipes)
+
+Depois dos passos 1 a 5.
+
+### 7.1 Banco
+
+No **SQL Editor** do Supabase, cole e rode `nuvem/supabase/002_contas.sql`
+(depois do 001). A migração pode ser rodada de novo sem perigo.
+
+### 7.2 Login por e-mail
+
+Em **Authentication → Sign In / Providers → Email**, deixe **"Confirm email"
+ligado**. O convite só libera depois da confirmação.
+
+### 7.3 Entrar com Google
+
+1. No Google Cloud Console (https://console.cloud.google.com), em **APIs e
+   serviços → Credenciais → Criar credenciais → ID do cliente OAuth**, escolha
+   o tipo **Aplicativo da Web**.
+2. Em **URI de redirecionamento autorizado**, use
+   `https://<projeto>.supabase.co/auth/v1/callback`.
+3. Cole o **Client ID** e o **Client Secret** em **Supabase → Authentication →
+   Sign In / Providers → Google**.
+
+### 7.4 Endereços do app
+
+Em **Authentication → URL Configuration**:
+
+- **Site URL** = o endereço do app na Vercel (passo 7.6), por exemplo
+  `https://clippro-app.vercel.app`;
+- **Redirect URLs**: o mesmo endereço seguido de `/**`.
+
+### 7.5 Chave pública e convites
+
+1. Em **Project Settings → API Keys**, copie a **Publishable key**
+   (`sb_publishable_…`). Ela vai para a Vercel como `SUPABASE_PUBLISHABLE_KEY`.
+   Esta é pública por natureza; a secreta **nunca** vai para a Vercel.
+2. **Convites:** em **Table Editor → convites → Insert row**, um e-mail por
+   linha, **em minúsculas**. Ou pelo SQL Editor:
+
+   ```
+   insert into convites (email) values ('seu-email@gmail.com');
+   ```
+
+   Comece pelo seu.
+
+### 7.6 Projeto na Vercel
+
+1. Em https://vercel.com/new, importe `Corrar/ClipPro`:
+   - Project Name: **clippro-app**;
+   - Root Directory: **./** (a raiz);
+   - Framework: **Other**.
+2. Em **Environment Variables**, cadastre:
+   - `SUPABASE_URL`;
+   - `SUPABASE_PUBLISHABLE_KEY`;
+   - `R2_ACCOUNT_ID`;
+   - `R2_ACCESS_KEY_ID` e `R2_SECRET_ACCESS_KEY` — de uma **segunda chave do
+     R2**, só para o app, com Object Read & Write no bucket `clippro`. Assim dá
+     para revogar uma sem derrubar a outra;
+   - `R2_BUCKET` = `clippro`.
+3. Em **Settings → Git → Production Branch**, coloque
+   `claude/loving-newton-bykd21`. O `master` não tem o app, e continua
+   intocado até o seu "pode fazer o merge".
+4. Em **Settings → Deployment Protection**, o app precisa de **produção
+   pública**: as pessoas entram nele. Deixe a proteção só nos previews. É uma
+   decisão sua.
+5. Faça o **Deploy**. O site público (projeto `clippro`) não muda.
+
+### 7.7 CORS do R2
+
+O navegador envia o vídeo e lê o texto do post direto do R2. Em **R2 →
+clippro → Settings → CORS Policy**, use (troque pelo endereço do passo 7.6):
+
+```
+[
+  {
+    "AllowedOrigins": ["https://clippro-app.vercel.app"],
+    "AllowedMethods": ["GET", "PUT", "HEAD"],
+    "AllowedHeaders": ["content-type"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+### 7.8 Primeira volta completa
+
+1. Abra o app, **crie a conta** com o e-mail convidado e **confirme** pelo
+   link do e-mail. O saldo deve mostrar **300 min**.
+2. No PC, deixe o worker de plantão: `.venv\Scripts\python -m worker --nuvem`.
+3. No app, cole um link **seu**, com 2 a 5 minutos, e clique em **Gerar
+   cortes**. O rolo passa de "Na fila" para "Processando" e depois para
+   "Pronto", e o saldo devolve o que sobrou.
+4. Abra o rolo, veja e baixe um clipe.
+
+Mande o que viu em cada passo. Se algo falhar, mande também a mensagem que
+apareceu.

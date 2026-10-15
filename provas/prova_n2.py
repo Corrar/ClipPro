@@ -16,6 +16,7 @@ ao usuario em PT-BR com acentuacao correta.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import shutil
@@ -23,7 +24,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Iterator
 
 RAIZ = Path(__file__).resolve().parent.parent
 if str(RAIZ) not in sys.path:
@@ -222,8 +223,130 @@ def f_banco_das_contas(raiz: Path) -> None:
             "fica negativo", f"saldo {_saldo(db, CAIO)}")
 
 
+def _node_com_playwright() -> tuple[str, dict[str, str]]:
+    node, npm = shutil.which("node"), shutil.which("npm")
+    if not node or not npm:
+        raise Pulou("pendente: a prova de interface precisa de Node + Playwright (Chromium).")
+    raiz_global = subprocess.run([npm, "root", "-g"], capture_output=True, text=True).stdout.strip()
+    env = {**os.environ, "NODE_PATH": raiz_global}
+    teste = subprocess.run([node, "-e", "require('playwright')"], env=env, capture_output=True)
+    if teste.returncode:
+        raise Pulou("pendente: o pacote playwright do Node não está instalado neste ambiente.")
+    return node, env
+
+
+@contextlib.contextmanager
+def _servidor_do_app(amb: dict[str, str]) -> Iterator[str]:
+    """Serve app/ e as rotas /api/* como a Vercel: estatico + funcoes."""
+    import mimetypes
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from threading import Thread
+    from urllib.parse import parse_qs, urlsplit
+
+    from nuvem import app
+    from nuvem.web import ler_json, responder, token_de
+
+    pasta = (RAIZ / "app").resolve()
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *_: Any) -> None:
+            pass
+
+        def do_GET(self) -> None:  # noqa: N802
+            partes = urlsplit(self.path)
+            if partes.path == "/api/config":
+                return responder(self, *app.configuracao_publica(amb))
+            if partes.path == "/api/clipes":
+                trabalho = (parse_qs(partes.query).get("trabalho") or [""])[0]
+                return responder(self, *app.links_dos_clipes(amb, token_de(self), trabalho))
+            alvo = (pasta / (partes.path.lstrip("/") or "index.html")).resolve()
+            if pasta not in alvo.parents or not alvo.is_file():
+                self.send_response(404)
+                self.end_headers()
+                return
+            corpo = alvo.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", mimetypes.guess_type(alvo.name)[0] or "text/plain")
+            self.send_header("Content-Length", str(len(corpo)))
+            self.end_headers()
+            self.wfile.write(corpo)
+
+        def do_POST(self) -> None:  # noqa: N802
+            if urlsplit(self.path).path == "/api/upload":
+                return responder(self, *app.pedir_upload(amb, token_de(self), ler_json(self)))
+            self.send_response(404)
+            self.end_headers()
+
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        yield f"http://127.0.0.1:{srv.server_address[1]}"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def f_interface(raiz: Path) -> None:
+    """N2-F2: o app num Chromium de verdade, ponta a ponta, contra a nuvem falsa."""
+    from provas.nuvem_falsa import SupabaseFalso, s3_falso
+
+    node, env_node = _node_com_playwright()
+    saida = _pasta(raiz, "n2-f2")
+    sb = SupabaseFalso()
+    sb.cadastrar("ana@exemplo.com", "senha-da-ana")
+    sb.cadastrar("bia@exemplo.com", "senha-da-bia", liberado=False)
+
+    with sb.servir() as url_sb, s3_falso(SEGREDO_R2) as (url_s3, objetos, _):
+        def ao_concluir(id_: str) -> dict[str, Any]:
+            pasta = f"resultados/{id_}/"
+            agora = time.time()
+            objetos[f"/clippro/{pasta}01-o-momento--cortes.mp4"] = (b"\x00" * 2048, agora)
+            objetos[f"/clippro/{pasta}01-o-momento--cortes.capa.jpg"] = (b"\xff\xd8\xff", agora)
+            objetos[f"/clippro/{pasta}01-o-momento--cortes.publicacao.md"] = (
+                "Texto do post #clippro".encode(), agora)
+            objetos[f"/clippro/{pasta}02-x--cortes.mp4"] = (b"\x00" * 1024, agora)
+            return {"status": "concluido", "creditos": 2, "clipes": [
+                {"titulo": "O momento em que tudo mudou", "score": 8.7, "duracao": 42.0,
+                 "gancho": "Ninguém esperava essa resposta",
+                 "arquivos": {"video": pasta + "01-o-momento--cortes.mp4",
+                              "capa": pasta + "01-o-momento--cortes.capa.jpg",
+                              "publicacao": pasta + "01-o-momento--cortes.publicacao.md"}},
+                {"titulo": "<img src=x onerror=alert(1)>", "score": 7.1, "duracao": 30.0,
+                 "gancho": "x", "arquivos": {"video": pasta + "02-x--cortes.mp4"}},
+            ]}
+
+        sb.ao_concluir = ao_concluir
+        with _servidor_do_app(_ambiente(url_sb, url_s3)) as url_app:
+            proc = subprocess.run(
+                [node, str(RAIZ / "provas" / "n2_interface.cjs")],
+                env={**env_node, "APP_URL": url_app, "SB_URL": url_sb, "SAIDA": str(saida)},
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=240)
+
+    checks = [json.loads(l[6:]) for l in proc.stdout.splitlines() if l.startswith("CHECK ")]
+    if not checks:
+        raise Falhou(f"o script de interface não relatou nada: {(proc.stderr or proc.stdout)[-300:]}")
+    for c in checks:
+        confere(c["ok"], c["descricao"], c["detalhe"] if not c["ok"] else "")
+
+    pedidos = [p for p in sb.pedidos if p["caminho"] == "/rest/v1/rpc/criar_trabalho"]
+    primeiro = pedidos[0]["corpo"] if pedidos else {}
+    confere(primeiro.get("p_preset") == "cortes-editorial" and primeiro.get("p_n") == 3,
+            "o pedido levou o visual e o número de cortes escolhidos na tela",
+            f"{primeiro.get('p_preset')}, {primeiro.get('p_n')}")
+    enviados = [k for k in objetos if k.startswith("/clippro/entradas/")]
+    por_arquivo = [t for t in sb.trabalhos if t["pedido"]["entrada"]["tipo"] == "arquivo"]
+    confere(len(enviados) == 1 and len(objetos[enviados[0]][0]) == 50000 and por_arquivo
+            and enviados[0].endswith(por_arquivo[0]["pedido"]["entrada"]["valor"]),
+            "o arquivo chegou ao R2 inteiro e o pedido aponta para ele")
+    confere(all(p["apikey"] == SupabaseFalso.CHAVE_PUBLICA for p in sb.pedidos
+                if not p["caminho"].startswith("/__prova")),
+            "o navegador só usou a chave pública do Supabase")
+    print(f"    prints  {saida}")
+
+
 FISICAS: dict[str, tuple[str, Callable[[Path], None]]] = {
     "N2-F1": ("banco das contas num Postgres real", f_banco_das_contas),
+    "N2-F2": ("interface num Chromium real (Playwright)", f_interface),
 }
 
 

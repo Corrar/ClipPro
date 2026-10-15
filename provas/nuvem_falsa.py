@@ -194,6 +194,9 @@ class SupabaseFalso:
         self.trabalhos: list[dict[str, Any]] = []
         self.pedidos: list[dict[str, Any]] = []
         self.trava = threading.Lock()
+        # Gancho da prova de interface: recebe o id, semeia os arquivos e
+        # devolve o resultado que o "worker" gravaria.
+        self.ao_concluir: Any = None
 
     # ---------------------------------------------------- apoio das provas
     def cadastrar(self, email: str, senha: str, *, liberado: bool = True,
@@ -349,6 +352,12 @@ class SupabaseFalso:
                     return self._json(200, sb._publico(u))
                 if partes.path == "/auth/v1/logout":
                     return self._json(204, None)
+                if partes.path == "/__prova/concluir":
+                    # Rota SO da falsa: a prova de interface "faz o papel do
+                    # worker" e conclui o trabalho com os clipes que semeou.
+                    resultado = sb.ao_concluir(corpo["id"]) if sb.ao_concluir else {}
+                    sb.concluir(corpo["id"], resultado)
+                    return self._json(200, {"ok": True})
                 u = sb._quem(self)
                 if partes.path == "/rest/v1/rpc/meu_saldo":
                     return self._json(200, sb.saldo.get(u["id"], 0) if u else 0)

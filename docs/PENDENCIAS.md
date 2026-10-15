@@ -29,7 +29,12 @@ F1–F4 → F9 "paridade". F7 (narração) guardada.
 > `.venv\Scripts\python provas\prova_n1.py --fisicas` no Windows.
 > **§28: P1 = Supabase + R2, P2 = tokens por trabalho — feitos** (relatório
 > da N-1 §7). Pendente do Bruno: criar as contas e rodar a N-F4 seguindo
-> `docs/nuvem/roteiro-contas.md`. Próximo: N-2 (app), com a palavra do Bruno.
+> `docs/nuvem/roteiro-contas.md`.
+> **§29: delegação** ("o restante faça com o que achar recomendado").
+> **N-2 (app) feita e provada** (`relatorio-n2.md`). Do Bruno: roteiro §7
+> (Auth, Google, convites, CORS do R2, projeto Vercel `clippro-app` com
+> produção pública e no branch de trabalho). Próximo: N-3 (Mercado Pago),
+> com o preço dos pacotes decidido pelo Bruno.
 
 ---
 

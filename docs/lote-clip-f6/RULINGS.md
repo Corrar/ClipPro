@@ -1449,3 +1449,16 @@ O restante faça com oq achar recomendado
   - interface pelo Playwright num Chromium real, contra um backend falso
     local. A prova de interface **pula** onde não há Node + Playwright, como
     as de ffmpeg pulam sem ffmpeg.
+
+### 29.4 Resultado da N-2 (decidida por delegação)
+
+- `app/` (identidade do site, fontes locais, `supabase-js` embutido), `api/`
+  e `nuvem/` (lógica compartilhada), `002_contas.sql`, `vercel.json` e
+  `.vercelignore`.
+- Placar: N-2 **7/0/0** (SQL num Postgres real; interface num Chromium real
+  contra a nuvem falsa); N-1 16/1 pendente/0; 13 de 13 mutantes da N-2
+  mordem. Relatório: `docs/lote-clip-f6/relatorio-n2.md`.
+- Com o Bruno: contas, Auth, Google, CORS, projeto Vercel com produção
+  pública e produção no branch de trabalho (roteiro §7).
+- A **N-3** (compra de créditos, Mercado Pago) segue pela delegação; o
+  **preço dos pacotes fica com o Bruno**.
