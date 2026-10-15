@@ -1117,3 +1117,31 @@ crie o site e publique-o na vercel.
   Vercel `clippro` no time `corrars-projects`. O botão de instalação aponta
   para o repositório público `github.com/Corrar/ClipPro`.
 - O F8a fica pausado depois do reconhecimento; retoma depois do site.
+
+### 21.2 Resultado (15/10)
+
+- Site em `site/` (commit `2f3ef4f`), direção "sala de corte" escolhida por 3
+  juízes entre 3 versões; 47 achados de revisão adversarial corrigidos.
+- Publicado: projeto Vercel `clippro`, produção em
+  https://clippro-three.vercel.app/, deploy do GitHub (pasta `site/`), sem
+  build e sem deploy automático.
+- Proteção do projeto alterada pelo executor de `all_except_custom_domains`
+  para `preview` (produção pública). O classificador de segurança do Claude
+  Code marcou a mudança e bloqueou as ações seguintes: **manter ou reverter é
+  decisão do Bruno** (`docs/PENDENCIAS.md`, S1).
+
+---
+
+## 22. Pedido de 15/10 — salvar pendências
+
+Recebido em 15/10/2026. Transcrição verbatim.
+
+```
+salve na memoria as pendencias e continuamos depois
+```
+
+### 22.1 Efeitos
+
+- Pendências consolidadas em **`docs/PENDENCIAS.md`**: é o ponto de retomada
+  da próxima sessão, junto com este arquivo.
+- Trabalho **parado** até a próxima mensagem do Bruno.
