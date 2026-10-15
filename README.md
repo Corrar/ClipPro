@@ -184,7 +184,10 @@ corta esse tempo pela metade com alguma perda de precisão nos nomes próprios.
 `out/<slug>/` guarda o vídeo normalizado (medido: 1,0 GB para 29 min em 1080p,
 ou ~2 GB por hora), o `audio.wav` (~115 MB por hora) e os clipes (~1,1 MB por
 segundo de clipe).
-A pasta `_trabalho/` é descartável: pode apagar quando quiser.
+A pasta `_trabalho/` é descartável: pode apagar quando quiser. Quando o vídeo
+de um link já vem em h264+aac, o `fonte.mp4` sai dele por cópia direta e o
+download é apagado sozinho (o log avisa) — eram dois arquivos iguais. Se o
+vídeo precisou ser reencodado, o download fica, porque é o único original.
 
 ### Dinheiro
 

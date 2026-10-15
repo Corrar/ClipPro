@@ -16,8 +16,12 @@ Duas decisoes que valem explicar:
    Se o remux falhar por qualquer motivo (moov quebrado, stream exotico), o
    modulo cai sozinho no reencode completo em vez de estourar na cara do
    usuario.
-2. O bruto baixado fica em _trabalho. Nada e apagado sem aviso; o tamanho vai
-   para o log para o usuario decidir se quer limpar.
+2. O bruto baixado fica em _trabalho -- salvo quando o fonte.mp4 saiu dele por
+   remux (-c copy): ai os dois tem os mesmos streams e o bruto e uma copia
+   inteira a mais (~1,76 GB somando dois jobs reais). Nesse caso ele sai, e o
+   log diz (RULINGS §18, item 7). Reencodado, ele fica: o fonte.mp4 perdeu
+   qualidade e o bruto e o unico original. Arquivo LOCAL do usuario nunca e
+   tocado.
 """
 
 from __future__ import annotations
@@ -575,6 +579,45 @@ def _normalizar(
     return True, "reencode para h264+aac"
 
 
+def _descartar_bruto_remuxado(bruto: Path, saida: Saida, log: Any) -> bool:
+    """Apaga o download que virou fonte.mp4 por remux. True se apagou.
+
+    So o 'baixado.*' de DENTRO de _trabalho: a guarda de caminho e o que
+    impede este codigo de algum dia apagar um arquivo que o usuario passou.
+    Custo aceito (§18): --force ou --reencodar-fonte depois disto baixam de novo.
+    """
+    try:
+        dentro = bruto.resolve().parent == saida.trabalho_dir.resolve()
+    except OSError:
+        return False
+    if not dentro or not bruto.name.startswith(_PREFIXO_BAIXADO + "."):
+        return False
+    if not _arquivo_valido(saida.fonte_mp4):
+        return False
+    try:
+        tamanho = bruto.stat().st_size
+        bruto.unlink()
+    except OSError as exc:
+        log.warning(
+            f"   não consegui apagar o download {bruto.name} ({exc}); ele continua "
+            "em _trabalho e pode ser apagado à mão."
+        )
+        return False
+    log.info(
+        f"   download apagado: {bruto.name} ({humanizar_bytes(tamanho)}) — o "
+        "fonte.mp4 saiu dele por remux, com os mesmos streams. Um --force ou um "
+        "--reencodar-fonte daqui em diante baixa o vídeo de novo."
+    )
+    return True
+
+
+def _arquivo_valido(caminho: Path) -> bool:
+    try:
+        return caminho.is_file() and caminho.stat().st_size > 0
+    except OSError:
+        return False
+
+
 def _extrair_audio(fonte_mp4: Path, destino: Path) -> None:
     ffmpeg_utils.rodar(
         [
@@ -718,12 +761,15 @@ def ingerir(
         )
         log.info(f"   duração: {humanizar_tempo(info_video.duracao)}")
 
-        # Nada e apagado sem aviso: o bruto baixado fica, mas o usuario sabe o custo.
+        # Nada e apagado sem aviso: o que sai e o que fica vao para o log.
         if origem.tipo == "url" and tamanho_bruto:
-            log.info(
-                f"   o bruto baixado continua em {bruto} "
-                f"({humanizar_bytes(tamanho_bruto)}); apague se precisar de espaço."
-            )
+            if not reencodado and _descartar_bruto_remuxado(bruto, saida, log):
+                dados["bruto_descartado"] = True
+            else:
+                log.info(
+                    f"   o bruto baixado continua em {bruto} "
+                    f"({humanizar_bytes(tamanho_bruto)}); apague se precisar de espaço."
+                )
 
     estado.marcar(ESTAGIO, assinatura, segundos=crono.segundos, extra=dados)
     return {**dados, "reaproveitado": False}

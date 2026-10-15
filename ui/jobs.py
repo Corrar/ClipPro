@@ -363,7 +363,20 @@ class Fila:
         saida = Saida.para(pedido.slug, pedido.opcoes.out)
         saida.criar_dirs()
         with registro.em_arquivo(saida.log):
-            self._executar_com_log(pedido, saida)
+            # Rede do job inteiro (RULINGS §18, item 14). Os `try` de dentro
+            # cobrem a origem e os estagios, mas montar_estagios() e as
+            # gravacoes do job.json ficavam de fora: um erro ali subia para o
+            # worker, que so logava -- e o job.json ficava em 'rodando' para
+            # sempre, com a tela girando sem fim.
+            try:
+                self._executar_com_log(pedido, saida)
+            except ErroClipper as exc:
+                self._falhar(saida, pedido.slug, exc)
+            except BaseException as exc:  # noqa: BLE001 - o job tem de terminar
+                registro.obter().error(
+                    "erro inesperado no job:\n" + traceback.format_exc()
+                )
+                self._falhar(saida, pedido.slug, exc)
 
     def _executar_com_log(self, pedido: Pedido, saida: Saida) -> None:
         from clipper.pipeline import ingest

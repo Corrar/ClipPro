@@ -377,6 +377,82 @@ def h_apagar_job(raiz: Path) -> None:
 
 
 # ==========================================================================
+# Item 14 -- erro fora dos `try` do job nao deixa o job em 'rodando'
+# ==========================================================================
+
+
+def h_job_nunca_fica_rodando(raiz: Path) -> None:
+    """H-10: erro em montar_estagios() marca o job como erro, com traceback."""
+    from clipper import motor
+    from clipper.config import Saida
+    from clipper.pipeline import ingest
+    from ui import jobs
+
+    base = _pasta(raiz, "h10")
+    opcoes = motor.Opcoes(out=base)
+    original_origem, original_montar = ingest.resolver_origem, motor.montar_estagios
+    ingest.resolver_origem = lambda entrada: type("O", (), {"titulo": "t"})()
+
+    def explodir(*_a: Any, **_k: Any) -> Any:
+        raise RuntimeError("bomba-da-prova-h10")
+
+    motor.montar_estagios = explodir
+    try:
+        fila = jobs.Fila(base)
+        try:
+            fila._executar(jobs.Pedido(slug="video", entrada="x.mp4", opcoes=opcoes))
+        except RuntimeError:
+            raise Falhou("o erro escapou do job e foi parar no worker") from None
+    finally:
+        ingest.resolver_origem, motor.montar_estagios = original_origem, original_montar
+
+    saida = Saida.para("video", base)
+    job = json.loads((saida.base / "job.json").read_text(encoding="utf-8"))
+    confere(job.get("status") == jobs.ERRO, "o job termina em erro, não em 'rodando'",
+            str(job.get("status")))
+    confere("bomba-da-prova-h10" in saida.log.read_text(encoding="utf-8"),
+            "o traceback está no clipper.log")
+
+
+# ==========================================================================
+# Item 7 -- o download que virou fonte.mp4 por remux sai de _trabalho
+# ==========================================================================
+
+
+def h_descarte_so_do_baixado(raiz: Path) -> None:
+    """H-11: o descarte só alcança `_trabalho/baixado.*`, nunca arquivo do usuário."""
+    import logging
+
+    from clipper.config import Saida
+    from clipper.pipeline import ingest
+
+    base = _pasta(raiz, "h11")
+    saida = Saida.para("video", base).criar_dirs()
+    saida.fonte_mp4.write_bytes(b"fonte")
+    log = logging.getLogger("prova-h11")
+
+    do_usuario = base / "meu-video.mp4"
+    do_usuario.write_bytes(b"original")
+    confere(not ingest._descartar_bruto_remuxado(do_usuario, saida, log) and do_usuario.is_file(),
+            "arquivo fora de _trabalho nunca é apagado")
+
+    outro = saida.trabalho_dir / "outro.mp4"
+    outro.write_bytes(b"x")
+    confere(not ingest._descartar_bruto_remuxado(outro, saida, log) and outro.is_file(),
+            "arquivo de _trabalho que não é 'baixado.*' fica")
+
+    baixado = saida.trabalho_dir / "baixado.mp4"
+    baixado.write_bytes(b"x")
+    saida.fonte_mp4.unlink()
+    confere(not ingest._descartar_bruto_remuxado(baixado, saida, log) and baixado.is_file(),
+            "sem fonte.mp4 válido, o download fica")
+
+    saida.fonte_mp4.write_bytes(b"fonte")
+    confere(ingest._descartar_bruto_remuxado(baixado, saida, log) and not baixado.exists(),
+            "com fonte.mp4 válido, o baixado.* de _trabalho sai")
+
+
+# ==========================================================================
 # Fisicas
 # ==========================================================================
 
@@ -405,6 +481,58 @@ def f_capa_em_fonte_lenta(raiz: Path) -> None:
             f"instante {instante:.3f}s de {duracao:.3f}s, 5 fps")
 
 
+def _semear_download(raiz: Path, nome: str) -> tuple[Path, Any]:
+    """Pasta de job com um 'download' h264+aac ja em _trabalho.
+
+    O _baixar() reaproveita baixado.* existente sem chamar o yt-dlp, entao a
+    prova atravessa o ingerir() real sem rede.
+    """
+    from clipper.config import Saida
+    from provas.gerar_clipe_curto import gerar
+
+    base = _pasta(raiz, nome)
+    saida = Saida.para("video", base).criar_dirs()
+    gerar(saida.trabalho_dir / "baixado.mp4", 4.0)
+    return base, saida
+
+
+def f_bruto_remuxado_sai(raiz: Path) -> None:
+    """F-H2: remux apaga o download; reencode e arquivo local não."""
+    from clipper.config import Estado
+    from clipper.pipeline import ingest
+
+    if shutil.which("ffmpeg") is None:
+        raise Pulou("ffmpeg indisponível neste ambiente.")
+
+    url = ingest.Origem(tipo="url", valor="https://exemplo.invalid/v", slug="video", titulo="t")
+
+    _, saida = _semear_download(raiz, "fh2-remux")
+    bruto = saida.trabalho_dir / "baixado.mp4"
+    dados = ingest.ingerir(url, saida, Estado(saida.estado_json))
+    confere(dados["normalizado"]["reencodado"] is False, "controle: o caminho foi remux")
+    confere(not bruto.exists(), "remux: o download saiu de _trabalho")
+    confere(saida.fonte_mp4.stat().st_size > 0 and saida.audio_wav.is_file(),
+            "fonte.mp4 e audio.wav ficaram")
+    confere(dados.get("bruto_descartado") is True, "o descarte ficou registrado no estado")
+    de_novo = ingest.ingerir(url, saida, Estado(saida.estado_json))
+    confere(de_novo.get("reaproveitado") is True,
+            "rodar de novo reaproveita a ingestão sem precisar do download")
+
+    _, saida = _semear_download(raiz, "fh2-reencode")
+    bruto = saida.trabalho_dir / "baixado.mp4"
+    dados = ingest.ingerir(url, saida, Estado(saida.estado_json), reencodar=True)
+    confere(dados["normalizado"]["reencodado"] is True, "controle: o caminho foi reencode")
+    confere(bruto.is_file(), "reencode: o download (único original) fica")
+
+    base, saida = _semear_download(raiz, "fh2-local")
+    local = base / "meu-video.mp4"
+    shutil.move(str(saida.trabalho_dir / "baixado.mp4"), local)
+    arquivo = ingest.Origem(tipo="arquivo", valor=str(local), slug="video", titulo="t")
+    dados = ingest.ingerir(arquivo, saida, Estado(saida.estado_json))
+    confere(dados["normalizado"]["reencodado"] is False, "controle: arquivo local por remux")
+    confere(local.is_file(), "arquivo local do usuário nunca é apagado")
+
+
 # ==========================================================================
 # Registro e execucao
 # ==========================================================================
@@ -419,10 +547,13 @@ ESTRUTURAIS: dict[str, tuple[str, Callable[[Path], None]]] = {
     "H-7": ("item 10: recusa avisa que o início já foi deslocado", h_aviso_de_deslocamento),
     "H-8": ("item 11: mensagens de forma conhecem o v2", h_mensagens_conhecem_v2),
     "H-9": ("item 13: DELETE /jobs/{id} não quebra com NameError", h_apagar_job),
+    "H-10": ("item 14: erro no início do job não o deixa em 'rodando'", h_job_nunca_fica_rodando),
+    "H-11": ("item 7: descarte só alcança _trabalho/baixado.*", h_descarte_so_do_baixado),
 }
 
 FISICAS: dict[str, tuple[str, Callable[[Path], None]]] = {
     "F-H1": ("item 9: capa no último quadro de fonte < 20 fps", f_capa_em_fonte_lenta),
+    "F-H2": ("item 7: remux apaga o download; reencode e local não", f_bruto_remuxado_sai),
 }
 
 

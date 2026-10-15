@@ -93,4 +93,28 @@ Smoke do item 2 (o que a prova não alcança no Linux): no painel, dar play num
 clipe, pausar, clicar em re-renderizar o mesmo clipe → tem de terminar sem
 `WinError 5`.
 
+---
+
+## 6. Rodada 2 — decisões do §18 ("12 A, 6 A, 7 A, 14 pode consertar")
+
+| # | Feito | Prova |
+|---|---|---|
+| 12 | Dois fatores na E-C4: pílula 1,38 (estimativa 156 px = medida), legenda 1,35. Vão do `cortes` estimado 26 px = medido. Nada renderizado muda | E-C4 |
+| 14 | `Fila._executar` ganhou rede do job inteiro: erro em `montar_estagios()` (ou qualquer ponto fora dos `try` de dentro) vira job em `erro`, com traceback no `clipper.log` | H-10 |
+| 7 | Download por URL que virou `fonte.mp4` por remux é apagado e anunciado no log; reencodado, fica; arquivo local nunca é tocado (guarda: só `baixado.*` de dentro de `_trabalho/`). README atualizado | H-11, F-H2 |
+| 6 | **Não feito aqui** — opção A é lote próprio; posição na fila a definir | — |
+
+Mordida: H-10, H-11 e F-H2 falham no código de `5bf2699` (antes desta
+rodada) e passam no novo.
+
+**Custo aceito do item 7, declarado:** depois do descarte, `--force` na
+ingestão ou `--reencodar-fonte` baixam o vídeo de novo. Rodar o mesmo comando
+de novo não baixa nada (a ingestão é reaproveitada — conferido na F-H2).
+
+Placar desta rodada: `prova_f61.py --fisicas` **13/13**;
+`prova_f6.py --fisicas` em execução — placar no próximo commit.
+
+**Pergunta aberta:** onde entra o lote das provas F1–F4 (item 6 A) na fila
+F8a → F8b → F8c → F9?
+
 PARE aqui.
