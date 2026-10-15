@@ -1014,3 +1014,29 @@ Q1 A, Q2 A, Q3 B — pode seguir
   Branch de trabalho desta sessão: `claude/charming-euler-02p9cf`, a partir de
   `origin/master` = `aa958d0` (paridade conferida em 15/10). `master`
   intocado.
+
+
+---
+
+## 18. Decisões sobre o relatório do F6.1 (§3 de `relatorio-f61.md`)
+
+Recebida em 15/10/2026. Transcrição verbatim.
+
+```
+12 A, 6 A, 7 A, 14 pode consertar — pode seguir
+```
+
+### 18.1 Efeitos
+
+- **Item 12 = A.** Dois fatores na prova E-C4: pílula **1,38** (medido com a
+  fonte real: 156 px) e legenda **1,35**. Nada renderizado muda; `VERSAO`
+  não sobe.
+- **Item 6 = A.** As provas de F1–F4 são reescritas como provas estruturais +
+  físicas novas, **num lote próprio** — fora do F6.1. Posição na fila ainda
+  não definida.
+- **Item 7 = A.** O `baixado.*` de `_trabalho/` é apagado **só quando o
+  `fonte.mp4` veio de remux `-c copy`** (mesmos streams, nada se perde). Veio
+  de reencode → o bruto fica, como hoje. A regra "nada é apagado sem aviso"
+  continua: a remoção é anunciada no log.
+- **Item 14 autorizado:** erro inesperado no início de um job do painel não
+  pode deixar o job em `rodando` para sempre.
