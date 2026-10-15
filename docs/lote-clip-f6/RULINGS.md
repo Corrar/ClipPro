@@ -1333,3 +1333,31 @@ verbatim (pergunta → resposta).
   mutantes mordem. Relatório: `docs/lote-clip-f6/relatorio-n1.md`.
 - **PARE** até P1 (fornecedor da fila, arquivos e login) e P2 (medir tokens
   por trabalho).
+
+---
+
+## 28. Respostas P1 e P2 (formulário de 15/10)
+
+Recebidas em 15/10/2026 pelo formulário de perguntas da sessão. Transcrição
+verbatim (pergunta → resposta).
+
+```
+"P1 — Onde ficam, na nuvem, a fila de pedidos, os arquivos (vídeos e clipes)
+ e o login? Todas as opções são grátis."
+  = "Supabase + Cloudflare R2 (Recomendado)"
+"P2 — Medir quanto a IA custa em cada vídeo? É o número que define o preço
+ do crédito." = "Sim, por trabalho (Recomendado)"
+```
+
+### 28.1 Efeitos
+
+- **P1 = A:** Supabase (banco: fila, contas, créditos; login com e-mail e
+  Google) + Cloudflare R2 (arquivos). Planos grátis (§27, G1). As contas são
+  criadas pelo Bruno; chaves **nunca** entram no repositório (vão em variável
+  de ambiente na máquina do worker).
+- **P2 = A:** o estágio de seleção passa a devolver os tokens usados no
+  resultado que entrega ao motor; o worker grava por trabalho. Nenhum arquivo
+  muda de formato; `VERSAO` não sobe (o vídeo renderizado não muda).
+- Próximo passo da N-1: fila no Supabase e depósito no R2, com as mesmas
+  provas por dentro; a física contra as contas reais fica **pendente** até
+  as contas existirem.
