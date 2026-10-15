@@ -985,3 +985,32 @@ relatório). Pelo protocolo (CLAUDE.md §1), **dúvida de arquitetura para o lot
 e volta como pergunta**: nenhum código escrito, nenhum lote aberto. Recon e
 perguntas em `docs/lote-clip-f6/relatorio-pedido-1510.md`. **PARE** até a
 resposta.
+
+
+---
+
+## 17. Resposta ao pedido de 15/10 (§16)
+
+Recebida em 15/10/2026. Transcrição verbatim.
+
+```
+Q1 A, Q2 A, Q3 B — pode seguir
+```
+
+### 17.1 Efeitos
+
+- **Q1 = A.** O REA **não** é apontado para opus.pro nem cut.pro. A tabela §3
+  de `relatorio-pedido-1510.md` (material público) é a especificação de
+  paridade; tudo construído do zero.
+- **Q2 = A.** Fila: **CLIP-F6.1 agora** (itens §12.2 e §14.3) → F8a → F8b →
+  F8c → **F9 "paridade"** (sinal visual na escolha + score decomposto). F7
+  segue guardada.
+- **Q3 = B.** Funcionalidades que exigem rede (publicação direta, B-roll,
+  dublagem) entram, quando entrarem, como **módulos opcionais desligados por
+  padrão**; o modo padrão continua 100% local.
+- **Q4 (escopo do F9) não foi respondida** — fica aberta até o F9 abrir; não
+  bloqueia o F6.1.
+- "pode seguir" = abrir o CLIP-F6.1. Prefixo dos commits: **`[CLIP-F6.1]`**.
+  Branch de trabalho desta sessão: `claude/charming-euler-02p9cf`, a partir de
+  `origin/master` = `aa958d0` (paridade conferida em 15/10). `master`
+  intocado.
