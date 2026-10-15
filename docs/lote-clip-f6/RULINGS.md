@@ -953,3 +953,35 @@ PARE no relatório.
 - **Fila do ClipPro depois do pouso:** CLIP-F6.1 (higiene — §12.2 e §14.3) →
   F8a (modelos) → F8b (horizontal) → F8c (referência). F7 (narração) segue
   guardada.
+
+
+---
+
+## 16. Pedido de 15/10 — "replicar cut.pro e opus.pro com o REA"
+
+Recebido em 15/10/2026, depois do pouso do CLIP-F6. Transcrição verbatim.
+
+```
+continue de onde parou utilize o https://github.com/morluto/rea.git, para
+replicar o https://cut.pro/pt-BR e https://www.opus.pro/pt-br?&utm_source=
+google&utm_medium=ppc&utm_campaign=G_PMAX_BoF_PlanPurchased_Portuguese&...
+```
+
+(A URL do opus.pro veio com ~20 parâmetros de rastreio de anúncio — `gclid`,
+`gbraid` etc. —, truncados aqui por não terem conteúdo de diretiva.)
+
+### 16.1 Estado no recebimento
+
+- `origin/master` = `aa958d0` = tip do branch: **o merge da D7 pousou**
+  (fast-forward, cadeia linear desde `12fc1e2b`). Os passos 3–5 da D7 (cópia
+  do painel, invalidação VERSAO 3, smoke pelo painel real) rodam no Windows do
+  Bruno e **não têm resultado visível daqui** — seguem pendentes de relato.
+- Fila vigente pela D7: CLIP-F6.1 → F8a → F8b → F8c; F7 guardada.
+
+### 16.2 Efeito
+
+O pedido muda escopo e fila e esbarra em três pontos de arquitetura (§16.3 do
+relatório). Pelo protocolo (CLAUDE.md §1), **dúvida de arquitetura para o lote
+e volta como pergunta**: nenhum código escrito, nenhum lote aberto. Recon e
+perguntas em `docs/lote-clip-f6/relatorio-pedido-1510.md`. **PARE** até a
+resposta.
