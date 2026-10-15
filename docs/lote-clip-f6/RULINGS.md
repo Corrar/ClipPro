@@ -1288,3 +1288,39 @@ verbatim (pergunta → resposta).
   da N-3.
 - **Hospedagem: "tudo de forma gratuita, free tier".** Colide com três fatos
   verificados; ver `relatorio-pedido-nuvem.md` §6. **PARE** até a resposta.
+
+---
+
+## 27. Respostas G1–G4 (formulário de 15/10) — abre a fase N-1
+
+Recebidas em 15/10/2026 pelo formulário de perguntas da sessão. Transcrição
+verbatim (pergunta → resposta).
+
+```
+"G1 — O plano grátis da Vercel só permite uso não comercial. Até onde vai o
+ "tudo grátis"?" = "Beta fechado grátis (Recomendado)"
+"G2 — A IA que escolhe os melhores trechos não tem plano grátis na Anthropic.
+ Como fica?" = "Anthropic com teto de gasto (Recomendado)"
+"G3 — Onde roda o processamento durante o beta grátis?"
+  = "Meu PC Windows (Recomendado)"
+"G4 — Posso começar a fase N-1 agora, neste branch, sem esperar o merge do
+ F6.1 (que depende das provas no seu Windows)?"
+  = "Sim, pode começar (Recomendado)"
+```
+
+### 27.1 Efeitos
+
+- **G1 = A:** N-1 e N-2 em planos grátis, **beta fechado** (só convidados,
+  sem cobrança). Antes da N-3, os custos são decididos com números medidos.
+- **G2 = A:** seleção pela API da Anthropic, paga por uso, com teto de gasto
+  mensal definido pelo Bruno.
+- **G3 = C:** no beta, o **PC Windows do Bruno é o worker**: busca os
+  trabalhos na fila da nuvem por conexão de saída (sem porta aberta). O
+  worker nasce portátil para mudar de máquina quando a venda começar.
+- **G4 = A:** a **N-1 abre agora**, neste branch
+  (`claude/loving-newton-bykd21`), sem esperar o merge do F6.1. Prefixo
+  **`[CLIP-N1]`**. `master` intocado.
+- Regras que seguem valendo: CLAUDE.md §4 (provas estruturais + físicas,
+  `main(argv)`, zero dependência nova sem decisão), §5 e §6; o worker **não
+  duplica regra de estágio** — chama as mesmas funções do `clipper`, como o
+  painel.
