@@ -1179,3 +1179,15 @@ siga de onde parou
   arquitetura volta como pergunta: o executor entrega as perguntas do F8a
   consolidadas e **PARA** até a resposta. Nenhum código do F8a é escrito.
 - Site (S1, S5) e F6.1 no Windows (W1–W5) seguem com o Bruno, sem mudança.
+
+### 23.3 Resultado
+
+- Placar da base nesta sessão (Linux, ffmpeg, venv com o lockfile):
+  `prova_f6.py --fisicas` **44/0/0**, `prova_f61.py --fisicas` **13/0/0**.
+- Perguntas do F8a consolidadas em **`docs/lote-clip-f6/perguntas-f8a.md`**:
+  Q1–Q9 do `PENDENCIAS.md` §3 com a mesma numeração, mais Q10–Q19 que o
+  recon levantou e não tinham virado pergunta (medição de linhas × fonte,
+  onde mora o "4", resolvedor de nome, duplicar, isolamento das provas,
+  harness, editar a legenda não refaz os clipes, **regressão E-R1/E-R2 que
+  não morde**, F-G1 sobrescrevendo o vídeo da F5, divergências D1–D6).
+- **PARE** até a resposta.

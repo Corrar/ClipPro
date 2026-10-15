@@ -52,7 +52,9 @@ Escopo decidido (RULINGS §20): modelos do usuário em pasta no repositório
 (ignorada pelo git), `--preset` com nome ou caminho, painel lista fábrica +
 usuário, duplicar modelo, S1 e S2. Reconhecimento completo em
 `docs/lote-clip-f6/recon-f8a-codigo.md` (`8254c75`); a crítica no fim dele
-prevalece sobre os relatórios. Colisões que precisam de decisão:
+prevalece sobre os relatórios. **Lista completa e respondível (Q1–Q19, com
+folha de resposta): `docs/lote-clip-f6/perguntas-f8a.md`** (RULINGS §23).
+Resumo das nove primeiras:
 
 | # | Colisão | Recomendação do executor |
 |---|---|---|
