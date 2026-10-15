@@ -1059,3 +1059,31 @@ provas F1–F4 depois do F8c, antes do F9 — pode seguir
   (referência) → **provas F1–F4** (§18, item 6 = A) → **F9** "paridade". F7
   (narração) segue guardada.
 - "pode seguir" = próximo da fila: **F8a**.
+
+
+---
+
+## 20. Escopo do F8a (respostas ao `recon-f8a.md`)
+
+Recebida em 15/10/2026. Transcrição verbatim.
+
+```
+1 A, 2 repositório, 3 sim, 4 neste branch — pode seguir
+```
+
+### 20.1 Efeitos
+
+- **Escopo = A:** modelos do usuário. Pasta própria fora do pacote;
+  `--preset` aceita o nome de um modelo do usuário ou o caminho de um
+  arquivo; o painel lista fábrica + usuário; um jeito de duplicar um modelo de
+  fábrica como ponto de partida; mais as sementes **S1** (teto de blocos de 1
+  palavra da legenda vira parâmetro do modelo) e **S2** (§14.2). Sem editor
+  visual.
+- **Pasta = no repositório, ignorada pelo git.**
+- **S2 entra no F8a:** teto de linhas do gancho no validador v2 (recusa + o
+  selecionador reescreve); o render continua nunca truncando; v1 congelado.
+- **Branch:** `claude/charming-euler-02p9cf`, prefixo **`[CLIP-F8a]`**, sem
+  esperar o merge do F6.1.
+- Regras que seguem valendo (CLAUDE.md §6): forma ANINHADA é o formato de
+  arquivo; campo novo entra nas DUAS camadas; chave desconhecida avisa;
+  `VERSAO` só sobe se o resultado mudar para os mesmos parâmetros.
