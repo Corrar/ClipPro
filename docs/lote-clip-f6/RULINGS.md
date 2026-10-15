@@ -1462,3 +1462,28 @@ O restante faça com oq achar recomendado
   pública e produção no branch de trabalho (roteiro §7).
 - A **N-3** (compra de créditos, Mercado Pago) segue pela delegação; o
   **preço dos pacotes fica com o Bruno**.
+
+### 29.5 Desenho da N-3 (compra de créditos), decidido por delegação (§29)
+
+- **Checkout Pro do Mercado Pago, pela API de Preferências.** É suportada; o
+  Mercado Pago recomenda a de Orders para integrações novas, e a troca fica
+  registrada como melhoria. O usuário escolhe o pacote, paga no Mercado Pago
+  (Pix, cartão) e volta ao app.
+- **O crédito só entra depois de conferir o pagamento direto na API do
+  Mercado Pago:** status aprovado, BRL e o valor exato do pacote. Não basta o
+  aviso que chegou. O webhook ainda precisa ter a assinatura `x-signature`
+  válida (HMAC-SHA256 do manifest oficial). A confirmação é idempotente:
+  pagamento repetido não credita duas vezes.
+- **Desligada por padrão** (`COMPRAS_ATIVAS`). Vender exige, antes:
+  - o preço dos pacotes, que é do Bruno;
+  - o plano Pro da Vercel (uso comercial, §26/G1);
+  - termos e privacidade (N-4);
+  - a conta e as credenciais do Mercado Pago.
+- **Pacotes numa tabela** (`pacotes`) que o Bruno preenche. O app só mostra
+  os ativos. **Nenhum preço é definido pelo executor.**
+- O webhook usa a **chave secreta do Supabase no ambiente da Vercel**, só
+  para chamar `confirmar_compra`, a única função que credita uma compra. É o
+  único uso da chave secreta fora do worker.
+- **Extrato visível ao usuário:** cadastro, reservas, devoluções e compras.
+- Estorno ou chargeback não debita automaticamente no beta; fica registrado
+  como pendência.
