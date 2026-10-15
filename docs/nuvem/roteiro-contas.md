@@ -251,3 +251,37 @@ momento.
 
 Se não entrar, veja em **Vercel → clippro-app → Logs** as linhas
 `[mp_webhook]`: elas dizem o motivo (assinatura, valor ou estorno).
+
+---
+
+## 9. N-4: antes de abrir para mais gente
+
+### 9.1 Prazo de guarda no R2
+
+A Política de privacidade promete prazos; quem os cumpre é o R2. Em **R2 →
+clippro → Settings → Object lifecycle rules**, crie duas regras:
+
+- prefixo `entradas/` → **apagar objetos 3 dias** depois de enviados (o
+  vídeo original);
+- prefixo `resultados/` → **apagar objetos 30 dias** depois de criados (os
+  clipes; o app avisa até quando cada um fica disponível).
+
+### 9.2 Termos e privacidade
+
+1. `app/termos.html` e `app/privacidade.html` são **rascunhos** e aparecem
+   marcados como tal. Preencha os colchetes: `[NOME DO RESPONSÁVEL]`,
+   `[CPF OU CNPJ]` e `[E-MAIL DE CONTATO]`.
+2. Leve o texto a um advogado. Merecem atenção:
+   - o direito de arrependimento de 7 dias para créditos não usados;
+   - os créditos sem prazo de validade (escolha do executor, troque se
+     quiser);
+   - a transferência internacional (Supabase, Vercel, Anthropic).
+3. Depois da revisão, tire o aviso de rascunho, o `<p class="rascunho">` no
+   topo de cada página.
+
+### 9.3 Site público
+
+O site (`clippro-three.vercel.app`) ainda descreve a versão local ("nenhum
+vídeo sai do seu computador"). Pela decisão N9 = B, ele muda **no
+lançamento**, junto com o preço. Peça "atualize o site para o lançamento" e
+o executor reescreve e publica.

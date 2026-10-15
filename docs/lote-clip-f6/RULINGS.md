@@ -1498,3 +1498,21 @@ O restante faça com oq achar recomendado
   `docs/nuvem/roteiro-contas.md` §8.
 - **Ligar as vendas** exige V1–V6, que ficam com o Bruno: preço, Vercel Pro,
   termos, credenciais, sandbox e nota fiscal.
+
+### 29.7 N-4 (decidida por delegação): o que foi feito e o que fica para o lançamento
+
+- **Feito:**
+  - `app/termos.html` e `app/privacidade.html`, como **rascunhos marcados**,
+    com campos a preencher (N10: o executor redige, o Bruno revisa);
+  - consentimento no cadastro e rodapé com os dois links;
+  - o app avisa até quando os clipes ficam disponíveis (30 dias);
+  - prazos de guarda no roteiro §9 (ciclo de vida do R2: entradas 3 dias,
+    resultados 30 dias);
+  - S3 (`og:url` + `canonical`) no site, publicado junto com a próxima
+    atualização.
+- **Decidido:** créditos sem prazo de validade; direito de arrependimento de
+  7 dias para créditos não usados. As duas escolhas vão à revisão jurídica.
+- **Fica para o lançamento** (N9 = B): a reescrita do site público para a
+  versão na nuvem. Depende do preço e da data, que são do Bruno.
+- Placar final: N-1 16/1 pendente (N-F4, contas reais)/0; N-2 7/0/0; N-3
+  6/0/0; F6.1 13/0/0; F6 44/0/0.

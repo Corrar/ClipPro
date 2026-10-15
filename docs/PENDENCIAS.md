@@ -37,7 +37,10 @@ F1–F4 → F9 "paridade". F7 (narração) guardada.
 > com o preço dos pacotes decidido pelo Bruno.
 > **N-3 (compra de créditos) feita, provada e DESLIGADA** (`relatorio-n3.md`).
 > Ligar as vendas exige V1–V6 do relatório (preço, Vercel Pro, termos,
-> credenciais, sandbox, nota fiscal). Próximo: N-4 (termos, privacidade, site).
+> credenciais, sandbox, nota fiscal).
+> **N-4:** termos e privacidade redigidos como rascunho (preencher os colchetes
+> e passar por revisão jurídica; roteiro §9); site público muda no lançamento.
+> **Tudo o que resta da nuvem depende das contas do Bruno** (roteiro §1–§9).
 
 ---
 

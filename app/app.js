@@ -238,6 +238,7 @@
       $("#senha", no).setAttribute("autocomplete", qual === "entrar" ? "current-password" : "new-password");
       $("#dica-senha", no).hidden = qual === "entrar";
       $("#esqueci", no).hidden = qual !== "entrar";
+      $("#consentimento", no).hidden = qual !== "criar";
       msg(aviso, "");
     }
     abas.entrar.addEventListener("click", () => modo("entrar"));
@@ -617,7 +618,12 @@
     }
     if (vez !== estado.vez) return;
     $("#tr-titulo", no).textContent = `${dados.clipes.length} cortes prontos`;
-    corpo.replaceChildren(el("div", { class: "grade-clipes" }, ...dados.clipes.map(cartaoClipe)));
+    // Os clipes ficam 30 dias no deposito (regra de ciclo de vida do R2 e
+    // Politica de privacidade, secao 4).
+    const ate = new Date(new Date(t.criado_em).getTime() + 30 * 86400000);
+    corpo.replaceChildren(
+      el("p", { class: "dica validade", texto: `Disponíveis até ${ate.toLocaleDateString("pt-BR", { day: "2-digit", month: "long" })}. Baixe o que quiser guardar.` }),
+      el("div", { class: "grade-clipes" }, ...dados.clipes.map(cartaoClipe)));
   }
 
   // Polling da tela de espera sem remontar a tela (nada pisca).

@@ -54,6 +54,19 @@ async function texto(page, seletor) {
     confere(true, "a tela de entrada abre (título e formulário)");
     await foto(page, "1-entrar.png");
 
+    await page.click("#aba-criar");
+    confere(!(await page.$("#consentimento[hidden]")) &&
+            (await texto(page, "#consentimento")).includes("Termos de uso"),
+      "ao criar conta, aparecem os links para os Termos e a Privacidade");
+    await page.click("#aba-entrar");
+    for (const [rota, titulo] of [["/termos", "Termos de uso"], ["/privacidade", "Política de privacidade"]]) {
+      const r = await page.request.get(APP + rota + ".html");
+      const corpo = await r.text();
+      confere(r.status() === 200 && corpo.includes(`<h1>${titulo}</h1>`) && corpo.includes("Rascunho em revisão"),
+        `a página ${rota} existe e está marcada como rascunho`);
+    }
+    confere((await page.$$("footer.rodape a")).length === 2, "o rodapé leva aos Termos e à Privacidade");
+
     await page.fill("#email", "ana@exemplo.com");
     await page.fill("#senha", "senha-errada");
     await page.click("#enviar-conta");
@@ -101,6 +114,8 @@ async function texto(page, seletor) {
     // 4. Tela dos clipes
     await page.click(".rolo");
     await page.waitForSelector(".clipe");
+    confere((await texto(page, ".validade")).startsWith("Disponíveis até"),
+      "a tela avisa até quando os clipes ficam disponíveis", await texto(page, ".validade"));
     const titulos = await page.$$eval(".clipe-titulo", (els) => els.map((e) => e.textContent));
     confere(titulos.length === 2, "os 2 clipes aparecem", titulos.join(" | "));
     confere(titulos.includes("<img src=x onerror=alert(1)>") && !dialogo && !(await page.$(".clipe img")),

@@ -34,6 +34,11 @@
   <div class="carregando" aria-busy="true"><span class="playhead" aria-hidden="true"></span>Abrindo a ilha de edição…</div>
 </main>
 
+<footer class="rodape">
+  <a href="/termos">Termos de uso</a>
+  <a href="/privacidade">Privacidade</a>
+</footer>
+
 <div class="aviso" id="aviso" role="status" aria-live="polite" hidden></div>
 
 <!-- ============================== ENTRAR ============================== -->
@@ -74,6 +79,7 @@
           <input id="senha" name="senha" type="password" autocomplete="current-password" minlength="8" required>
           <p class="dica" id="dica-senha" hidden>Pelo menos 8 caracteres.</p>
         </div>
+        <p class="consentimento" id="consentimento" hidden>Ao criar a conta, você concorda com os <a href="/termos" target="_blank" rel="noopener">Termos de uso</a> e a <a href="/privacidade" target="_blank" rel="noopener">Política de privacidade</a>.</p>
         <button class="btn primario" type="submit" id="enviar-conta">Entrar</button>
         <button class="link" type="button" id="esqueci">Esqueci minha senha</button>
       </form>

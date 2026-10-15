@@ -373,6 +373,25 @@ a.rolo:hover { border-color: var(--linha2); transform: translateX(2px); }
 .acoes-linha { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
 .acoes-linha .btn { margin-top: 0 !important; }
 
+/* ------------------------------------------------------------ documentos legais e rodape */
+.documento { max-width: 760px; margin: 0 auto; padding: 32px var(--gut) 80px; }
+.documento h1 { margin-bottom: 10px; }
+.documento h2 { font-size: 1.35rem; margin: 34px 0 10px; }
+.documento p, .documento li { color: var(--tx2); }
+.documento ul { padding-left: 22px; }
+.documento li { margin: 4px 0; }
+.rascunho { margin: 0 0 22px; padding: 12px 16px; border-radius: 10px; border: 1px solid rgba(255, 181, 71, .5); background: rgba(255, 181, 71, .08); color: var(--tx) !important; font-size: 14.5px; }
+.tabela { width: 100%; border-collapse: collapse; font-size: 14.5px; margin: 8px 0 14px; }
+.tabela th, .tabela td { text-align: left; vertical-align: top; padding: 10px 10px 10px 0; border-bottom: 1px solid var(--linha); }
+.tabela th { font-family: var(--f-mono); font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--fraco); font-weight: 400; }
+.documento-voltar { margin-top: 40px; }
+.consentimento { margin: 14px 0 0; font-size: 13px; color: var(--fraco); }
+.consentimento a, .rodape a { color: var(--tx2); }
+.rodape { display: flex; justify-content: center; gap: 22px; padding: 26px var(--gut) 34px; font-size: 13px; border-top: 1px solid var(--linha); }
+.rodape a { text-decoration: none; }
+.rodape a:hover { color: var(--tx); text-decoration: underline; }
+.validade { margin: -10px 0 18px; }
+
 /* ------------------------------------------------------------ responsivo */
 @media (max-width: 960px) {
   .entrar { grid-template-columns: 1fr; }
@@ -395,6 +414,8 @@ a.rolo:hover { border-color: var(--linha2); transform: translateX(2px); }
   .saldo-grande { justify-items: start; }
   .trabalho-cab { flex-direction: column; }
   .marca-nome { display: none; }
+  .tabela { font-size: 13px; }
+  .tabela th, .tabela td { padding-right: 6px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
