@@ -112,7 +112,7 @@ ingestão ou `--reencodar-fonte` baixam o vídeo de novo. Rodar o mesmo comando
 de novo não baixa nada (a ingestão é reaproveitada — conferido na F-H2).
 
 Placar desta rodada: `prova_f61.py --fisicas` **13/13**;
-`prova_f6.py --fisicas` em execução — placar no próximo commit.
+`prova_f6.py --fisicas` **43 passaram, 1 pulou (E-V5, sem `anthropic` aqui), 0 falharam** — 11/11 físicas.
 
 **Pergunta aberta:** onde entra o lote das provas F1–F4 (item 6 A) na fila
 F8a → F8b → F8c → F9?
