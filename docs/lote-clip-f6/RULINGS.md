@@ -1087,3 +1087,33 @@ Recebida em 15/10/2026. Transcrição verbatim.
 - Regras que seguem valendo (CLAUDE.md §6): forma ANINHADA é o formato de
   arquivo; campo novo entra nas DUAS camadas; chave desconhecida avisa;
   `VERSAO` só sobe se o resultado mudar para os mesmos parâmetros.
+
+
+---
+
+## 21. Pedido de 15/10 — site do ClipPro na Vercel
+
+Recebido em 15/10/2026, com o reconhecimento do F8a em andamento. Transcrição
+verbatim.
+
+```
+crie o site e publique-o na vercel.
+```
+
+### 21.1 Leitura do executor (declarada, não decisão)
+
+- **"o site" = página pública do ClipPro**, no papel que cut.pro e opus.pro
+  cumprem para os produtos deles (§16): o que é, como funciona, o que entrega,
+  como instalar. Construída do zero (§17 Q1 = A): **nenhuma** marca, texto,
+  imagem ou código dos dois concorrentes.
+- **O painel NÃO vai para a Vercel.** Ele escuta só em 127.0.0.1 por regra,
+  roda ffmpeg + whisper na CPU por minutos ou horas e o produto promete que
+  "nenhum vídeo sai do computador" (§17 Q3 = B). Uma função serverless não
+  roda isso e publicar o painel quebraria a promessa.
+- O site **só afirma o que o código e o README sustentam** (números medidos,
+  presets reais, Windows/Python 3.13/ffmpeg). Sem depoimento, sem contador de
+  usuários, sem preço inventado.
+- Fonte em `site/` no repositório (estático: HTML + CSS, zero build), projeto
+  Vercel `clippro` no time `corrars-projects`. O botão de instalação aponta
+  para o repositório público `github.com/Corrar/ClipPro`.
+- O F8a fica pausado depois do reconhecimento; retoma depois do site.
