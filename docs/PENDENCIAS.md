@@ -18,6 +18,8 @@ F1–F4 → F9 "paridade". F7 (narração) guardada.
 > servidor). Revoga o §17 Q3 = B. Perguntas **N1–N10** em
 > `docs/lote-clip-f6/relatorio-pedido-nuvem.md`; a **N8** redefine esta fila.
 > Até a resposta: PARE, e as perguntas do F8a ficam em espera.
+> Respondidas no §25: **N6 = Mercado Pago**, **300 créditos grátis**. Abertas:
+> N1–N5, N7–N10 (a N7 define o que os 300 valem).
 
 ---
 

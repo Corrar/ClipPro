@@ -1225,3 +1225,32 @@ compra de creditos....
 - Pelo CLAUDE.md §1, a arquitetura volta como pergunta: N1–N9 em
   `relatorio-pedido-nuvem.md`. **PARE** até a resposta; nenhum código escrito.
 - As perguntas do F8a (§23) ficam em espera: a N8 decide a ordem.
+
+---
+
+## 25. Respostas parciais ao relatório da nuvem (§24)
+
+Recebida em 15/10/2026. Transcrição verbatim.
+
+```
+300 créditos grátis, usar o mercado pago
+```
+
+### 25.1 Efeitos
+
+- **N6 = Mercado Pago.**
+- **Créditos grátis no cadastro = 300.**
+- N1–N5, N7–N10 **não foram respondidas**; continuam abertas.
+
+### 25.2 ⚠ Colisão destacada: o 300 depende da N7
+
+- Com N7 = A (1 crédito = 1 minuto de vídeo), 300 créditos = **5 h de vídeo
+  por conta nova**. Pela medida do README (transcrição 0,685× o áudio em 12
+  núcleos; render ~1,2× cada clipe, 5 clipes de 1 min por hora de vídeo), isso
+  dá ~205 min de transcrição + ~30 min de render ≈ **4 h de máquina de 12
+  núcleos por cadastro**, antes de qualquer compra.
+- Com N7 = B (1 crédito = 1 clipe), 300 = 300 clipes grátis, com custo que
+  varia com a duração do vídeo enviado.
+- Brinde por cadastro também é alvo de contas repetidas: a verificação do
+  cadastro entra na fase N-2.
+- A escolha é do Bruno; o executor só mede.
