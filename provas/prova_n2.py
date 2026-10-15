@@ -226,7 +226,226 @@ FISICAS: dict[str, tuple[str, Callable[[Path], None]]] = {
     "N2-F1": ("banco das contas num Postgres real", f_banco_das_contas),
 }
 
-ESTRUTURAIS: dict[str, tuple[str, Callable[[Path], None]]] = {}
+
+# ==========================================================================
+# Estruturais: funcoes do app contra Supabase e S3 falsos (provas/nuvem_falsa.py)
+# ==========================================================================
+
+SEGREDO_R2 = "segredo-r2-da-prova"
+
+
+def _ambiente(supabase_url: str, s3_url: str, **mexe: str) -> dict[str, str]:
+    from provas.nuvem_falsa import SupabaseFalso
+
+    amb = {
+        "SUPABASE_URL": supabase_url, "SUPABASE_PUBLISHABLE_KEY": SupabaseFalso.CHAVE_PUBLICA,
+        "SUPABASE_SECRET_KEY": "sb_secret_NAO_PODE_VAZAR",
+        "R2_ACCOUNT_ID": "conta", "R2_ACCESS_KEY_ID": "AKIDPROVA",
+        "R2_SECRET_ACCESS_KEY": SEGREDO_R2, "R2_BUCKET": "clippro", "R2_ENDPOINT": s3_url,
+    }
+    amb.update(mexe)
+    return amb
+
+
+def _put(url: str, corpo: bytes) -> int:
+    import urllib.error
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, data=corpo, method="PUT"),
+                                    timeout=30) as r:
+            return r.status
+    except urllib.error.HTTPError as exc:
+        return exc.code
+
+
+def _get(url: str) -> tuple[int, bytes, dict[str, str]]:
+    import urllib.error
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(url, timeout=30) as r:
+            return r.status, r.read(), dict(r.headers)
+    except urllib.error.HTTPError as exc:
+        return exc.code, b"", {}
+
+
+def e_url_assinada(_: Path) -> None:
+    """N2-E1: URL pré-assinada bate com a AWS e não codifica duas vezes."""
+    from datetime import datetime, timezone
+    from urllib.parse import parse_qsl, quote, urlsplit
+
+    from nuvem.s3 import presignar_s3
+
+    k = dict(chave_id="AKIAIOSFODNN7EXAMPLE", segredo="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+             regiao="us-east-1", quando=datetime(2013, 5, 24, tzinfo=timezone.utc))
+    url = presignar_s3("GET", "https://examplebucket.s3.amazonaws.com/test.txt",
+                       expira_s=86400, **k)
+    confere(url.endswith("X-Amz-Signature=aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404"),
+            "a URL pré-assinada bate com o exemplo oficial da AWS")
+    disp = 'attachment; filename="01-clipe--cortes.mp4"'
+    url = presignar_s3("GET", "https://b.exemplo/x.mp4?response-content-disposition="
+                       + quote(disp, safe=""), expira_s=60, **k)
+    volta = dict(parse_qsl(urlsplit(url).query)).get("response-content-disposition")
+    confere(volta == disp, "o nome do arquivo no download chega íntegro (sem %253B)", str(volta))
+
+
+def e_config_publica(_: Path) -> None:
+    """N2-E2: /api/config entrega só valores públicos; sem eles, 503 claro."""
+    from nuvem import app
+
+    status, dados = app.configuracao_publica({})
+    confere(status == 503 and "configurado" in dados["erro"], "sem ambiente: 503 com mensagem")
+    status, dados = app.configuracao_publica(_ambiente("https://p.supabase.co/", "http://s3"))
+    texto = json.dumps(dados)
+    confere(status == 200 and dados["supabase_url"] == "https://p.supabase.co"
+            and "NAO_PODE_VAZAR" not in texto and SEGREDO_R2 not in texto,
+            "entrega URL e chave pública — nunca a secreta nem o segredo do R2")
+
+
+def e_upload(_: Path) -> None:
+    """N2-E3: o envio exige login, limita tamanho e tipo, e o R2 confere o tamanho."""
+    from nuvem import app
+    from provas.nuvem_falsa import SupabaseFalso, s3_falso
+
+    sb = SupabaseFalso()
+    ana = sb.cadastrar("ana@exemplo.com", "senha-ana")
+    with sb.servir() as url_sb, s3_falso(SEGREDO_R2) as (url_s3, objetos, _):
+        amb = _ambiente(url_sb, url_s3)
+        token = sb.token_de("ana@exemplo.com")
+        pedido = {"nome": "Live de Sexta.MP4", "tamanho": 4096, "tipo": "video/mp4"}
+
+        confere(app.pedir_upload(amb, None, pedido)[0] == 401, "sem login: 401")
+        confere(app.pedir_upload(amb, "token-falso", pedido)[0] == 401, "token inválido: 401")
+        casos = {
+            "maior que 2 GB": {**pedido, "tamanho": 2 * 1024**3 + 1},
+            "tamanho como texto": {**pedido, "tamanho": "4096"},
+            "não é vídeo (.exe)": {**pedido, "nome": "virus.exe"},
+            "tipo declarado não é vídeo": {**pedido, "tipo": "image/png"},
+        }
+        aceitos = [r for r, c in casos.items() if app.pedir_upload(amb, token, c)[0] != 400]
+        confere(not aceitos, "tamanho, tipo e extensão inválidos dão 400", ", ".join(aceitos))
+        st, sem_tipo = app.pedir_upload(amb, token, {**pedido, "nome": "a.mkv", "tipo": ""})
+        confere(st == 200, "tipo vazio com extensão de vídeo passa (navegador que não sabe o .mkv)")
+
+        status, r = app.pedir_upload(amb, token, pedido)
+        confere(status == 200 and r["chave"].startswith(ana["id"] + "-")
+                and r["chave"].endswith(".mp4") and "X-Amz-SignedHeaders=content-length%3Bhost" in r["url"],
+                "devolve a URL assinada com o tamanho dentro da assinatura", r.get("chave", ""))
+        confere(_put(r["url"], b"\x00" * 4096) == 200
+                and objetos.get(f"/clippro/entradas/{r['chave']}", (b"",))[0] == b"\x00" * 4096,
+                "o navegador consegue enviar exatamente o tamanho declarado")
+        confere(_put(r["url"], b"\x00" * 9000) == 403,
+                "arquivo maior que o declarado é recusado pelo próprio R2")
+
+
+def e_clipes(_: Path) -> None:
+    """N2-E4: os clipes só saem para o dono, com URL de ver e de baixar."""
+    from nuvem import app
+    from provas.nuvem_falsa import SupabaseFalso, s3_falso
+
+    sb = SupabaseFalso()
+    sb.cadastrar("ana@exemplo.com", "a")
+    sb.cadastrar("bia@exemplo.com", "b")
+    ana = sb.usuarios["ana@exemplo.com"]
+    with sb.servir() as url_sb, s3_falso(SEGREDO_R2) as (url_s3, objetos, _):
+        amb = _ambiente(url_sb, url_s3)
+        tok_ana, tok_bia = sb.token_de("ana@exemplo.com"), sb.token_de("bia@exemplo.com")
+        st, id_ = sb.criar_trabalho(ana, {"p_entrada": {"tipo": "link", "valor": "https://y/x"},
+                                          "p_n": 1, "p_preset": "cortes"})
+        status, r = app.links_dos_clipes(amb, tok_ana, id_)
+        confere(status == 200 and r["status"] == "pendente" and r["clipes"] == [],
+                "trabalho ainda na fila: sem clipes, com o status")
+
+        pasta = f"resultados/{id_}/"
+        objetos[f"/clippro/{pasta}01-clipe--cortes.mp4"] = (b"mp4" * 100, time.time())
+        objetos[f"/clippro/{pasta}01-clipe--cortes.capa.jpg"] = (b"jpg", time.time())
+        sb.concluir(id_, {"status": "concluido", "creditos": 2, "clipes": [
+            {"titulo": "Clipe 1", "score": 8.5, "gancho": "um gancho", "duracao": 31.2,
+             "arquivos": {"video": pasta + "01-clipe--cortes.mp4",
+                          "capa": pasta + "01-clipe--cortes.capa.jpg"}},
+            {"titulo": "Adulterado", "arquivos": {"video": "resultados/outro/x.mp4"}},
+        ]})
+        confere(sb.saldo[ana["id"]] == 298, "a conclusão devolve o que sobrou da reserva (300 → 298)")
+
+        confere(app.links_dos_clipes(amb, tok_bia, id_)[0] == 404,
+                "outra conta recebe 404 (o banco nem devolve o trabalho)")
+        confere(app.links_dos_clipes(amb, None, id_)[0] == 401, "sem login: 401")
+        confere(app.links_dos_clipes(amb, tok_ana, "../../etc")[0] == 400, "id torto: 400")
+
+        status, r = app.links_dos_clipes(amb, tok_ana, id_)
+        confere(status == 200 and [c["titulo"] for c in r["clipes"]] == ["Clipe 1"],
+                "o clipe com chave fora de resultados/<id>/ é ignorado")
+        c = r["clipes"][0]
+        st, corpo, _ = _get(c["ver"])
+        confere(st == 200 and corpo == b"mp4" * 100, "a URL de ver abre o MP4")
+        st, _, cab = _get(c["baixar"])
+        confere(st == 200 and cab.get("Content-Disposition") ==
+                'attachment; filename="01-clipe--cortes.mp4"',
+                "a URL de baixar devolve o arquivo com o nome certo", cab.get("Content-Disposition", ""))
+        confere(c["capa"] and _get(c["capa"])[0] == 200 and c["publicacao"] is None,
+                "capa assinada; sem publicação no resultado, sem URL")
+        adulterada = c["ver"].replace("01-clipe", "02-clipe")
+        confere(_get(adulterada)[0] == 403, "URL adulterada é recusada pelo R2")
+
+
+def e_rotas_http(_: Path) -> None:
+    """N2-E5: as rotas da Vercel respondem JSON sem cache, pelo HTTP de verdade."""
+    import urllib.error
+    import urllib.request
+    from http.server import ThreadingHTTPServer
+    from threading import Thread
+
+    from api import clipes, config, upload
+    from provas.nuvem_falsa import SupabaseFalso, s3_falso
+
+    sb = SupabaseFalso()
+    sb.cadastrar("ana@exemplo.com", "a")
+    with sb.servir() as url_sb, s3_falso(SEGREDO_R2) as (url_s3, _o, _p):
+        antes = dict(os.environ)
+        os.environ.update(_ambiente(url_sb, url_s3))
+        try:
+            respostas = {}
+            for nome, mod, metodo, corpo, caminho in (
+                ("config", config, "GET", None, "/api/config"),
+                ("upload", upload, "POST", {"nome": "a.mp4", "tamanho": 10, "tipo": "video/mp4"},
+                 "/api/upload"),
+                ("clipes", clipes, "GET", None, "/api/clipes?trabalho=nao-e-uuid"),
+            ):
+                quieto = type("Quieto", (mod.handler,), {"log_message": lambda *_: None})
+                srv = ThreadingHTTPServer(("127.0.0.1", 0), quieto)
+                Thread(target=srv.serve_forever, daemon=True).start()
+                req = urllib.request.Request(
+                    f"http://127.0.0.1:{srv.server_address[1]}{caminho}", method=metodo,
+                    data=None if corpo is None else json.dumps(corpo).encode(),
+                    headers={"Authorization": f"Bearer {sb.token_de('ana@exemplo.com')}",
+                             "Content-Type": "application/json"})
+                try:
+                    with urllib.request.urlopen(req, timeout=30) as r:
+                        respostas[nome] = (r.status, json.loads(r.read()), r.headers)
+                except urllib.error.HTTPError as exc:
+                    respostas[nome] = (exc.code, json.loads(exc.read()), exc.headers)
+                srv.shutdown()
+                srv.server_close()
+        finally:
+            os.environ.clear()
+            os.environ.update(antes)
+    confere(respostas["config"][0] == 200 and "supabase_chave" in respostas["config"][1],
+            "GET /api/config responde")
+    confere(respostas["upload"][0] == 200 and "url" in respostas["upload"][1],
+            "POST /api/upload responde com a URL")
+    confere(respostas["clipes"][0] == 400, "GET /api/clipes com id torto: 400")
+    confere(all(r[2].get("Cache-Control") == "no-store" for r in respostas.values()),
+            "nenhuma resposta fica em cache (URL assinada não pode vazar por cache)")
+
+
+ESTRUTURAIS: dict[str, tuple[str, Callable[[Path], None]]] = {
+    "N2-E1": ("URL pré-assinada", e_url_assinada),
+    "N2-E2": ("/api/config só com valores públicos", e_config_publica),
+    "N2-E3": ("/api/upload: login, limites e tamanho assinado", e_upload),
+    "N2-E4": ("/api/clipes: só para o dono", e_clipes),
+    "N2-E5": ("rotas pelo HTTP de verdade", e_rotas_http),
+}
 
 
 # ==========================================================================

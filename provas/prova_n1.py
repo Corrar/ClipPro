@@ -332,80 +332,8 @@ def e_porta_de_entrada(raiz: Path) -> None:
 # --------------------------------------------------------------------------
 
 
-@contextlib.contextmanager
-def _s3_falso(segredo: str) -> Iterator[tuple[str, dict[str, Any], list[tuple[str, str, int]]]]:
-    """S3 local que RECALCULA a assinatura de cada pedido e recusa a errada.
-
-    Confere o que viajou (Host com porta, cabecalhos assinados, hash do
-    corpo), nao so o algoritmo -- este a N-E10 confere contra a AWS.
-    """
-    from worker.nuvem import assinar_s3
-
-    objetos: dict[str, Any] = {}
-    pedidos: list[tuple[str, str, int]] = []
-    padrao = re.compile(
-        r"AWS4-HMAC-SHA256 Credential=([^/]+)/(\d{8})/([^/]+)/s3/aws4_request, "
-        r"SignedHeaders=([^,]+), Signature=([0-9a-f]{64})$")
-
-    class Handler(BaseHTTPRequestHandler):
-        def log_message(self, *_: Any) -> None:
-            pass
-
-        def _valido(self, corpo: bytes) -> bool:
-            auth = self.headers.get("Authorization", "")
-            m = padrao.match(auth)
-            if not m:
-                return False
-            chave_id, _, regiao, assinados, _ = m.groups()
-            carga = self.headers.get("x-amz-content-sha256", "")
-            if self.command == "PUT" and hashlib.sha256(corpo).hexdigest() != carga:
-                return False
-            extras = {n: self.headers.get(n, "") for n in assinados.split(";")
-                      if n not in ("host", "x-amz-date", "x-amz-content-sha256")}
-            quando = datetime.strptime(self.headers.get("x-amz-date", ""),
-                                       "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
-            esperado = assinar_s3(self.command, f"http://{self.headers.get('Host')}{self.path}",
-                                  extras, carga, chave_id=chave_id, segredo=segredo,
-                                  regiao=regiao, quando=quando)
-            return hmac.compare_digest(esperado["Authorization"], auth)
-
-        def _fim(self, status: int, corpo: bytes = b"", cab: dict[str, str] | None = None) -> None:
-            pedidos.append((self.command, self.path, status))
-            self.send_response(status)
-            for k, v in (cab or {}).items():
-                self.send_header(k, v)
-            self.send_header("Content-Length", str(len(corpo) if self.command != "HEAD" else
-                                                   int((cab or {}).get("X-Tamanho", 0))))
-            self.end_headers()
-            if self.command != "HEAD":
-                self.wfile.write(corpo)
-
-        def do_PUT(self) -> None:  # noqa: N802
-            corpo = self.rfile.read(int(self.headers.get("Content-Length") or 0))
-            if not self._valido(corpo):
-                return self._fim(403)
-            objetos[self.path] = (corpo, time.time())
-            self._fim(200)
-
-        def _ler(self) -> None:
-            if not self._valido(b""):
-                return self._fim(403)
-            if self.path not in objetos:
-                return self._fim(404)
-            corpo, mtime = objetos[self.path]
-            self._fim(200, corpo, {"Last-Modified": formatdate(mtime, usegmt=True),
-                                   "X-Tamanho": str(len(corpo))})
-
-        do_GET = _ler  # noqa: N815
-        do_HEAD = _ler  # noqa: N815
-
-    servidor = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    threading.Thread(target=servidor.serve_forever, daemon=True).start()
-    try:
-        yield f"http://127.0.0.1:{servidor.server_address[1]}", objetos, pedidos
-    finally:
-        servidor.shutdown()
-        servidor.server_close()
+# O S3 falso mora em provas/nuvem_falsa.py, um so para N-1 e N-2.
+from provas.nuvem_falsa import s3_falso as _s3_falso  # noqa: E402
 
 
 @contextlib.contextmanager

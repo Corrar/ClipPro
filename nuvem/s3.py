@@ -14,7 +14,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 from datetime import datetime, timezone
-from urllib.parse import quote, urlsplit
+from urllib.parse import parse_qsl, quote, urlsplit
 
 ALGORITMO = "AWS4-HMAC-SHA256"
 CARGA_NAO_ASSINADA = "UNSIGNED-PAYLOAD"
@@ -38,7 +38,10 @@ def _consulta_canonica(pares: list[tuple[str, str]]) -> str:
 
 
 def _pares_da_url(consulta: str) -> list[tuple[str, str]]:
-    return [(k, v) for k, _, v in (p.partition("=") for p in consulta.split("&") if p)]
+    # DECODIFICA antes: a forma canonica codifica uma vez so. Repassar o texto
+    # cru codificava duas (%3B virava %253B) -- a assinatura batia, mas o
+    # nome do arquivo no download chegava quebrado.
+    return parse_qsl(consulta, keep_blank_values=True)
 
 
 def _assinatura(metodo: str, caminho: str, consulta: str, cabecalhos: dict[str, str],
