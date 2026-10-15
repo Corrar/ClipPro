@@ -10,7 +10,7 @@ RULINGS §17 ("Q1 A, Q2 A, Q3 B — pode seguir").
 |---|---|
 | `provas/prova_f61.py --fisicas` (nova) | **10/10** verdes; contra o código de `aa958d0`, **10/10 vermelhas** (todas mordem) |
 | `provas/prova_f6.py` estruturais | 32 passaram, 1 pulou (E-V5: sem o pacote `anthropic` aqui), 0 falharam — igual à partida |
-| `provas/prova_f6.py --fisicas` | 10 de 11 físicas medidas antes de instalar o reframe aqui; F-I1–F-I4 em execução — placar no próximo commit |
+| `provas/prova_f6.py --fisicas` | **11/11** físicas verdes. F-I1–F-I4 só depois de instalar no venv de teste mediapipe/opencv do lock + `libegl1` do sistema; sem eles falhavam igual no código de `aa958d0` (ambiente, não regressão) |
 
 Ambiente desta medição: Linux, Python 3.13, ffmpeg do sistema, venv de teste
 fora do repositório. **Não é o Windows do Bruno** — as físicas valem como
