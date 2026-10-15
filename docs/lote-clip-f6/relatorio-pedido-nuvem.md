@@ -179,4 +179,83 @@ N1 A, N2 A, N3 A, N4 A, N5 A, N6 <qual>, N7 A, N8 A, N9 B
 créditos grátis: <quantos>   N10: <quem>
 ```
 
+Respondidas no RULINGS §25 e §26: N1 A, N2 A, N3 A, N4 A, N5 A, N6 Mercado
+Pago, N7 A, N8 A, N9 B, 300 créditos grátis, N10 "sem CNPJ; redija, eu
+reviso". Hospedagem: "tudo de forma gratuita, free tier" (§6 abaixo).
+
+## 6. "Tudo de forma gratuita, free tier" — o que os fatos dizem
+
+Verificado em 15/10/2026 (fontes no fim desta seção).
+
+| # | Fato | Consequência |
+|---|---|---|
+| Z1 | **O plano grátis da Vercel (Hobby) é só para uso pessoal e não comercial.** Cobrar dos visitantes exige o plano Pro ou o Enterprise, segundo a página do plano Hobby e o guia de uso justo da Vercel. A redação mais nova deve ser confirmada. | Dá para construir e testar no grátis. **Vender créditos no Hobby viola os termos**: antes da N-3, Pro (pago) ou outro host. |
+| Z2 | **Processamento grátis é pequeno.** O maior servidor grátis conhecido, o Oracle Always Free ARM, **caiu em 2026 de 4 núcleos/24 GB para 2 núcleos/12 GB** (as fontes divergem na data). O Modal dá US$ 30/mês de crédito, com cartão. | Estimativa grosseira, por escala linear da medida do README (de 12 núcleos para 2): transcrição ~4× a duração do vídeo. **Os 300 min grátis de UMA conta ≈ 20 h de servidor**; um servidor grátis atende ~1 cadastro novo por dia. A N-1 mede o número real. |
+| Z3 | **A IA que escolhe os cortes (API da Anthropic) não tem plano grátis**: é paga por uso. | O único jeito "grátis" é trocar de fornecedor (ex.: plano grátis do Google Gemini, com limites e uso dos dados pelo Google) ou tirar a IA. |
+| Z4 | **Vídeo é pesado:** 29 min = 1,0 GB no download medido (README). Armazenamento grátis é da ordem de poucos GB. | O vídeo original é apagado logo após o processamento; ficam só os clipes, com prazo de validade. |
+
+**A favor, medido nesta sessão:** todas as bibliotecas do motor têm pacote
+pronto para servidor ARM com Python 3.13. O `pip download` para `aarch64`
+achou mediapipe, ctranslate2, onnxruntime, av, opencv, numpy e pillow. Isso
+prova que instalam; que rodam, só a N-1 prova.
+
+### Perguntas
+
+**G1. Grátis até onde.**
+
+| | |
+|---|---|
+| **A** | N-1 e N-2 em planos grátis, como **beta fechado**: só convidados, sem cobrança. Antes da N-3, decidir os custos com os números medidos. |
+| B | Abrir ao público já no grátis (fila longa; cobrar no Hobby viola os termos da Vercel). |
+
+Recomendação **A**.
+
+**G2. A IA que escolhe os cortes.**
+
+| | |
+|---|---|
+| **A** | API da Anthropic paga por uso, com **teto de gasto mensal** definido pelo Bruno. É a que o motor já usa e que as provas cobrem. |
+| B | Plano grátis do Google Gemini: troca o fornecedor no motor, tem limites diários e o Google pode usar os dados. |
+| C | Sem IA na nuvem (seleção pior). |
+
+Recomendação **A**.
+
+**G3. Servidor de processamento no beta.**
+
+| | |
+|---|---|
+| A | Oracle Always Free: 2 núcleos ARM, grátis, pede cartão para verificar; lento. |
+| B | Modal: US$ 30/mês de crédito grátis; pede cartão. |
+| **C** | **O PC Windows do Bruno como servidor do beta.** Ele busca os trabalhos na fila da nuvem por conexão de saída, sem abrir porta no roteador. |
+
+Recomendação **C**:
+
+- é grátis;
+- é a máquina mais rápida disponível (12 núcleos, medida do README);
+- o motor já é provado nela;
+- o IP de casa escapa do bloqueio que o YouTube faz em datacenter (C3).
+
+Contras: o PC precisa estar ligado, e os vídeos dos convidados passam por ele
+(os termos do beta dizem isso). O worker nasce portátil, em contêiner, para
+mudar para um servidor pago quando a venda começar.
+
+**G4. Começar a N-1 antes do merge do F6.1?** O F6.1 espera as provas no
+Windows (W1–W5 do `PENDENCIAS.md`).
+
+| | |
+|---|---|
+| **A** | Sim, neste branch, como foi com o F8a (§20). |
+| B | Não; esperar o merge. |
+
+Recomendação **A**.
+
+**Fontes:**
+
+- [Vercel — plano Hobby](https://vercel.com/docs/plans/hobby)
+- [Vercel — uso justo](https://vercel.com/docs/limits/fair-use-guidelines)
+- [InfoQ — limites do free tier da Oracle](https://infoq.com/news/2026/07/oracle-cloud-free-tier-limits/)
+- [terminalbytes — mudanças de 2026](https://terminalbytes.com/oracle-cloud-free-tier-changes-2026)
+- [freetier.co — Modal](https://freetier.co/directory/products/modal)
+- [morphllm — preços do Modal](https://www.morphllm.com/modal-pricing)
+
 PARE aqui.

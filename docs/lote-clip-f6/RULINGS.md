@@ -1254,3 +1254,37 @@ Recebida em 15/10/2026. Transcrição verbatim.
 - Brinde por cadastro também é alvo de contas repetidas: a verificação do
   cadastro entra na fase N-2.
 - A escolha é do Bruno; o executor só mede.
+
+---
+
+## 26. Respostas às perguntas da nuvem (formulário de 15/10)
+
+Recebidas em 15/10/2026 pelo formulário de perguntas da sessão. Transcrição
+verbatim (pergunta → resposta).
+
+```
+"Com 300 créditos grátis no cadastro, quanto vale 1 crédito? (N7)"
+  = "1 minuto de vídeo (Recomendado)"
+"As outras recomendações do relatório valem? N1 nuvem é o produto e o local
+ vira ferramenta interna; N2 Vercel para o app + servidor de processamento
+ separado; N3 transcrição na CPU (GPU depois, com números); N4 link e envio
+ de arquivo; N5 login com e-mail/senha + Google; N8 fecha o F6.1, depois as
+ fases N-1→N-4; N9 o site muda só no lançamento."
+  = "Sim, todas"
+"Onde roda o servidor que processa os vídeos? (necessário para a fase N-1)"
+  = "Tudo de forma gratuita, free tier"
+"N10 — CNPJ, termos de uso e política de privacidade (LGPD): como fica?"
+  = "Sem CNPJ ainda; redija, eu reviso"
+```
+
+### 26.1 Efeitos
+
+- **N7 = A**: 1 crédito = 1 minuto de vídeo; com o §25, **300 créditos = 5 h
+  de vídeo grátis por cadastro**.
+- **N1 A, N2 A, N3 A, N4 A, N5 A, N8 A, N9 B** — como recomendado em
+  `relatorio-pedido-nuvem.md` §4.
+- **N10:** sem CNPJ; o executor redige termos e privacidade (fase N-4), o
+  Bruno revisa. Tipo de conta do Mercado Pago e nota fiscal: do Bruno, antes
+  da N-3.
+- **Hospedagem: "tudo de forma gratuita, free tier".** Colide com três fatos
+  verificados; ver `relatorio-pedido-nuvem.md` §6. **PARE** até a resposta.

@@ -18,8 +18,10 @@ F1–F4 → F9 "paridade". F7 (narração) guardada.
 > servidor). Revoga o §17 Q3 = B. Perguntas **N1–N10** em
 > `docs/lote-clip-f6/relatorio-pedido-nuvem.md`; a **N8** redefine esta fila.
 > Até a resposta: PARE, e as perguntas do F8a ficam em espera.
-> Respondidas no §25: **N6 = Mercado Pago**, **300 créditos grátis**. Abertas:
-> N1–N5, N7–N10 (a N7 define o que os 300 valem).
+> Respondidas no §25–§26: N1–N5 A, N6 Mercado Pago, N7 A (300 créditos =
+> 5 h de vídeo por cadastro), N8 A, N9 B, N10 "sem CNPJ; redija, eu reviso".
+> Abertas: **G1–G4** ("tudo free tier" colide com Vercel Hobby não comercial,
+> servidor grátis pequeno e IA paga), em `relatorio-pedido-nuvem.md` §6.
 
 ---
 
