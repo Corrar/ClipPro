@@ -1,0 +1,1597 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClipPro — vídeo longo em clipes 9:16, no seu computador</title>
+<meta name="description" content="O ClipPro transforma lives, podcasts, aulas e entrevistas em clipes verticais 9:16 para TikTok, Reels e Shorts, com legenda karaokê queimada e enquadramento pelo rosto. Roda no seu Windows: nenhum vídeo sai do seu computador.">
+<meta property="og:title" content="ClipPro — vídeo longo em clipes 9:16, no seu computador">
+<meta property="og:description" content="Clipes verticais com legenda karaokê queimada, enquadramento pelo rosto e composição própria. Linha de comando com painel local, para Windows. Nenhum vídeo sai do seu computador.">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="pt_BR">
+<meta name="twitter:card" content="summary">
+<meta name="theme-color" content="#0a0b0d">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23111417'/%3E%3Crect x='30' y='18' width='40' height='64' rx='8' fill='%23ffe500'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wdth,wght@62..125,400..900&family=JetBrains+Mono:wght@400;600;700&display=swap">
+<style>
+/* ============================================================ tokens */
+:root{
+  --bg:#0a0b0d; --bg2:#0f1114; --painel:#14171c; --painel2:#1a1e24;
+  --linha:#252a31; --linha2:#343b45;
+  --tx:#eef1f4; --tx2:#c4ccd5; --fraco:#9aa5b1;
+  --y:#ffe500; --y-tinta:#171400; --y-tinta2:#3a3400;
+  --ok:#4ade80; --erro:#ff6b6b; --azul:#7fb2ff;
+  --f-disp:"Anton","Impact","Arial Narrow Bold",sans-serif;
+  --f-ui:"Archivo",system-ui,"Segoe UI",Roboto,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Consolas,"Courier New",monospace;
+  --raio:14px;
+  --ciclo:8s;
+  --gut:32px;
+  color-scheme:dark;
+}
+@media (max-width:1000px){:root{--gut:24px}}
+@media (max-width:600px){:root{--gut:16px}}
+
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;scroll-padding-top:76px}
+body{margin:0;background:var(--bg);color:var(--tx2);font-family:var(--f-ui);font-size:17px;line-height:1.6}
+img,svg{max-width:100%}
+a{color:var(--tx)}
+code,kbd,pre,.mono{font-family:var(--f-mono)}
+h1,h2,h3{color:var(--tx);margin:0}
+p{margin:0 0 1em}
+:focus-visible{outline:3px solid var(--y);outline-offset:3px;border-radius:4px}
+::selection{background:var(--y);color:var(--y-tinta)}
+
+.pular{position:absolute;left:12px;top:-60px;z-index:100;background:var(--y);color:var(--y-tinta);padding:10px 14px;border-radius:8px;font-weight:700;text-decoration:none}
+.pular:focus{top:12px}
+
+.caixa{width:100%;max-width:1240px;margin:0 auto;padding-inline:var(--gut)}
+.y{color:var(--y)}
+.vh{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.nw{white-space:nowrap}
+
+/* grao de broadcast, sutil; fica atras do conteudo */
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.05;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E")}
+main,footer{position:relative;z-index:1}
+
+/* ============================================================ topo */
+.topo{position:sticky;top:0;z-index:50;background:rgba(10,11,13,.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--linha)}
+.topo-in{display:flex;align-items:center;justify-content:space-between;gap:20px;min-height:60px}
+.marca{display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:var(--tx);font-weight:800;font-size:20px;letter-spacing:-.01em;flex:none}
+.marca b{color:var(--y);font-weight:800}
+.marca-quadro{width:14px;height:23px;border-radius:4px;background:var(--y);box-shadow:0 0 0 3px rgba(255,229,0,.14)}
+a.marca{min-height:44px}
+.nav{display:none;flex:1;min-width:0}
+.nav ul{list-style:none;margin:0;padding:0;display:flex;gap:2px;justify-content:center}
+.nav a{display:flex;align-items:center;min-height:44px;padding:8px 10px;border-radius:8px;color:var(--fraco);text-decoration:none;font-family:var(--f-mono);font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.nav a:hover{color:var(--tx);background:var(--painel)}
+@media (min-width:1180px){.nav{display:block}}
+.btn-topo{padding:9px 14px!important;font-size:14.5px!important;gap:8px!important;min-height:44px}
+@media (max-width:359px){.btn-topo svg{display:none}}
+
+/* ============================================================ botoes */
+.btn{display:inline-flex;align-items:center;gap:10px;padding:14px 22px;border-radius:10px;font-weight:700;font-size:16px;text-decoration:none;border:1px solid transparent;line-height:1.2;cursor:pointer;font-family:var(--f-ui);transition:transform .15s,box-shadow .15s,border-color .15s,background .15s}
+.btn svg{flex:none}
+.btn-pri{background:var(--y);color:var(--y-tinta)}
+.btn-pri:hover{box-shadow:0 0 0 5px rgba(255,229,0,.18);transform:translateY(-1px)}
+.btn-sec{border-color:var(--linha2);color:var(--tx);background:transparent}
+.btn-sec:hover{border-color:var(--y)}
+
+/* ============================================================ cabecalho de secao */
+section{scroll-margin-top:76px}
+.sec{padding:104px 0 0}
+.slate{display:flex;align-items:center;gap:12px;margin:0 0 18px;font-family:var(--f-mono);font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--fraco)}
+.slate::before{content:"";width:10px;height:10px;border-radius:2px;background:var(--y);flex:none}
+.slate b{color:var(--tx);font-weight:600}
+.slate .regua-mini{flex:1;height:10px;min-width:20px;background:repeating-linear-gradient(90deg,var(--linha2) 0 1px,transparent 1px 8px);opacity:.8}
+/* 1.18 e nao 1.1: em Anton, maiuscula acentuada e cedilha do PT-BR encostavam na linha vizinha (Ç de TRANSCRIÇÃO sobre o Q de QUAL) */
+h2{font-family:var(--f-disp);font-weight:400;text-transform:uppercase;font-size:clamp(2.1rem,1.2rem + 3.4vw,3.9rem);line-height:1.18;letter-spacing:.005em;text-wrap:balance;max-width:21ch}
+.lead{font-size:clamp(17px,1rem + .3vw,20px);color:var(--tx2);max-width:62ch;margin-top:20px}
+h3{font-size:19px;line-height:1.3;font-weight:800;letter-spacing:-.005em}
+.nota{font-size:14px;color:var(--fraco)}
+code.i{font-size:.86em;background:var(--painel2);border:1px solid var(--linha);padding:1px 6px;border-radius:5px;color:var(--tx);white-space:nowrap;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+/* comandos com espaco quebram so nos espacos; flags ficam inteiras dentro de .nw */
+code.i.q{white-space:normal;overflow-wrap:normal}
+
+/* ============================================================ HERO */
+.hero{padding:56px 0 8px;position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(50% 50% at 78% 30%,rgba(255,229,0,.07),transparent 70%),
+             repeating-linear-gradient(90deg,rgba(255,255,255,.025) 0 1px,transparent 1px 120px)}
+.hero-grade{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:56px;align-items:start}
+.olho{display:flex;align-items:center;gap:10px;font-family:var(--f-mono);font-size:12.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--y);margin:8px 0 22px}
+.olho::before{content:"";flex:none;width:9px;height:15px;border-radius:2px;background:var(--y)}
+h1{font-family:var(--f-disp);font-weight:400;text-transform:uppercase;font-size:clamp(2.6rem,1.2rem + 4.6vw,5.1rem);line-height:.98;letter-spacing:.004em}
+.hero-lead{font-size:clamp(17px,1rem + .35vw,20px);margin-top:26px;max-width:48ch}
+.hero-forte{color:var(--tx);font-weight:700;border-left:3px solid var(--y);padding-left:14px;margin-top:4px;max-width:48ch}
+.acoes{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px}
+.ficha-hero{margin:34px 0 0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid var(--linha);border-radius:12px;background:rgba(15,17,20,.7);overflow:hidden}
+.ficha-hero div{padding:12px 16px;border-right:1px solid var(--linha);border-bottom:1px solid var(--linha)}
+.ficha-hero div:nth-child(3n){border-right:0}
+.ficha-hero div:nth-last-child(-n+3){border-bottom:0}
+.ficha-hero dt{font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--fraco);margin-bottom:3px}
+.ficha-hero dd{margin:0;color:var(--tx);font-size:14.5px;font-weight:600;line-height:1.4}
+
+/* ---------- monitor de programa */
+.hero-mon{position:relative}
+/* ao lado do rotulo, nunca fixo no canto: o foco precisa rolar ate um controle visivel */
+.pausa-in{position:absolute;left:24px;top:24px;width:1px;height:1px;margin:0;opacity:0;pointer-events:none}
+.monitor{margin:0;width:max-content;max-width:100%;border:1px solid var(--linha);border-radius:var(--raio);background:linear-gradient(180deg,var(--painel),var(--bg2));overflow:hidden;box-shadow:0 40px 80px -40px rgba(0,0,0,.8)}
+.mon-cab{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;border-bottom:1px solid var(--linha);font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--fraco)}
+.mon-cab b{color:var(--tx);font-weight:600}
+.mon-corpo{padding:16px 20px 6px}
+.cotado{--tw:clamp(220px,21vw,300px);display:grid;grid-template-columns:30px var(--tw) 44px;grid-template-rows:26px auto;justify-content:center}
+.cota{position:relative;font-family:var(--f-mono);font-size:11px;color:var(--fraco)}
+.cota-h{grid-column:2;grid-row:1}
+.cota-h::before{content:"";position:absolute;left:0;right:0;top:50%;border-top:1px solid var(--linha2)}
+.cota-h::after{content:"";position:absolute;left:0;right:0;top:30%;height:40%;border-left:1px solid var(--fraco);border-right:1px solid var(--fraco)}
+.cota-v{grid-column:1;grid-row:2}
+.cota-v::before{content:"";position:absolute;top:0;bottom:0;left:50%;border-left:1px solid var(--linha2)}
+.cota-v::after{content:"";position:absolute;top:0;bottom:0;left:30%;width:40%;border-top:1px solid var(--fraco);border-bottom:1px solid var(--fraco)}
+.cota-c{grid-column:3;grid-row:2}
+.cota-c i{position:absolute;top:12.5%;bottom:12.5%;left:8px;width:9px;border:1px solid var(--y);border-left:0;opacity:.8}
+.cota span{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--painel);padding:0 6px;white-space:nowrap;line-height:1}
+.cota-v span,.cota-c span{transform:translate(-50%,-50%) rotate(-90deg)}
+.cota-c span{left:30px;color:var(--y);background:var(--bg2)}
+
+.tela{grid-column:2;grid-row:2;position:relative;aspect-ratio:9/16;border-radius:8px;overflow:hidden;background:#000;container-type:inline-size;isolation:isolate;box-shadow:0 0 0 1px #2c3139}
+.tela svg,.mini svg,.mk-player svg{display:block;width:100%;height:100%}
+.clip{position:absolute;inset:0}
+.fundo{position:absolute;inset:-12%;filter:blur(7px) brightness(.6) saturate(1.05);transform:scale(1.15)}
+.cartao{position:absolute;left:12.5%;top:12.5%;width:75%;height:75%;border-radius:3.33cqw;overflow:hidden;box-shadow:0 1.85cqw 5.5cqw rgba(0,0,0,.6);background:#000}
+.cartao::after{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);pointer-events:none}
+.kb,.punch{position:absolute;inset:0;transform-origin:50% 42%}
+.kb{transform:scale(1.012)}
+.scrim{position:absolute;left:0;right:0;bottom:0;height:52%;background:linear-gradient(transparent,rgba(0,0,0,.28) 35%,rgba(0,0,0,.28))}
+.prog{position:absolute;left:0;right:0;bottom:0;height:.93cqw;min-height:2px;background:rgba(255,255,255,.35)}
+.prog i{position:absolute;inset:0;background:var(--y);transform-origin:0 50%;transform:scaleX(.19)}
+/* gancho em y=196 de 1920 (zona segura do topo = 180): 10,2% da altura */
+.pilula{position:absolute;left:50%;top:10.2%;transform:translateX(-50%);display:flex;align-items:center;gap:2.2cqw;max-width:90%;width:max-content;padding:2.1cqw 4.4cqw 2.1cqw 3.4cqw;border-radius:6cqw;background:rgba(16,19,23,.84);color:#fff;font-weight:900;font-stretch:72%;font-size:4.07cqw;line-height:1.15;text-transform:uppercase;letter-spacing:.01em;text-align:left}
+.pilula .acento{flex:none;width:.74cqw;height:4.07cqw;border-radius:1px;background:var(--y)}
+.leg{position:absolute;left:5%;right:5%;top:63%;display:grid;text-align:center}
+.bloco{grid-area:1/1;margin:0;font-family:var(--f-disp);font-size:8.6cqw;line-height:1.14;letter-spacing:.01em;text-transform:uppercase;color:#fff}
+.bloco.b,.bloco.c{opacity:0}
+.w{display:inline-block;margin-inline:.1em;color:#fff;-webkit-text-stroke:1.2cqw #000;paint-order:stroke fill;text-shadow:.45cqw .45cqw 0 rgba(0,0,0,.29);transform-origin:50% 60%}
+.tela .w2{color:var(--y);transform:scale(1.12)}
+.tela .w1{color:#bfbfbf}
+
+.pino{position:absolute;z-index:3;width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;background:var(--y);color:var(--y-tinta);font:700 11px/20px var(--f-mono);text-align:center;box-shadow:0 0 0 2px rgba(0,0,0,.6)}
+.pinos-leg{list-style:none;margin:14px 0 0;padding:12px 0 0;border-top:1px solid var(--linha);display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 18px;max-width:calc(var(--tw) + 74px)}
+.cotado + .pinos-leg{margin-inline:auto}
+.pinos-leg li{display:grid;grid-template-columns:20px minmax(0,1fr);gap:8px;align-items:start;font-size:13.5px;line-height:1.35;color:var(--tx)}
+.pinos-leg .pn{width:20px;height:20px;border-radius:50%;background:var(--y);color:var(--y-tinta);font:700 11px/20px var(--f-mono);text-align:center}
+.pinos-leg .pn.t{background:transparent;color:var(--y);box-shadow:inset 0 0 0 1.5px var(--y)}
+.pinos-leg b{font-weight:700;display:block}
+.pinos-leg small{display:block;color:var(--fraco);font-size:12.5px}
+.mon-pe{position:relative;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;padding:12px 20px 16px}
+.mon-pe p{margin:0;font-size:12.5px;color:var(--fraco);line-height:1.45;max-width:30ch}
+
+/* animacoes do loop (8 s) */
+.anim .clip{animation:fadeclip var(--ciclo) linear infinite}
+.anim .pilula{animation:pilula var(--ciclo) linear infinite}
+.anim .bloco.a{animation:blocoA var(--ciclo) linear infinite}
+.anim .bloco.b{animation:blocoB var(--ciclo) linear infinite}
+.anim .bloco.c{animation:blocoC var(--ciclo) linear infinite}
+.anim .kb{animation:kb var(--ciclo) linear infinite}
+.anim .punch{animation:punch var(--ciclo) ease-out infinite}
+.anim .prog i{animation:prog var(--ciclo) linear infinite}
+.anim .w1{animation:w1 var(--ciclo) linear infinite}
+.anim .w2{animation:w2 var(--ciclo) linear infinite}
+.anim .w3{animation:w3 var(--ciclo) linear infinite}
+.anim .w4{animation:w4 var(--ciclo) linear infinite}
+.anim .w5{animation:w5 var(--ciclo) linear infinite}
+.anim .w6{animation:w6 var(--ciclo) linear infinite}
+.anim .w7{animation:w7 var(--ciclo) linear infinite}
+.anim .w8{animation:w8 var(--ciclo) linear infinite}
+.anim .cabeca{animation:cabeca var(--ciclo) linear infinite}
+.anim .tc::after{animation:tcs var(--ciclo) steps(8,end) infinite,tcf 1s steps(30,end) infinite}
+
+@keyframes fadeclip{0%{opacity:0}3.75%{opacity:1}96.25%{opacity:1}100%{opacity:0}}
+/* gancho: 3 s = 37,5% do loop de 8 s; o fade de saida de 0,4 s fica DENTRO dos 3 s (2,6 s a 3,0 s) */
+@keyframes pilula{0%,32.5%{opacity:1}37.5%,100%{opacity:0}}
+@keyframes blocoA{0%,37.4%{opacity:1}37.5%,100%{opacity:0}}
+/* no maximo 3 palavras por bloco: FOI AI QUE e EU PERCEBI sao dois blocos */
+@keyframes blocoB{0%,37.4%{opacity:0}37.5%,55.9%{opacity:1}56%,100%{opacity:0}}
+@keyframes blocoC{0%,55.9%{opacity:0}56%,92.4%{opacity:1}92.5%,100%{opacity:0}}
+@keyframes kb{from{transform:scale(1)}to{transform:scale(1.06)}}
+@keyframes punch{0%,24.4%{transform:scale(1)}25.4%,30%{transform:scale(1.05)}35%,56.4%{transform:scale(1)}57.4%,62%{transform:scale(1.05)}67%,100%{transform:scale(1)}}
+@keyframes prog{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes cabeca{from{left:0}to{left:100%}}
+/* palavra: branca (por falar) -> amarela com pop de 112% (ativa) -> cinza (falada); "AI" e "EU" tem 2 letras e nao acendem */
+@keyframes w1{0%,2.5%{color:#fff;transform:scale(1)}3%,12.5%{color:#ffe500;transform:scale(1.12)}13%,100%{color:#bfbfbf;transform:scale(1)}}
+@keyframes w2{0%,12.5%{color:#fff;transform:scale(1)}13%,23.5%{color:#ffe500;transform:scale(1.12)}24%,100%{color:#bfbfbf;transform:scale(1)}}
+@keyframes w3{0%,23.5%{color:#fff;transform:scale(1)}24%,35.5%{color:#ffe500;transform:scale(1.12)}36%,100%{color:#bfbfbf;transform:scale(1)}}
+@keyframes w4{0%,38.5%{color:#fff;transform:scale(1)}39%,46.5%{color:#ffe500;transform:scale(1.12)}47%,100%{color:#bfbfbf;transform:scale(1)}}
+@keyframes w5{0%,46.5%{color:#fff}47%,100%{color:#bfbfbf}}
+@keyframes w6{0%,46.5%{color:#fff;transform:scale(1)}47%,55.5%{color:#ffe500;transform:scale(1.12)}56%,100%{color:#bfbfbf;transform:scale(1)}}
+@keyframes w7{0%,55.5%{color:#fff}56%,100%{color:#bfbfbf}}
+@keyframes w8{0%,55.5%{color:#fff;transform:scale(1)}56%,73.5%{color:#ffe500;transform:scale(1.12)}74%,100%{color:#bfbfbf;transform:scale(1)}}
+
+/* timecode em CSS puro */
+@property --s{syntax:"<integer>";inherits:false;initial-value:0}
+@property --f{syntax:"<integer>";inherits:false;initial-value:0}
+@keyframes tcs{from{--s:0}to{--s:8}}
+@keyframes tcf{from{--f:0}to{--f:30}}
+.tc{font-family:var(--f-mono);font-size:12.5px;color:var(--y);letter-spacing:.06em;font-variant-numeric:tabular-nums;white-space:nowrap;text-transform:none}
+.tc::before{content:"TC ";color:var(--fraco)}
+.tc::after{--s:1;--f:15;counter-reset:s var(--s) f var(--f);content:"00:00:0" counter(s) ":" counter(f,decimal-leading-zero)}
+
+/* pausa sem JS: um checkbox, dois rotulos (monitor e linha do tempo) */
+.pausa{display:inline-flex;align-items:center;gap:8px;font-family:var(--f-mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--tx2);cursor:pointer;border:1px solid var(--linha2);border-radius:999px;padding:6px 12px 6px 10px;background:var(--bg2);user-select:none;white-space:nowrap;min-height:44px}
+.pausa:hover{border-color:var(--y)}
+body:has(#pausa:focus-visible) .pausa{outline:3px solid var(--y);outline-offset:3px}
+.pausa .ico{width:10px;height:10px;display:inline-block;border-left:3px solid var(--y);border-right:3px solid var(--y)}
+.pausa .rot-play{display:none}
+body:has(#pausa:checked) .anim,body:has(#pausa:checked) .anim *,body:has(#pausa:checked) .anim *::after{animation-play-state:paused!important}
+body:has(#pausa:checked) .pausa .rot-pausa{display:none}
+body:has(#pausa:checked) .pausa .rot-play{display:inline}
+body:has(#pausa:checked) .pausa .ico{border:0;width:0;height:0;border-left:9px solid var(--y);border-top:6px solid transparent;border-bottom:6px solid transparent}
+
+@media (max-width:1180px){.hero-grade{gap:40px}}
+@media (max-width:960px){
+  .hero-grade{grid-template-columns:minmax(0,1fr)}
+  .hero-texto{max-width:760px}
+  .hero-mon{justify-self:center}
+  .cotado{--tw:min(300px,calc(100vw - 2*var(--gut) - 42px - 74px))}
+}
+@media (max-width:600px){
+  .hero{padding-top:36px}
+  .ficha-hero{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ficha-hero div:nth-child(3n){border-right:1px solid var(--linha)}
+  .ficha-hero div:nth-child(2n){border-right:0}
+  .ficha-hero div:nth-last-child(-n+3){border-bottom:1px solid var(--linha)}
+  .ficha-hero div:nth-last-child(-n+2){border-bottom:0}
+  .hero-mon,.monitor{width:100%}
+  .mon-corpo{padding:14px 12px 4px}
+  .mon-pe{padding:12px 12px 14px}
+  .pinos-leg small{display:none}
+  .so-larga{display:none}
+}
+@media (max-width:440px){
+  .cotado{grid-template-columns:26px var(--tw) 8px;--tw:min(300px,calc(100vw - 2*var(--gut) - 26px - 34px))}
+  .cota-c{display:none}
+}
+
+/* ============================================================ indice (sem nav no topo) */
+.indice{display:none}
+@media (max-width:1179px){.indice{display:block;margin-top:44px}}
+.indice-in{border:1px solid var(--linha);border-radius:var(--raio);background:var(--bg2);padding:14px 18px 6px}
+.indice-t{margin:0;font-family:var(--f-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--fraco)}
+.indice ol{list-style:none;margin:4px 0 0;padding:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0 18px}
+.indice a{display:flex;gap:10px;align-items:center;min-height:44px;padding:6px 0;border-bottom:1px dashed var(--linha);color:var(--tx);text-decoration:none;font-weight:600;font-size:15px;line-height:1.25}
+.indice li:nth-last-child(-n+5) a{border-bottom:0}
+.indice a span{font-family:var(--f-mono);font-size:12px;color:var(--y);font-weight:600}
+.indice a:hover{color:var(--y)}
+@media (max-width:860px){.indice ol{grid-template-columns:repeat(2,minmax(0,1fr))}.indice li:nth-last-child(-n+5) a{border-bottom:1px dashed var(--linha)}.indice li:nth-last-child(-n+2) a{border-bottom:0}}
+
+/* ============================================================ 01 visuais (faixa de filme) */
+.banda{margin-top:96px;padding:76px 0 84px;background:var(--bg2);border-block:1px solid var(--linha);position:relative}
+.banda::before,.banda::after{content:"";position:absolute;left:0;right:0;height:10px;opacity:.9;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='10'%3E%3Crect x='8' y='1' width='12' height='8' rx='2' fill='%23050607' stroke='%23252a31'/%3E%3C/svg%3E") repeat-x}
+.banda::before{top:14px}
+.banda::after{bottom:14px}
+.presets{list-style:none;margin:44px 0 0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.pre{border:1px solid var(--linha);border-radius:var(--raio);background:var(--painel);padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.pre.padrao{border-color:rgba(255,229,0,.5);box-shadow:inset 0 3px 0 var(--y)}
+.pre-cab{display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+.pre-cab h3{font-family:var(--f-mono);font-size:16px;font-weight:600}
+.selo{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:3px 7px;border-radius:5px;border:1px solid var(--linha2);color:var(--fraco)}
+.selo.on{border-color:rgba(255,229,0,.5);color:var(--y)}
+.mini{position:relative;width:100%;max-width:230px;margin:0 auto;aspect-ratio:9/16;border-radius:12px;overflow:hidden;background:#000;container-type:inline-size;box-shadow:0 0 0 1px #2c3139}
+.mini .pilula{font-size:5.2cqw;padding:2.4cqw 4.4cqw 2.4cqw 3.4cqw}
+.mini .pilula .acento{height:5.2cqw}
+.mini .leg{top:64%}
+.mini .prog i{transform:scaleX(.42)}
+.mini.cheio .leg{top:62%}
+.mini .w{margin-inline:.08em}
+/* abaixo de 200 px a pilula viraria texto de 6 px: vira tarja sem letras */
+@container (max-width:199px){
+  .mini .pilula span{color:transparent;background:repeating-linear-gradient(180deg,rgba(255,255,255,.5) 0 .5em,transparent .5em 1.15em) 0 .32em/100% 100% no-repeat;border-radius:2px}
+  .mini .pilula span::selection{color:transparent}
+}
+.p-edit .fundo{filter:blur(7px) brightness(.64) saturate(.72)}
+.p-edit .vinheta{position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 45%,transparent 55%,rgba(0,0,0,.18) 100%);box-shadow:inset 0 0 18cqw rgba(0,0,0,.35)}
+.p-edit .cartao{border-radius:2.96cqw;box-shadow:0 2.2cqw 7cqw rgba(0,0,0,.65)}
+.p-edit .cartao::after{box-shadow:inset 0 0 0 1px rgba(255,255,255,.16)}
+.p-edit .scrim{background:linear-gradient(transparent,rgba(0,0,0,.45) 45%,rgba(0,0,0,.45))}
+.p-edit .prog{height:.74cqw;background:rgba(255,255,255,.3)}
+.p-edit .prog i{background:#ffc24a}
+.p-edit .pilula{border-radius:2.6cqw;background:rgba(20,17,14,.88);color:#f4efe6;font-weight:600;font-stretch:85%;letter-spacing:.03em}
+.p-edit .pilula .acento{width:1.11cqw;height:1.11cqw;border-radius:50%;background:#ffc24a}
+.p-edit .bloco{font-family:var(--f-ui);font-weight:900;text-transform:none;font-size:7.8cqw;line-height:1.16;letter-spacing:-.005em}
+.p-edit .w{color:#8e887c;-webkit-text-stroke:.4cqw #0d0b09;text-shadow:.3cqw .3cqw 0 rgba(0,0,0,.45)}
+.p-edit .w.f{color:#f2ede3}
+.p-edit .w.a{color:#ffc24a;font-size:1.12em}
+.p-bold .bloco{font-size:8.9cqw}
+.p-bold .w{color:#fff;-webkit-text-stroke:1.3cqw #000}
+.p-bold .w.f{color:#ffe500}
+.p-clean .bloco{font-family:var(--f-ui);font-weight:700;text-transform:none;font-size:7.6cqw;letter-spacing:-.01em}
+.p-clean .w{color:#a8a8a8;-webkit-text-stroke:.75cqw #141414;text-shadow:.2cqw .2cqw 0 rgba(0,0,0,.41)}
+.p-clean .w.f{color:#fff}
+.p-cortes .w{color:#fff}
+.p-cortes .w.f{color:#bfbfbf}
+.p-cortes .w.a{color:#ffe500;font-size:1.12em}
+.pre-desc{font-size:15px;margin:0;color:var(--tx2)}
+.pre-desc q{color:var(--tx)}
+.amostras{display:flex;flex-wrap:wrap;gap:6px;list-style:none;margin:0;padding:0}
+.amostras li{display:inline-flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:11.5px;color:var(--tx2);border:1px solid var(--linha);border-radius:6px;padding:3px 7px 3px 4px}
+.amostras i{width:14px;height:14px;border-radius:3px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.2)}
+.pre-spec{margin:auto 0 0;font-family:var(--f-mono);font-size:12px;color:var(--fraco);line-height:1.65;padding-top:12px;border-top:1px dashed var(--linha)}
+.pre-spec b{color:var(--tx2);font-weight:600}
+.presets-pe{margin-top:20px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.presets-pe p{margin:0;font-size:15px;border:1px dashed var(--linha2);border-radius:10px;padding:14px 16px}
+.presets-pe b{color:var(--tx)}
+@media (max-width:1180px){.presets{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:760px){
+  .presets{grid-template-columns:minmax(0,1fr)}
+  .pre{display:grid;grid-template-columns:42% minmax(0,1fr);gap:12px 16px;align-items:start}
+  .pre .mini{grid-row:1/span 2;grid-column:1;max-width:none}
+  .pre .pre-cab{grid-column:2;grid-row:1;flex-direction:column;align-items:flex-start}
+  .pre .amostras{grid-column:2;grid-row:2;align-self:start}
+  .pre .pre-desc{grid-column:1/-1;grid-row:3}
+  .pre .pre-spec{grid-column:1/-1;grid-row:4}
+  .presets-pe{grid-template-columns:minmax(0,1fr)}
+}
+
+/* ============================================================ 02 estagios (fita) */
+.estagios{list-style:none;margin:48px 0 0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0}
+.est{position:relative;padding:0 22px 0 0;display:flex;flex-direction:column;min-width:0}
+.est-topo{display:flex;align-items:center;gap:0;margin-bottom:14px}
+.est-n{font-family:var(--f-disp);font-size:34px;line-height:1;color:var(--y);border:1px solid rgba(255,229,0,.55);border-radius:8px;padding:8px 12px 6px;background:var(--painel)}
+.est-topo::after{content:"";flex:1;height:0;border-top:2px dashed var(--linha2);margin:0 0 0 12px}
+.est-topo::before{content:"";order:2;width:0;height:0;border-left:8px solid var(--linha2);border-top:5px solid transparent;border-bottom:5px solid transparent;margin-right:-22px}
+.est:last-child .est-topo::after,.est:last-child .est-topo::before{display:none}
+.est-painel{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--fraco);margin:0 0 6px}
+.est h3{font-size:22px;margin-bottom:8px}
+.est .desc{font-size:15.5px;margin:0 0 14px}
+.grava{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+.grava code{font-size:12.5px;color:var(--tx);background:var(--painel2);border:1px solid var(--linha);border-radius:5px;padding:2px 7px}
+.medido{margin:auto 0 0;padding-top:12px;border-top:1px solid var(--linha);font-size:13.5px;color:var(--fraco);line-height:1.45}
+.medido b{display:block;font-family:var(--f-mono);font-size:15px;color:var(--y);font-weight:600}
+.medido code{color:var(--tx2)}
+.medicao{margin-top:28px;display:flex;flex-wrap:wrap;gap:8px 24px;font-size:14.5px;color:var(--fraco)}
+.medicao strong{color:var(--tx2);font-weight:600}
+.reuso{margin-top:40px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.reuso div{border-left:2px solid var(--y);padding:4px 0 4px 16px}
+.reuso h3{font-size:16.5px;margin-bottom:6px}
+.reuso p{font-size:15px;margin:0}
+@media (max-width:1060px){
+  .estagios{grid-template-columns:repeat(2,minmax(0,1fr));gap:40px 0}
+  .est:nth-child(2) .est-topo::after,.est:nth-child(2) .est-topo::before{display:none}
+}
+@media (max-width:860px){.reuso{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:620px){
+  .estagios{grid-template-columns:minmax(0,1fr);gap:0}
+  .est{padding:0 0 30px 0;border-left:2px dashed var(--linha2);margin-left:22px;padding-left:22px}
+  .est:last-child{border-left-color:transparent;padding-bottom:0}
+  .est-topo{margin-left:-45px}
+  .est-topo::after,.est-topo::before{display:none}
+  .est-n{font-size:28px;padding:6px 10px 4px}
+}
+
+/* ============================================================ 03 composicao */
+.ilha{margin:44px 0 0;border:1px solid var(--linha);border-radius:var(--raio);background:var(--bg2);overflow:hidden;--rotw:112px}
+.ilha-barra{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px 16px;padding:9px 16px;border-bottom:1px solid var(--linha);background:var(--painel)}
+.ilha-nome{font-family:var(--f-mono);font-size:12.5px;color:var(--tx2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1 1 240px}
+@media (max-width:720px){.ilha-nome{white-space:normal;overflow-wrap:anywhere}}
+.ilha-nome::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-right:8px;vertical-align:1px}
+.ilha-dir{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.pistas{position:relative;padding-bottom:6px}
+.pista{display:grid;grid-template-columns:var(--rotw) minmax(0,1fr);align-items:center;min-height:36px;border-bottom:1px solid rgba(255,255,255,.04)}
+.rot{font-family:var(--f-mono);font-size:11.5px;color:var(--fraco);padding:0 10px 0 16px;letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rot b{color:var(--tx);font-weight:600;margin-right:6px}
+.faixa{position:relative;height:24px;margin-right:16px}
+.seg{position:absolute;top:0;bottom:0;left:calc(var(--a)*1%);width:calc((var(--b) - var(--a))*1%);border-radius:5px;font-style:normal;font-family:var(--f-mono);font-size:11px;line-height:22px;padding:0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:1px solid}
+.seg.lg{background:rgba(255,229,0,.13);border-color:rgba(255,229,0,.45);color:#fff3a0}
+.seg.gancho{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.25);color:var(--tx)}
+.seg.cv{background:linear-gradient(90deg,rgba(0,0,0,.6),transparent 3.75%,transparent 96.25%,rgba(0,0,0,.6)),#24303c;border-color:#3b4b5c;color:#cfe0f0}
+.seg.bg{background:repeating-linear-gradient(135deg,#1b232c 0 6px,#18202a 6px 12px);border-color:#2b3743;color:var(--fraco)}
+.faixa svg{position:absolute;inset:0;width:100%;height:100%}
+.onda{stroke:#6fa0c9;stroke-width:2}
+.regua{display:grid;grid-template-columns:var(--rotw) minmax(0,1fr);height:36px;align-items:end}
+.regua .rot{align-self:center;padding-top:6px}
+.regua-faixa{position:relative;height:100%;margin-right:16px;background:repeating-linear-gradient(90deg,var(--linha2) 0 1px,transparent 1px 6.25%) bottom/100% 7px no-repeat,repeating-linear-gradient(90deg,#4a5260 0 1px,transparent 1px 25%) bottom/100% 13px no-repeat;border-bottom:1px solid var(--linha2)}
+.regua-faixa span{position:absolute;top:5px;font-family:var(--f-mono);font-size:10.5px;color:var(--fraco);transform:translateX(3px)}
+/* marcas de punch-in na regua: fora da trilha V2, nunca sobre o texto dela */
+.mk{position:absolute;bottom:4px;left:calc(var(--x)*1%);width:9px;height:9px;background:var(--y);transform:translateX(-50%) rotate(45deg);box-shadow:0 0 0 2px var(--bg2)}
+.cabeca-area{position:absolute;top:0;bottom:0;left:var(--rotw);right:16px;pointer-events:none}
+.cabeca{position:absolute;top:8px;bottom:0;width:2px;margin-left:-1px;background:var(--y);left:19%;box-shadow:0 0 12px rgba(255,229,0,.6)}
+.cabeca::before{content:"";position:absolute;top:-6px;left:-6px;border-left:7px solid transparent;border-right:7px solid transparent;border-top:9px solid var(--y)}
+.ilha figcaption{padding:12px 16px;border-top:1px solid var(--linha);font-size:13.5px;color:var(--fraco);display:flex;flex-wrap:wrap;gap:6px 18px;justify-content:space-between}
+.ilha figcaption .lg-mk::before{content:"";display:inline-block;width:8px;height:8px;background:var(--y);transform:rotate(45deg);margin-right:8px;vertical-align:1px}
+/* abaixo de 960 px a faixa do gancho nao comporta o rotulo longo; o fade de saida segue descrito na camada L6 */
+@media (max-width:960px){.seg .longo{display:none}}
+@media (max-width:720px){
+  .ilha{--rotw:44px}
+  .rot{padding:0 4px 0 10px}
+  .rot span{display:none}
+  .faixa,.regua-faixa{margin-right:10px}
+  .cabeca-area{right:10px}
+  .seg{padding:0 3px;font-size:10.5px}
+  /* no celular o bloco de legenda quebra em duas linhas em vez de virar reticencias */
+  .seg.lg{white-space:normal;overflow-wrap:anywhere;line-height:1.05;font-size:9.5px;letter-spacing:-.02em;padding:0 2px;display:flex;align-items:center;text-overflow:clip}
+  .pista-leg{min-height:40px}
+  .pista-leg .faixa{height:30px}
+  .ilha-barra{padding:9px 12px}
+}
+.comp-grade{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:48px;align-items:start;margin-top:48px}
+.sub{font-family:var(--f-mono);font-size:12.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--fraco);margin-bottom:12px}
+.camadas{list-style:none;margin:0;padding:0;border-top:1px solid var(--linha)}
+.camadas li{display:grid;grid-template-columns:40px minmax(0,1fr);gap:12px;padding:13px 0;border-bottom:1px solid var(--linha)}
+.camadas .n{font-family:var(--f-mono);font-size:12.5px;color:var(--y);padding-top:3px;font-weight:600}
+.camadas b{display:block;color:var(--tx);font-size:16.5px;margin-bottom:2px}
+.camadas p{margin:0;font-size:15px}
+.camadas li.au{border-top:1px solid var(--linha2)}
+.comp-pe{margin:14px 0 0}
+.rosto{margin:0;border:1px solid var(--linha);border-radius:var(--raio);background:var(--painel);overflow:hidden}
+.rosto svg{display:block;width:100%;height:auto;background:#000}
+.rosto figcaption{padding:14px 18px;font-size:15px;color:var(--tx2)}
+.rosto figcaption b{color:var(--tx)}
+.nota-tec{margin-top:16px;border:1px solid var(--linha2);border-radius:var(--raio);padding:16px 18px;background:var(--bg2)}
+.nota-tec-t{margin:0 0 6px;font-family:var(--f-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--fraco)}
+.nota-tec p:last-child{margin:0;font-size:15px}
+.nota-tec strong{color:var(--tx)}
+@media (min-width:961px){.comp-dir{position:sticky;top:84px}}
+@media (max-width:960px){.comp-grade{grid-template-columns:minmax(0,1fr)}}
+
+/* ============================================================ 04 arquivos */
+.arq-grade{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:20px;margin-top:44px;align-items:start}
+.janela{border:1px solid var(--linha);border-radius:var(--raio);background:var(--bg2);overflow:hidden}
+.janela-cab{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--linha);background:var(--painel);font-family:var(--f-mono);font-size:12.5px;color:var(--fraco);min-width:0}
+.janela-cab span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:720px){.janela-cab span{white-space:normal;overflow-wrap:anywhere}}
+.pontos{display:inline-flex;gap:6px;flex:none}
+.pontos i{width:9px;height:9px;border-radius:50%;background:var(--linha2)}
+.arvore-corpo{padding:16px 18px 10px}
+.raiz{margin:0 0 4px;font-family:var(--f-mono);font-size:14px;font-weight:600;color:var(--tx)}
+.arvore,.arvore ul{list-style:none;margin:0;padding:0}
+.arvore ul{margin-left:22px}
+.arvore li{position:relative;padding:7px 0 7px 24px}
+.arvore li::before{content:"";position:absolute;left:4px;top:0;bottom:0;border-left:1px solid var(--linha2)}
+.arvore li:last-child::before{bottom:auto;height:20px}
+.arvore li::after{content:"";position:absolute;left:4px;top:20px;width:13px;border-top:1px solid var(--linha2)}
+.no{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px}
+.no code{font-family:var(--f-mono);font-size:13.5px;color:var(--tx);overflow-wrap:anywhere}
+.no .dir{color:var(--azul)}
+.no .mp4{background:var(--y);color:var(--y-tinta);padding:1px 6px;border-radius:4px;font-weight:700}
+.tam{font-family:var(--f-mono);font-size:12px;color:var(--y);border:1px solid rgba(255,229,0,.35);border-radius:5px;padding:0 6px;white-space:nowrap}
+.arvore .d{margin:2px 0 0;font-size:14px;color:var(--fraco);line-height:1.5}
+.arvore .d b{color:var(--tx2);font-weight:600}
+.pub{border:1px solid var(--linha);border-radius:var(--raio);background:var(--painel);overflow:hidden}
+.pub-corpo{padding:18px 20px}
+.pub-corpo h3{font-size:16px;margin-bottom:10px}
+.pub-corpo ul{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:10px}
+.pub-corpo li{display:grid;grid-template-columns:20px 1fr;gap:8px;font-size:15px;color:var(--tx)}
+.pub-corpo li::before{content:"";width:16px;height:16px;border:2px solid var(--fraco);border-radius:4px;margin-top:3px}
+.pub-corpo .nota{margin:0}
+.trio{margin-top:16px;display:grid;gap:10px}
+.trio p{margin:0;border:1px dashed var(--linha2);border-radius:10px;padding:14px 16px;font-size:14.5px}
+.trio b{color:var(--tx)}
+@media (max-width:960px){.arq-grade{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:480px){.arvore-corpo{padding:14px 12px 8px}.arvore ul{margin-left:10px}.arvore li{padding-left:20px}}
+
+/* ============================================================ 05 privacidade (faixa amarela) */
+.sec-y{margin-top:104px;padding:80px 0 88px;background:var(--y);color:var(--y-tinta2)}
+.sec-y h2,.sec-y h3,.sec-y .slate b{color:var(--y-tinta)}
+.sec-y .slate{color:var(--y-tinta2)}
+.sec-y .slate::before{background:var(--y-tinta)}
+.sec-y .slate .regua-mini{background:repeating-linear-gradient(90deg,rgba(23,20,0,.45) 0 1px,transparent 1px 8px)}
+.sec-y .lead{color:var(--y-tinta2)}
+.sec-y :focus-visible{outline-color:var(--y-tinta)}
+.sec-y code.i{background:rgba(23,20,0,.08);border-color:rgba(23,20,0,.3);color:var(--y-tinta)}
+.priv{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:36px;margin-top:44px;align-items:start}
+.priv h3{font-size:18px;margin-bottom:14px}
+.lista-ok{list-style:none;margin:0;padding:0;display:grid;gap:14px}
+.lista-ok li{display:grid;grid-template-columns:22px 1fr;gap:10px;font-size:16px;color:var(--y-tinta)}
+.lista-ok li::before{content:"";width:12px;height:12px;margin-top:6px;border-radius:2px;background:var(--y-tinta)}
+.lista-ok b{font-weight:800}
+.rede{border-radius:var(--raio);background:#0b0c0e;color:var(--tx2);overflow:hidden;box-shadow:0 30px 60px -30px rgba(23,20,0,.6)}
+.rede table{width:100%;border-collapse:collapse;font-size:14.5px}
+.rede caption{text-align:left;padding:12px 18px;background:var(--painel);border-bottom:1px solid var(--linha);font-family:var(--f-mono);font-size:12.5px;color:var(--fraco)}
+.rede th,.rede td{text-align:left;vertical-align:top;padding:12px 18px;border-bottom:1px solid rgba(255,255,255,.06)}
+.rede thead th{font-family:var(--f-mono);font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--fraco);padding-top:10px;padding-bottom:10px}
+.rede tbody th{color:var(--tx);font-weight:700;width:28%}
+.rede td.tm{font-family:var(--f-mono);font-size:13px;color:var(--y);width:30%}
+.rede code{font-size:.92em;color:var(--tx)}
+.rede-pe{margin:0;padding:14px 18px;font-weight:700;color:var(--tx);background:var(--bg2)}
+.rede-pe::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--y);margin-right:10px;vertical-align:0}
+@media (max-width:960px){.priv{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:640px){
+  .rede thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  .rede tr{display:block;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.06)}
+  .rede tbody th,.rede td{display:block;width:auto!important;padding:2px 0;border:0}
+  .rede td::before{content:attr(data-rot) " ";font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--fraco)}
+  .sec-y{padding:64px 0 72px}
+}
+
+/* ============================================================ 06 selecao */
+.passos{list-style:none;margin:44px 0 0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;border:1px solid var(--linha);border-radius:var(--raio);overflow:hidden;background:var(--painel)}
+.passos li{padding:22px 20px;border-right:1px solid var(--linha);position:relative}
+.passos li:last-child{border-right:0}
+.passos .tcx{font-family:var(--f-mono);font-size:11.5px;color:var(--y);letter-spacing:.08em}
+.passos h3{font-size:17px;margin:8px 0 8px}
+.passos p{font-size:15px;margin:0}
+.passos code{font-size:12.5px;color:var(--tx)}
+.sel-grade{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:14px}
+.caixa-api,.valida{border:1px solid var(--linha);border-radius:var(--raio);background:var(--painel);padding:20px}
+.caixa-api{border-color:var(--linha2);background:linear-gradient(180deg,var(--painel2),var(--painel))}
+.caixa-api h3,.valida h3{font-size:17px;margin-bottom:10px}
+.caixa-api p,.valida p{font-size:15px}
+.caixa-api .forte{color:var(--tx);border-left:3px solid var(--y);padding-left:12px;margin:0}
+.valida ul{margin:0;padding-left:18px;font-size:15px}
+.valida li{margin-bottom:4px}
+.rotulo{font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:5px;display:inline-block;margin-bottom:10px}
+.rotulo.enc{background:rgba(74,222,128,.12);color:var(--ok)}
+.rotulo.rec{background:rgba(255,107,107,.12);color:var(--erro)}
+.rotulo.opc{background:rgba(255,255,255,.07);color:var(--tx2)}
+.citacao{margin:28px 0 0;padding:22px 24px;border-left:3px solid var(--y);background:var(--bg2);border-radius:0 var(--raio) var(--raio) 0}
+.citacao blockquote{margin:0}
+.citacao p{font-family:var(--f-disp);text-transform:uppercase;font-size:clamp(1.5rem,1.1rem + 1.2vw,2.1rem);line-height:1.15;color:var(--tx);margin:0 0 10px}
+.citacao figcaption{font-size:15px;color:var(--tx2)}
+.citacao cite{font-style:normal;color:var(--tx);font-weight:700}
+.campos{margin-top:12px;display:flex;flex-wrap:wrap;gap:6px}
+.campos span{font-family:var(--f-mono);font-size:12px;border:1px solid var(--linha2);border-radius:6px;padding:3px 8px;color:var(--tx)}
+.campos span.o{border-style:dashed;color:var(--fraco)}
+@media (max-width:1060px){.passos{grid-template-columns:repeat(2,minmax(0,1fr))}.passos li:nth-child(2){border-right:0}.passos li:nth-child(-n+2){border-bottom:1px solid var(--linha)}.sel-grade{grid-template-columns:repeat(2,minmax(0,1fr))}.caixa-api{grid-column:1/-1}}
+@media (max-width:640px){.passos{grid-template-columns:minmax(0,1fr)}.passos li{border-right:0;border-bottom:1px solid var(--linha)}.passos li:last-child{border-bottom:0}.sel-grade{grid-template-columns:minmax(0,1fr)}}
+
+/* ============================================================ 07 painel (ilustracao) */
+.painel-grade{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:36px;margin-top:44px;align-items:start}
+.mock{margin:0;border:1px solid var(--linha2);border-radius:16px;background:#0d0f12;overflow:hidden;box-shadow:0 30px 60px -30px rgba(0,0,0,.8);font-family:var(--f-ui)}
+.mock-barra{display:flex;align-items:center;gap:10px;padding:9px 14px;background:#14181d;border-bottom:1px solid #242c35;font-family:var(--f-mono);font-size:12px;color:#8b97a5;min-width:0}
+.mock-url{flex:1;min-width:0;background:#0d0f12;border:1px solid #242c35;border-radius:6px;padding:3px 10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mock-topo{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid #242c35}
+.mock-topo .marca{font-size:16px}
+.mock-topo .marca-quadro{width:11px;height:18px}
+.mock-topo small{font-size:12.5px;color:#8b97a5}
+.mock-corpo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:16px;padding:18px}
+.mk-cartao{background:#171c22;border:1px solid #242c35;border-radius:12px;padding:14px}
+.mk-rot{display:block;font-size:12px;color:#8b97a5;margin:0 0 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mk-campo{background:#0d0f12;border:1px solid #242c35;border-radius:8px;padding:8px 10px;font-size:13px;color:#8b97a5;margin-bottom:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mk-solta{border:1px dashed #3a4450;border-radius:8px;padding:12px;text-align:center;font-size:12.5px;color:#8b97a5;margin-bottom:10px}
+.mk-solta b{display:block;color:#e8edf2;font-size:13px}
+.mk-linha{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.mk-linha .mk-campo{color:#e8edf2}
+.mk-btn{display:inline-block;background:#ffe500;color:#171400;font-weight:700;font-size:13px;border-radius:8px;padding:8px 14px}
+.trilha{list-style:none;margin:0 0 10px;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.trilha li{font-size:12px;color:#8b97a5;border-top:3px solid #242c35;padding-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trilha li.ok{border-color:#4ade80;color:#e8edf2}
+.trilha li.vai{border-color:#ffe500;color:#ffe500}
+.mk-barra{height:6px;border-radius:6px;background:#242c35;overflow:hidden;margin-bottom:6px}
+.mk-barra i{display:block;height:100%;width:72%;background:#ffe500}
+.mk-tempo{font-size:12.5px;color:#8b97a5;margin:0 0 12px}
+.mk-grade{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.mk-player{border-radius:8px;overflow:hidden;background:#000;aspect-ratio:9/16;position:relative;container-type:inline-size}
+.mk-player .cartao{border-radius:3.33cqw}
+.mk-player .play{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:0;height:0;border-left:14px solid rgba(255,255,255,.9);border-top:9px solid transparent;border-bottom:9px solid transparent;filter:drop-shadow(0 1px 3px rgba(0,0,0,.6))}
+.mk-acoes{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.mk-acoes span{font-size:11px;color:#c9d2db;border:1px solid #2c3540;border-radius:5px;padding:2px 5px;white-space:nowrap}
+.mk-manual{margin-top:12px;font-size:13px;color:#c9d2db}
+.mk-manual b{color:#e8edf2}
+.mock-leg{padding:10px 18px;border-top:1px solid #242c35;font-family:var(--f-mono);font-size:12px;color:var(--fraco)}
+.painel-lista{list-style:none;margin:0;padding:0;display:grid;gap:20px}
+.painel-lista li{display:grid;grid-template-columns:30px 1fr;gap:12px}
+.painel-lista .k{font-family:var(--f-mono);font-size:12px;color:var(--y);padding-top:3px}
+.painel-lista h3{font-size:17px;margin-bottom:4px}
+.painel-lista p{font-size:15px;margin:0}
+@media (max-width:1060px){.painel-grade{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:620px){.mock-corpo{grid-template-columns:minmax(0,1fr);padding:12px}.mk-linha{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.mk-linha > div:last-child{grid-column:1/-1}}
+
+/* ============================================================ 08 instalacao */
+.inst-grade{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.35fr);gap:28px;margin-top:44px;align-items:start}
+.inst-esq{display:grid;gap:16px;min-width:0}
+.req,.tempos{border:1px solid var(--linha);border-radius:var(--raio);background:var(--painel);padding:20px 22px}
+.req h3,.tempos h3{font-size:17px;margin-bottom:12px}
+.req dl{margin:0;display:grid;gap:12px}
+.req div{display:grid;grid-template-columns:104px minmax(0,1fr);gap:12px;font-size:15px;padding-bottom:12px;border-bottom:1px dashed rgba(255,255,255,.08)}
+.req div:last-child{border-bottom:0;padding-bottom:0}
+.req dt{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--fraco);padding-top:3px}
+.req dd{margin:0;color:var(--tx)}
+.req dd small{display:block;color:var(--fraco);font-size:13.5px;line-height:1.45;margin-top:2px}
+.tempos p.nota{margin:-6px 0 10px}
+.tempos table{width:100%;border-collapse:collapse;font-size:14px}
+.tempos th,.tempos td{text-align:left;vertical-align:top;padding:8px 10px 8px 0;border-bottom:1px dashed rgba(255,255,255,.08)}
+.tempos tr:last-child th,.tempos tr:last-child td{border-bottom:0}
+.tempos thead th{font-family:var(--f-mono);font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--fraco)}
+.tempos tbody th{color:var(--tx);font-weight:700}
+.tempos td.t{font-family:var(--f-mono);font-size:13px;color:var(--y);white-space:nowrap}
+.tempos td.f{color:var(--tx2);font-size:13.5px}
+.tempos .rodape-t{margin:12px 0 0;font-size:14px;color:var(--tx2)}
+.cmds{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;min-width:0}
+.codigo{margin:0;border:1px solid var(--linha);border-radius:12px;background:#07080a;overflow:hidden;position:relative}
+.codigo figcaption{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 14px;border-bottom:1px solid var(--linha);background:var(--painel);font-size:14px;color:var(--tx2);min-height:46px}
+.codigo figcaption b{color:var(--tx);font-weight:700}
+.codigo figcaption .n{font-family:var(--f-mono);font-size:11.5px;color:var(--y);margin-right:4px}
+/* o comando quebra nos espacos com recuo nas linhas de continuacao, nunca no meio de uma flag; sem rolagem lateral */
+.codigo pre{margin:0;padding:14px 16px;font-size:13.5px;line-height:1.65;color:#e6edf3;white-space:pre-wrap;word-break:normal;overflow-wrap:break-word;tab-size:2}
+.codigo .l{display:block;padding-left:3ch;text-indent:-3ch}
+.codigo .c{color:#8a96a3}
+.copiar{flex:none;font-family:var(--f-mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;background:transparent;color:var(--tx2);border:1px solid var(--linha2);border-radius:6px;padding:6px 10px;min-height:44px;cursor:pointer}
+.copiar:hover{border-color:var(--y);color:var(--tx)}
+.copiar.ok{border-color:var(--ok);color:var(--ok)}
+.problema{border:1px solid rgba(255,107,107,.35);border-radius:12px;padding:16px 18px;background:rgba(255,107,107,.05);font-size:15px}
+.problema > p{margin:0 0 12px}
+.problema b{color:var(--tx)}
+.problema .codigo{margin:0}
+.comandos{margin-top:28px;border:1px solid var(--linha);border-radius:var(--raio);overflow:hidden;background:var(--bg2)}
+.comandos-cab{padding:12px 18px;border-bottom:1px solid var(--linha);background:var(--painel)}
+.comandos-cab h3{font-size:16px}
+.comandos-cab p{margin:4px 0 0;font-size:14px;color:var(--fraco)}
+.comandos ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
+.comandos li{padding:14px 16px;border-right:1px solid var(--linha);font-size:14px;line-height:1.45}
+.comandos li:last-child{border-right:0}
+.comandos code{display:block;font-size:14px;color:var(--y);margin-bottom:4px;font-weight:600}
+@media (max-width:1100px){.comandos ul{grid-template-columns:repeat(4,minmax(0,1fr))}.comandos li{border-bottom:1px solid var(--linha)}.comandos li:nth-child(4n){border-right:0}}
+@media (max-width:1000px){.inst-grade{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:600px){
+  .comandos ul{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .comandos li:nth-child(4n){border-right:1px solid var(--linha)}
+  .comandos li:nth-child(2n){border-right:0}
+  .codigo pre{font-size:12px;padding:12px}
+  .codigo .l{padding-left:2ch;text-indent:-2ch}
+  .codigo figcaption{padding:8px 12px;font-size:13.5px}
+  .req,.tempos{padding:18px 16px}
+}
+@media (max-width:420px){.req div{grid-template-columns:minmax(0,1fr);gap:2px}}
+/* em tela estreita a tabela de tempos vira linhas de duas colunas: estagio e tempo, fator embaixo */
+@media (max-width:480px){
+  .tempos thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  .tempos tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 12px;padding:9px 0;border-bottom:1px dashed rgba(255,255,255,.08)}
+  .tempos tr:last-child{border-bottom:0}
+  .tempos th,.tempos td{padding:0;border:0!important}
+  .tempos td.t{text-align:right}
+  .tempos td.f{grid-column:1/-1;margin-top:2px}
+}
+
+/* ============================================================ 09 limites */
+.limites{list-style:none;margin:40px 0 0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0 28px}
+.limites li{padding:18px 0 20px;border-top:2px solid var(--linha2);font-size:15px}
+.limites b{display:block;color:var(--tx);font-size:17px;margin-bottom:6px}
+@media (max-width:1060px){.limites{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:600px){.limites{grid-template-columns:minmax(0,1fr)}}
+
+/* ============================================================ 10 faq */
+.faq{margin-top:40px;border-top:1px solid var(--linha);max-width:900px}
+@media (min-width:1060px){.faq-grade{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:48px;align-items:start}.faq-grade .faq{margin-top:0}.faq-cab{position:sticky;top:96px}}
+.faq-cab .lead{max-width:36ch}
+.faq details{border-bottom:1px solid var(--linha)}
+.faq summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:20px 4px;font-weight:700;font-size:18px;color:var(--tx);min-height:56px}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"";flex:none;width:14px;height:14px;background:linear-gradient(var(--y),var(--y)) center/14px 2px no-repeat,linear-gradient(var(--y),var(--y)) center/2px 14px no-repeat;transition:transform .2s}
+.faq details[open] summary::after{transform:rotate(45deg)}
+/* alto contraste do Windows apaga background-image: o + vira texto */
+@media (forced-colors:active){
+  .faq summary::after{background:none;content:"+";width:auto;height:auto;color:CanvasText;font-size:24px;line-height:1;transform:none!important}
+  .faq details[open] summary::after{content:"\2212"}
+}
+.faq summary:hover{color:#fff}
+.faq .r{padding:0 4px 20px;font-size:16px;max-width:70ch}
+.faq .r p:last-child{margin:0}
+
+/* ============================================================ chamada final + rodape */
+.final{margin-top:112px;border-top:1px solid var(--linha);border-bottom:1px solid var(--linha);background:repeating-linear-gradient(90deg,rgba(255,255,255,.03) 0 1px,transparent 1px 80px),var(--bg2)}
+.final-in{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:28px 40px;align-items:center;padding-block:60px}
+.final h2{max-width:22ch}
+.final p{margin:16px 0 0;max-width:56ch}
+.final-acoes{display:flex;flex-wrap:wrap;gap:12px}
+@media (max-width:860px){.final-in{grid-template-columns:minmax(0,1fr)}}
+footer{padding:44px 0 56px;font-size:14px;color:var(--fraco)}
+.rod{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr) auto;gap:28px 40px;align-items:start}
+.rod p{margin:12px 0 0;max-width:44ch}
+.rod a{color:var(--tx2)}
+.rod a:hover{color:var(--y)}
+.rod .marca{color:var(--tx)}
+.carimbo{margin:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border:1px solid var(--linha);border-radius:12px;overflow:hidden}
+.carimbo div{padding:12px 16px;border-right:1px solid var(--linha);border-bottom:1px solid var(--linha)}
+.carimbo div:nth-child(2n){border-right:0}
+.carimbo div:nth-last-child(-n+2){border-bottom:0}
+.carimbo dt{font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--fraco);margin-bottom:3px}
+.carimbo dd{margin:0;color:var(--tx);font-size:14.5px;line-height:1.45}
+.carimbo dd small{display:block;color:var(--fraco);font-size:13px}
+.carimbo dd a{display:inline-flex;align-items:center;min-height:44px}
+.rod-links{list-style:none;margin:0;padding:0;display:grid;gap:2px;font-family:var(--f-mono);font-size:13px}
+.rod-links a{display:inline-flex;align-items:center;min-height:44px}
+@media (max-width:1000px){.rod{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.carimbo{grid-column:1/-1;grid-row:2}}
+@media (max-width:600px){.rod{grid-template-columns:minmax(0,1fr)}.carimbo{grid-row:auto;grid-template-columns:minmax(0,1fr)}.carimbo div{border-right:0}.carimbo div:nth-last-child(2){border-bottom:1px solid var(--linha)}}
+
+/* ============================================================ movimento reduzido */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+  html{scroll-behavior:auto}
+  /* sem animacao, o controle de pausa nao faz nada: sai da tela E da ordem do Tab */
+  .pausa,.pausa-in{display:none}
+}
+</style>
+</head>
+<body>
+<a class="pular" href="#conteudo">Pular para o conteúdo</a>
+
+<!-- cenas ilustrativas 16:9 em SVG; nao sao frames de video real. Cada preset usa uma cena diferente -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="gParede" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b4756"/><stop offset="1" stop-color="#1b222a"/></linearGradient>
+    <radialGradient id="gLuz" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffb46a" stop-opacity=".55"/><stop offset="1" stop-color="#ffb46a" stop-opacity="0"/></radialGradient>
+    <radialGradient id="gPele1" cx=".34" cy=".34" r=".78"><stop offset="0" stop-color="#e6b08b"/><stop offset=".62" stop-color="#bb7a57"/><stop offset="1" stop-color="#87503a"/></radialGradient>
+    <radialGradient id="gPele2" cx=".66" cy=".34" r=".78"><stop offset="0" stop-color="#d8a07a"/><stop offset=".62" stop-color="#a8694a"/><stop offset="1" stop-color="#77442f"/></radialGradient>
+    <radialGradient id="gPele3" cx=".4" cy=".3" r=".8"><stop offset="0" stop-color="#c08661"/><stop offset=".65" stop-color="#8d5739"/><stop offset="1" stop-color="#673b25"/></radialGradient>
+    <linearGradient id="gCamisa" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#346561"/><stop offset="1" stop-color="#14302e"/></linearGradient>
+    <linearGradient id="gCasaco" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8f6d3b"/><stop offset="1" stop-color="#4a371c"/></linearGradient>
+    <linearGradient id="gAula" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4a564d"/><stop offset="1" stop-color="#1f261f"/></linearGradient>
+    <radialGradient id="gLuzObra" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff1c9" stop-opacity=".55"/><stop offset="1" stop-color="#fff1c9" stop-opacity="0"/></radialGradient>
+    <pattern id="pTijolo" width="16" height="8" patternUnits="userSpaceOnUse"><rect width="16" height="8" fill="#7a412e"/><path d="M0 .4h16M0 4.4h16M4 .4v4M12 4.4v3.6" stroke="#3b1f16" stroke-width=".7"/></pattern>
+  </defs>
+
+  <!-- podcast: estudio com painel acustico, microfone de braco -->
+  <symbol id="cena-pod" viewBox="0 0 160 90">
+    <rect width="160" height="90" fill="url(#gParede)"/>
+    <circle cx="24" cy="24" r="44" fill="url(#gLuz)"/>
+    <rect x="124" y="10" width="28" height="40" rx="1" fill="#86a6be" opacity=".34"/>
+    <path d="M138 10v40M124 30h28" stroke="#1c232b" stroke-width="1.4"/>
+    <rect x="6" y="40" width="40" height="2" fill="#0f1317"/>
+    <rect x="9" y="31" width="4" height="9" fill="#b5523b"/>
+    <rect x="14" y="33" width="3" height="7" fill="#d9a441"/>
+    <rect x="18" y="30" width="4" height="10" fill="#3e6e8e"/>
+    <rect x="23" y="34" width="5" height="6" fill="#5d7a4a"/>
+    <rect x="35" y="34" width="6" height="6" rx="1" fill="#2c2620"/>
+    <circle cx="36" cy="31" r="3" fill="#4e7a45"/><circle cx="40" cy="30" r="3.2" fill="#5f8f52"/><circle cx="38" cy="27.5" r="2.6" fill="#4e7a45"/>
+    <rect x="66" y="6" width="48" height="54" rx="2" fill="#242d37"/>
+    <path d="M72 6v54M78 6v54M84 6v54M90 6v54M96 6v54M102 6v54M108 6v54" stroke="#1b222a" stroke-width="1"/>
+    <path d="M59 90c1-16 13-26 31-26s30 10 31 26z" fill="url(#gCamisa)"/>
+    <path d="M84 64.6l6 6.4 6-6.4" fill="none" stroke="#0e2221" stroke-width="1.3"/>
+    <path d="M85.2 50h9.6v14.2c-3 2.2-6.6 2.2-9.6 0z" fill="#9a5d42"/>
+    <path d="M85.2 52.4c3 2.6 6.6 2.6 9.6 0v3c-3 2-6.6 2-9.6 0z" fill="#3b1d12" opacity=".35"/>
+    <ellipse cx="90" cy="40.6" rx="10.2" ry="12.4" fill="url(#gPele1)"/>
+    <path d="M93.4 29c4.6 2.4 7 7 6.6 12.4-.4 5.4-3.6 9.6-8 11 2.8-3.2 4-7.4 4-11.6 0-4.4-.9-8.6-2.6-11.8z" fill="#4a2416" opacity=".3"/>
+    <path d="M79.7 41.4c-1.7-10.8 3.4-17.8 11-17.8 7.3 0 11.8 5.8 10.4 15-1-3.9-3-6.6-5.7-7.6-3.3 2.5-9.6 3.5-12.8 2.3-1.6 1.9-2.6 4.7-2.9 8.1z" fill="#21150e"/>
+    <path d="M78.4 41.8c-1.5-12.4 4.7-20.2 12-20.2s13.5 7.8 12 20.2" fill="none" stroke="#0d0f12" stroke-width="2.4" stroke-linecap="round"/>
+    <rect x="76" y="36.6" width="4.8" height="9.6" rx="2.1" fill="#15181c" stroke="#323a44" stroke-width=".5"/>
+    <rect x="99.6" y="36.6" width="4.8" height="9.6" rx="2.1" fill="#15181c" stroke="#323a44" stroke-width=".5"/>
+    <path d="M28 12L64 45l6 4" fill="none" stroke="#0d1013" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="67" y="46" width="8" height="14" rx="4" transform="rotate(-24 71 53)" fill="#15191e" stroke="#39414b" stroke-width=".6"/>
+    <path d="M68.6 50.5h5M68.4 53h5.2M68.6 55.5h5" stroke="#39414b" stroke-width=".5" transform="rotate(-24 71 53)"/>
+    <rect y="80" width="160" height="10" fill="#101317"/>
+    <rect x="122" y="71" width="8" height="9" rx="1" fill="#d8d2c4"/>
+    <path d="M130 73.5h2a2 2 0 010 4h-2" fill="none" stroke="#d8d2c4" stroke-width="1"/>
+  </symbol>
+
+  <!-- aula: lousa com giz, professora de oculos -->
+  <symbol id="cena-aula" viewBox="0 0 160 90">
+    <rect width="160" height="90" fill="url(#gAula)"/>
+    <rect x="134" y="8" width="20" height="46" fill="#a9c2cf" opacity=".22"/>
+    <path d="M144 8v46" stroke="#20271f" stroke-width="1.2"/>
+    <rect x="5" y="8" width="80" height="52" rx="1.5" fill="#1e3a30" stroke="#6d5a40" stroke-width="2"/>
+    <g fill="none" stroke="#e6eadc" stroke-width=".8" stroke-linecap="round" stroke-linejoin="round" opacity=".82">
+      <path d="M13 18h24M13 24h16M13 30h20"/>
+      <path d="M47 50V22M47 50h30"/>
+      <path d="M49 46l7-7 6 3 7-9 6-4"/>
+      <circle cx="27" cy="44" r="6"/>
+      <path d="M23 44h8M27 40v8"/>
+    </g>
+    <rect x="5" y="60" width="80" height="2.2" fill="#4c3d2b"/>
+    <path d="M83 90c1-15 10-25 23-25s22 10 23 25z" fill="url(#gCasaco)"/>
+    <path d="M101 65.4l5 8.6 5-8.6z" fill="#d9d4c6"/>
+    <path d="M95.5 68.6c-5.2-4-8.8-9.6-10.6-16.4l3.2-1.4c1.8 6 5 10.8 9.6 14.2z" fill="#6c5130"/>
+    <circle cx="86.4" cy="50.4" r="2.1" fill="#b77c5a"/>
+    <path d="M101.6 51h8.8v14c-2.9 2-5.9 2-8.8 0z" fill="#93583d"/>
+    <ellipse cx="106" cy="40.4" rx="9.6" ry="11.8" fill="url(#gPele2)"/>
+    <path d="M101.8 29.6c-4 2.6-6 7-5.6 12 .4 5 3.4 9 7.4 10.4-2.6-3-3.8-7-3.8-11 0-4.2.8-8.2 2-11.4z" fill="#4a2416" opacity=".25"/>
+    <path d="M95.6 44c-1.8-12 3.2-19.6 10.6-19.6 7.4 0 12 6.8 10.4 18.4-.4 3.4-.4 7 .4 10-3-1.4-4.2-6.2-4.2-11.4-3-1.2-6.6-3.6-8.4-6.6-1.8 3.4-5 6.4-8.8 8.2z" fill="#2c1a12"/>
+    <g fill="none" stroke="#141414" stroke-width=".75"><rect x="99.6" y="38.2" width="5.4" height="3.8" rx="1.3"/><rect x="106.8" y="38.2" width="5.4" height="3.8" rx="1.3"/><path d="M105 39.8h1.8"/></g>
+    <rect y="82" width="160" height="8" fill="#15110c"/>
+  </symbol>
+
+  <!-- live de obra: parede de tijolo aberta, capacete -->
+  <symbol id="cena-obra" viewBox="0 0 160 90">
+    <rect width="160" height="90" fill="url(#pTijolo)"/>
+    <rect width="160" height="90" fill="#000" opacity=".2"/>
+    <circle cx="138" cy="14" r="34" fill="url(#gLuzObra)"/>
+    <path d="M12 22l9-5 8 3 8-2 6 6-1 9 3 7-2 9 2 9-6 5H18l-6-6 2-8-3-9 3-8z" fill="#140e0c"/>
+    <path d="M8 84l5-6 5 2 5-5 7 5 4-2 5 4 3-1v9H8z" fill="#7b4734"/>
+    <path d="M63 90c1-16 13-26 31-26s30 10 31 26z" fill="#3c434b"/>
+    <path d="M70 90c1-13 6.6-21 15-24.2l3.6 24.2zM118 90c-1-13-6.6-21-15-24.2l-3.6 24.2z" fill="#e5672a"/>
+    <path d="M71.4 83.4h16.2M100.4 83.4h16.2" stroke="#e9edf0" stroke-width="2.2"/>
+    <path d="M89.2 51h9.6v14.2c-3 2.2-6.6 2.2-9.6 0z" fill="#80492f"/>
+    <ellipse cx="94" cy="41.6" rx="10" ry="12.2" fill="url(#gPele3)"/>
+    <path d="M84.6 45c1 6.4 4.6 9.6 9.4 9.6s8.4-3.2 9.4-9.6c-2 3.2-5.6 4.6-9.4 4.6s-7.4-1.4-9.4-4.6z" fill="#2e211a" opacity=".6"/>
+    <path d="M97.4 30.4c4.4 2.6 6.6 7 6.2 12.2-.4 5.2-3.4 9.2-7.6 10.6 2.6-3 3.8-7 3.8-11.2 0-4.2-.8-8.4-2.4-11.6z" fill="#3a1d10" opacity=".3"/>
+    <path d="M82.2 37.8c0-8.4 5.2-14 11.8-14s11.8 5.6 11.8 14z" fill="#f28c28"/>
+    <path d="M94 23.8v13.6" stroke="#cf6f14" stroke-width="1.8"/>
+    <rect x="79.6" y="36.4" width="28.8" height="3.2" rx="1.6" fill="#d77417"/>
+    <rect y="84" width="160" height="6" fill="#24170f"/>
+  </symbol>
+
+  <!-- tela compartilhada: slide com grafico, sem rosto (recorte no centro) -->
+  <symbol id="cena-tela" viewBox="0 0 160 90">
+    <rect width="160" height="90" fill="#15181d"/>
+    <rect x="5" y="4" width="150" height="82" rx="2" fill="#eceff3"/>
+    <path d="M7 4h146a2 2 0 012 2v5H5V6a2 2 0 012-2z" fill="#d3d9e0"/>
+    <circle cx="9.5" cy="7.6" r="1.1" fill="#e06c5a"/><circle cx="13.2" cy="7.6" r="1.1" fill="#e2b04a"/><circle cx="16.9" cy="7.6" r="1.1" fill="#5aae6b"/>
+    <rect x="14" y="17" width="56" height="4.2" rx="1" fill="#27303c"/>
+    <rect x="14" y="24.4" width="36" height="2.4" rx="1" fill="#8a94a3"/>
+    <g fill="#9aa3b0"><rect x="14" y="36" width="30" height="2" rx="1"/><rect x="14" y="41" width="26" height="2" rx="1"/><rect x="14" y="46" width="28" height="2" rx="1"/><rect x="14" y="51" width="20" height="2" rx="1"/></g>
+    <path d="M56 36h50M56 47h50M56 58h50" stroke="#d3d9e0" stroke-width=".4"/>
+    <path d="M56 70h50M56 70V30" stroke="#8d97a4" stroke-width=".6"/>
+    <rect x="60" y="54" width="8" height="16" fill="#3b6fb6"/>
+    <rect x="72" y="45" width="8" height="25" fill="#3b6fb6"/>
+    <rect x="84" y="36" width="8" height="34" fill="#e0a43a"/>
+    <rect x="96" y="49" width="8" height="21" fill="#3b6fb6"/>
+    <g fill="#6b7685"><rect x="60" y="73" width="8" height="1.6" rx=".8"/><rect x="72" y="73" width="8" height="1.6" rx=".8"/><rect x="84" y="73" width="8" height="1.6" rx=".8"/><rect x="96" y="73" width="8" height="1.6" rx=".8"/></g>
+    <g fill="#5b6574"><circle cx="118" cy="37" r="1.1"/><rect x="121" y="36" width="24" height="2" rx="1"/><circle cx="118" cy="43" r="1.1"/><rect x="121" y="42" width="20" height="2" rx="1"/><circle cx="118" cy="49" r="1.1"/><rect x="121" y="48" width="22" height="2" rx="1"/></g>
+    <path d="M101 28.5v7.2l1.9-1.8 1.5 3 1.1-.5-1.5-3h2.6z" fill="#111" stroke="#fff" stroke-width=".4"/>
+  </symbol>
+</svg>
+
+<header class="topo">
+  <div class="caixa topo-in">
+    <a class="marca" href="#topo" aria-label="ClipPro, início"><span class="marca-quadro" aria-hidden="true"></span><span>Clip<b>Pro</b></span></a>
+    <nav class="nav" aria-label="Seções">
+      <ul>
+        <li><a href="#visuais">Visuais</a></li>
+        <li><a href="#como">Como funciona</a></li>
+        <li><a href="#arquivos">Arquivos</a></li>
+        <li><a href="#local">Privacidade</a></li>
+        <li><a href="#selecao">Seleção</a></li>
+        <li><a href="#painel">Painel</a></li>
+        <li><a href="#instalar">Instalar</a></li>
+        <li><a href="#faq">Perguntas</a></li>
+      </ul>
+    </nav>
+    <a class="btn btn-pri btn-topo" href="https://github.com/Corrar/ClipPro" target="_blank" rel="noopener">
+      <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Baixar no GitHub
+    </a>
+  </div>
+</header>
+
+<main id="conteudo">
+
+<!-- ================================================================ HERO -->
+<section class="hero" id="topo" aria-labelledby="h1">
+  <div class="caixa hero-grade">
+    <div class="hero-texto">
+      <p class="olho">Para quem corta lives, podcasts, aulas e entrevistas</p>
+      <h1 id="h1">Vídeo longo entra.<br> Clipes <span class="y">9:16</span> saem.</h1>
+      <p class="hero-lead">O ClipPro transforma um vídeo longo em clipes verticais prontos para TikTok, Reels e Shorts — com legenda karaokê queimada, enquadramento pelo rosto e uma composição que refaz o quadro inteiro: fundo, cartão, movimento e tipografia.</p>
+      <p class="hero-forte">Transcreve, compõe e renderiza na sua máquina. Nenhum vídeo sai do seu computador.</p>
+      <div class="acoes">
+        <a class="btn btn-pri" href="https://github.com/Corrar/ClipPro" target="_blank" rel="noopener">
+          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Baixar no GitHub
+        </a>
+        <a class="btn btn-sec" href="#instalar">Ver a instalação</a>
+      </div>
+      <dl class="ficha-hero" aria-label="Especificação">
+        <div><dt>Saída</dt><dd>1080×1920 · 9:16</dd></div>
+        <div><dt>Vídeo</dt><dd>H.264 · CRF 20 · perfil high</dd></div>
+        <div><dt>Áudio</dt><dd>AAC 160 kb/s · 48 kHz · estéreo</dd></div>
+        <div><dt>Entrada</dt><dd>arquivo local ou link</dd></div>
+        <div><dt>Alvo</dt><dd>Windows x64 · Python 3.13 · CPU</dd></div>
+        <div><dt>Custo</dt><dd>zero no modo padrão</dd></div>
+      </dl>
+    </div>
+
+    <div class="hero-mon">
+      <figure class="monitor anim">
+        <div class="mon-cab"><span>Preset <b>cortes</b><span class="so-larga"> · ilustração</span></span><span class="tc" aria-hidden="true"></span></div>
+        <div class="mon-corpo">
+          <div class="cotado">
+            <span class="cota cota-h" aria-hidden="true"><span>1080 px</span></span>
+            <span class="cota cota-v" aria-hidden="true"><span>1920 px</span></span>
+            <div class="tela" role="img" aria-label="Ilustração de um clipe no preset cortes: fundo borrado, cartão arredondado com a pessoa enquadrada pelo rosto, pílula com o gancho no topo, barra de progresso e legenda karaokê acendendo uma palavra por vez. Os números marcam as camadas listadas abaixo.">
+              <div class="clip">
+                <div class="fundo"><svg viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice"><use href="#cena-pod" width="160" height="90"/></svg></div>
+                <div class="cartao">
+                  <div class="kb"><div class="punch"><svg viewBox="64.7 0 50.6 90" preserveAspectRatio="xMidYMid slice"><use href="#cena-pod" width="160" height="90"/></svg></div></div>
+                  <div class="scrim"></div>
+                  <div class="prog"><i></i></div>
+                </div>
+                <div class="pilula"><b class="acento"></b><span>Ninguém mediu a parede antes de quebrar</span></div>
+                <div class="leg">
+                  <p class="bloco a"><span class="w w1">Ninguém</span> <span class="w w2">mediu</span> <span class="w w3">nada</span></p>
+                  <p class="bloco b"><span class="w w4">Foi</span> <span class="w w5">aí</span> <span class="w w6">que</span></p>
+                  <p class="bloco c"><span class="w w7">eu</span> <span class="w w8">percebi</span></p>
+                </div>
+              </div>
+              <span class="pino" style="left:6.25%;top:42%" aria-hidden="true">1</span>
+              <span class="pino" style="left:70%;top:93%" aria-hidden="true">2</span>
+              <span class="pino" style="left:20%;top:27%" aria-hidden="true">3</span>
+              <span class="pino" style="left:87.5%;top:32%" aria-hidden="true">4</span>
+              <span class="pino" style="left:26%;top:87.3%" aria-hidden="true">5</span>
+              <span class="pino" style="left:93.75%;top:14%" aria-hidden="true">6</span>
+              <span class="pino" style="left:93.75%;top:68%" aria-hidden="true">7</span>
+            </div>
+            <span class="cota cota-c" aria-hidden="true"><i></i><span>cartão 75%</span></span>
+          </div>
+          <ol class="pinos-leg" aria-label="Camadas do preset cortes, de trás para frente">
+            <li><span class="pn" aria-hidden="true">1</span><span><b>Fundo</b><small>o próprio vídeo, borrado</small></span></li>
+            <li><span class="pn" aria-hidden="true">2</span><span><b>Sombra</b><small>sob o cartão</small></span></li>
+            <li><span class="pn" aria-hidden="true">3</span><span><b>Cartão</b><small>zoom lento e punch-in</small></span></li>
+            <li><span class="pn" aria-hidden="true">4</span><span><b>Fio de luz</b><small>na borda do cartão</small></span></li>
+            <li><span class="pn" aria-hidden="true">5</span><span><b>Progresso</b><small>na base do cartão</small></span></li>
+            <li><span class="pn" aria-hidden="true">6</span><span><b>Pílula do gancho</b><small>nos 3 primeiros segundos</small></span></li>
+            <li><span class="pn" aria-hidden="true">7</span><span><b>Legenda karaokê</b><small>uma palavra acesa por vez</small></span></li>
+            <li><span class="pn t" aria-hidden="true">8</span><span><b>Fade de 0,3 s</b><small>no tempo, não no quadro</small></span></li>
+          </ol>
+        </div>
+        <div class="mon-pe">
+          <input type="checkbox" id="pausa" class="pausa-in" aria-label="Pausar as animações da página">
+          <label class="pausa" for="pausa"><span class="ico" aria-hidden="true"></span><span class="rot-pausa">Pausar animação</span><span class="rot-play">Retomar animação</span></label>
+          <p>Ilustração em CSS e SVG, não é um clipe real. Gancho e legenda inventados para esta página.</p>
+        </div>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<nav class="indice caixa" aria-label="Nesta página">
+  <div class="indice-in">
+    <p class="indice-t">Nesta página</p>
+    <ol>
+      <li><a href="#visuais"><span>01</span>Visuais</a></li>
+      <li><a href="#como"><span>02</span>Como funciona</a></li>
+      <li><a href="#composicao"><span>03</span>Composição</a></li>
+      <li><a href="#arquivos"><span>04</span>Arquivos</a></li>
+      <li><a href="#local"><span>05</span>Privacidade</a></li>
+      <li><a href="#selecao"><span>06</span>Seleção</a></li>
+      <li><a href="#painel"><span>07</span>Painel</a></li>
+      <li><a href="#instalar"><span>08</span>Instalação</a></li>
+      <li><a href="#limites"><span>09</span>Limites</a></li>
+      <li><a href="#faq"><span>10</span>Perguntas</a></li>
+    </ol>
+  </div>
+</nav>
+
+<!-- ================================================================ 01 VISUAIS -->
+<section class="banda" id="visuais" aria-labelledby="vis-h">
+  <div class="caixa">
+    <p class="slate"><b>01</b> Os visuais <span class="regua-mini" aria-hidden="true"></span></p>
+    <h2 id="vis-h">Quatro visuais de fábrica. Cada um é um JSON.</h2>
+    <p class="lead">Dois com composição completa, dois com o recorte 9:16 cheio e a legenda por cima. O preset (o “visual”, no painel) entra no nome do arquivo, então dois visuais do mesmo clipe convivem na pasta.</p>
+
+    <ul class="presets">
+      <li class="pre padrao">
+        <div class="mini p-cortes" aria-hidden="true">
+          <div class="fundo"><svg viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice"><use href="#cena-obra" width="160" height="90"/></svg></div>
+          <div class="cartao"><div class="kb"><svg viewBox="68.7 0 50.6 90" preserveAspectRatio="xMidYMid slice"><use href="#cena-obra" width="160" height="90"/></svg></div><div class="scrim"></div><div class="prog"><i></i></div></div>
+          <div class="pilula"><b class="acento"></b><span>O erro que atrasou a obra</span></div>
+          <div class="leg"><p class="bloco"><span class="w f">Ninguém</span> <span class="w a">mediu</span> <span class="w">nada</span></p></div>
+        </div>
+        <div class="pre-cab"><h3>cortes</h3><span class="selo on">padrão · composição</span></div>
+        <p class="pre-desc">Karaokê Impact com uma palavra acesa por vez, pílula com barra amarela e cartão de 75% da altura. <q>O visual que o feed brasileiro reconhece.</q></p>
+        <ul class="amostras" aria-label="Cores do preset cortes">
+          <li><i style="background:#ffffff"></i>#FFFFFF</li><li><i style="background:#ffe500"></i>#FFE500</li><li><i style="background:#bfbfbf"></i>#BFBFBF</li><li><i style="background:#101317"></i>#101317</li>
+        </ul>
+        <p class="pre-spec"><b>Legenda</b> Impact 92, maiúsculas, contorno 6<br><b>Pílula</b> Segoe UI Black 44<br><b>Fundo</b> blur 12, escurecer 0,4</p>
+      </li>
+
+      <li class="pre">
+        <div class="mini p-edit" aria-hidden="true">
+          <div class="fundo"><svg viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice"><use href="#cena-aula" width="160" height="90"/></svg></div>
+          <div class="vinheta"></div>
+          <div class="cartao"><div class="kb"><svg viewBox="80.7 0 50.6 90" preserveAspectRatio="xMidYMid slice"><use href="#cena-aula" width="160" height="90"/></svg></div><div class="scrim"></div><div class="prog"><i></i></div></div>
+          <div class="pilula"><b class="acento"></b><span>Estudar não é decorar</span></div>
+          <div class="leg"><p class="bloco"><span class="w f">Estudar</span> <span class="w a">não</span> <span class="w">é</span></p></div>
+        </div>
+        <div class="pre-cab"><h3>cortes-editorial</h3><span class="selo on">composição</span></div>
+        <p class="pre-desc">O mesmo cartão com acabamento contido: tarja em Bahnschrift, âmbar no lugar do amarelo, legenda em caixa mista. <q>O contraste vem de escala e luminância, não de saturação.</q></p>
+        <ul class="amostras" aria-label="Cores do preset cortes-editorial">
+          <li><i style="background:#8e887c"></i>#8E887C</li><li><i style="background:#ffc24a"></i>#FFC24A</li><li><i style="background:#f2ede3"></i>#F2EDE3</li><li><i style="background:#14110e"></i>#14110E</li>
+        </ul>
+        <p class="pre-spec"><b>Legenda</b> Segoe UI Black 84, caixa mista<br><b>Pílula</b> Bahnschrift 42, acento em círculo<br><b>Fundo</b> saturação 0,72, vinheta 0,18</p>
+      </li>
+
+      <li class="pre">
+        <div class="mini cheio p-bold" aria-hidden="true">
+          <svg viewBox="64.7 0 50.6 90" preserveAspectRatio="xMidYMid slice"><use href="#cena-pod" width="160" height="90"/></svg>
+          <div class="leg"><p class="bloco"><span class="w f">Ninguém</span> <span class="w f">mediu</span> <span class="w">nada</span></p></div>
+        </div>
+        <div class="pre-cab"><h3>bold-amarelo</h3><span class="selo">sem composição</span></div>
+        <p class="pre-desc">Impact pesado sobre o recorte 9:16 cheio. A palavra falada acende em amarelo e fica acesa até o fim da linha. <q>Contorno grosso para ler em qualquer fundo.</q></p>
+        <ul class="amostras" aria-label="Cores do preset bold-amarelo">
+          <li><i style="background:#ffffff"></i>#FFFFFF</li><li><i style="background:#ffe500"></i>#FFE500</li><li><i style="background:#000000"></i>#000000</li>
+        </ul>
+        <p class="pre-spec"><b>Legenda</b> Impact 96, maiúsculas, contorno 7<br><b>Linha</b> até 4 palavras<br><b>Áudio</b> sem normalização</p>
+      </li>
+
+      <li class="pre">
+        <div class="mini cheio p-clean" aria-hidden="true">
+          <svg viewBox="54.7 0 50.6 90" preserveAspectRatio="xMidYMid slice"><use href="#cena-tela" width="160" height="90"/></svg>
+          <div class="leg"><p class="bloco"><span class="w f">Ninguém</span> <span class="w f">mediu</span> <span class="w">nada</span></p></div>
+        </div>
+        <div class="pre-cab"><h3>clean-branco</h3><span class="selo">sem composição</span></div>
+        <p class="pre-desc">Segoe UI em negrito, contorno fino e sombra discreta; a palavra falada acende em branco sobre cinza. <q>Para quando o clipe já tem muita informação na tela.</q></p>
+        <ul class="amostras" aria-label="Cores do preset clean-branco">
+          <li><i style="background:#a8a8a8"></i>#A8A8A8</li><li><i style="background:#ffffff"></i>#FFFFFF</li><li><i style="background:#141414"></i>#141414</li>
+        </ul>
+        <p class="pre-spec"><b>Legenda</b> Segoe UI 82 negrito, caixa mista<br><b>Linha</b> até 5 palavras<br><b>Áudio</b> sem normalização</p>
+      </li>
+    </ul>
+
+    <div class="presets-pe">
+      <p><b>Faça o seu.</b> Os presets ficam em <code class="i">clipper/presets/</code>. Copie um, mude cores e tamanhos, e ele aparece sozinho no <code class="i">--help</code>. Mudou a composição (fundo, cartão, pílula, movimento)? Os clipes compostos são refeitos na próxima rodada, sem <code class="i">--force</code>. Mudou só a legenda? Aí rode o <code class="i">render</code> com <code class="i">--force</code>.</p>
+      <p><b>Sobre as prévias.</b> Impact, Segoe UI, Segoe UI Black e Bahnschrift já vêm no Windows e são as fontes que o ClipPro usa. Esta página usa fontes parecidas do Google Fonts e cenas desenhadas, então as prévias são aproximadas. No <code class="i">clean-branco</code> a cena é uma tela compartilhada: sem rosto, o recorte fica no centro.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ 02 COMO FUNCIONA -->
+<section class="sec" id="como" aria-labelledby="como-h">
+  <div class="caixa">
+    <p class="slate"><b>02</b> Como funciona <span class="regua-mini" aria-hidden="true"></span></p>
+    <h2 id="como-h">Quatro estágios. Cada um grava o que fez.</h2>
+    <p class="lead"><code class="i">clipper run</code> passa pelos quatro em sequência — aqui, como no <code class="i">--help</code>, <code class="i">clipper</code> é a forma curta de <code class="i q"><span class="nw">.venv\Scripts\python</span> <span class="nw">-m</span> clipper</code>. Cada estágio grava o que produziu e pula o que já está pronto: rodar o mesmo comando duas vezes não baixa nem transcreve de novo.</p>
+
+    <ol class="estagios">
+      <li class="est">
+        <div class="est-topo"><span class="est-n">01</span></div>
+        <p class="est-painel">No painel: Baixar</p>
+        <h3>Ingestão</h3>
+        <p class="desc">Baixa o link (yt-dlp) ou copia o arquivo, normaliza o vídeo e extrai o áudio em 16 kHz mono.</p>
+        <p class="grava"><span class="vh">Grava: </span><code>fonte.mp4</code><code>audio.wav</code></p>
+        <p class="medido"><b>35 s</b>download de 1,0 GB + remux; depende da sua internet</p>
+      </li>
+      <li class="est">
+        <div class="est-topo"><span class="est-n">02</span></div>
+        <p class="est-painel">No painel: Transcrever</p>
+        <h3>Transcrição</h3>
+        <p class="desc"><code class="i">faster-whisper</code> na CPU, palavra a palavra e com tempo. Também calcula a curva de energia do áudio.</p>
+        <p class="grava"><span class="vh">Grava: </span><code>transcricao.json</code><code>.srt</code><code>energia.json</code></p>
+        <p class="medido"><b>19 min 56 s</b>0,685× a duração do áudio, Whisper <code>medium</code>. Energia: 0,3 s</p>
+      </li>
+      <li class="est">
+        <div class="est-topo"><span class="est-n">03</span></div>
+        <p class="est-painel">No painel: Selecionar</p>
+        <h3>Seleção</h3>
+        <p class="desc">Monta o prompt com a transcrição em blocos e recebe de volta os N melhores trechos, validados antes de seguir.</p>
+        <p class="grava"><span class="vh">Grava: </span><code>prompt_selecao.txt</code><code>selecao.json</code></p>
+        <p class="medido"><b>instantânea</b>no modo manual</p>
+      </li>
+      <li class="est">
+        <div class="est-topo"><span class="est-n">04</span></div>
+        <p class="est-painel">No painel: Renderizar</p>
+        <h3>Render</h3>
+        <p class="desc">Corta, reenquadra em 9:16, compõe o visual e queima a legenda.</p>
+        <p class="grava"><span class="vh">Grava: </span><code>clips/*.mp4</code><code>relatorio.md</code></p>
+        <p class="medido"><b>42 s a 80 s por clipe</b>~1,2× a duração do clipe, preset <code>cortes</code></p>
+      </li>
+    </ol>
+    <div class="medicao">
+      <span><strong>Onde foi medido:</strong> Windows 11, CPU 12 núcleos, sem GPU, num vídeo de 29 min.</span>
+      <span><strong>Na prática:</strong> um vídeo de 1 hora leva ~41 min de transcrição e mais uns 6 min para renderizar 5 clipes de 1 minuto.</span>
+    </div>
+
+    <div class="reuso">
+      <div>
+        <h3>Refaz só o que pedir</h3>
+        <p><code class="i">--force</code> refaz apenas o estágio que dá nome ao subcomando: <code class="i q">clipper transcribe &lt;entrada&gt; <span class="nw">--force</span></code> refaz a transcrição sem baixar de novo 1 GB de vídeo. A seleção é a resposta do modelo: para trocá-la, volte com uma <code class="i">--resposta</code> nova (ou <code class="i">--api</code>).</p>
+      </div>
+      <div>
+        <h3>Renderiza só alguns</h3>
+        <p><code class="i">--clipe N</code> (pode repetir) renderiza só os clipes escolhidos. <code class="i">render</code> e <code class="i">info</code> leem só <code class="i">out/&lt;slug&gt;/</code> e funcionam offline, mesmo com o original apagado.</p>
+      </div>
+      <div>
+        <h3>Padrões</h3>
+        <p>5 clipes (<code class="i">--n</code>), Whisper <code class="i">medium</code>, idioma <code class="i">pt</code>, preset <code class="i">cortes</code>. Modelos de transcrição: <code class="i">tiny</code>, <code class="i">base</code>, <code class="i">small</code>, <code class="i">medium</code>, <code class="i">large-v3</code>. <code class="i">--modelo-whisper small</code> corta o tempo de transcrição pela metade, com alguma perda de precisão nos nomes próprios.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ 03 COMPOSICAO -->
+<section class="sec" id="composicao" aria-labelledby="comp-h">
+  <div class="caixa">
+    <p class="slate"><b>03</b> A composição <span class="regua-mini" aria-hidden="true"></span></p>
+    <h2 id="comp-h">Um quadro novo, não o mesmo vídeo em pé.</h2>
+    <p class="lead">Nos presets <code class="i">cortes</code> e <code class="i">cortes-editorial</code>, o render mexe no quadro inteiro: geometria, movimento, áudio e tipografia. O objetivo é o clipe não ser lido como cópia 1:1 do vídeo de origem. Não é garantia diante de regra de plataforma: o ClipPro é para vídeos seus ou que você tem direito de usar.</p>
+
+    <figure class="ilha anim" aria-labelledby="ilha-leg">
+      <div class="ilha-barra">
+        <span class="ilha-nome">01-ninguem-mediu-a-parede--cortes.mp4</span>
+        <span class="ilha-dir"><span class="tc" aria-hidden="true"></span><label class="pausa" for="pausa"><span class="ico" aria-hidden="true"></span><span class="rot-pausa">Pausar animação</span><span class="rot-play">Retomar animação</span></label></span>
+      </div>
+      <div class="pistas" aria-hidden="true">
+        <div class="regua"><span class="rot"><b>◆</b><span>marcas</span></span><div class="regua-faixa"><span style="left:0">00:00</span><span style="left:25%">00:02</span><span style="left:50%">00:04</span><span style="left:75%">00:06</span><b class="mk" style="--x:27.6"></b><b class="mk" style="--x:59.6"></b></div></div>
+        <div class="pista pista-leg"><span class="rot"><b>T2</b><span>legenda</span></span><span class="faixa"><i class="seg lg" style="--a:0;--b:37.2">NINGUÉM MEDIU NADA</i><i class="seg lg" style="--a:37.6;--b:55.6">FOI AÍ QUE</i><i class="seg lg" style="--a:56;--b:92.5">EU PERCEBI</i></span></div>
+        <div class="pista"><span class="rot"><b>T1</b><span>gancho</span></span><span class="faixa"><i class="seg gancho" style="--a:0;--b:37.5">gancho · 3 s<span class="longo"> (fade de saída 0,4 s no fim)</span></i></span></div>
+        <div class="pista"><span class="rot"><b>V2</b><span>cartão</span></span><span class="faixa"><i class="seg cv" style="--a:0;--b:100">cartão 75% · zoom 1,00→1,06×</i></span></div>
+        <div class="pista"><span class="rot"><b>V1</b><span>fundo</span></span><span class="faixa"><i class="seg bg" style="--a:0;--b:100">fundo borrado e escurecido</i></span></div>
+        <div class="pista"><span class="rot"><b>A1</b><span>áudio</span></span><span class="faixa"><svg viewBox="0 0 400 40" preserveAspectRatio="none"><path class="onda" vector-effect="non-scaling-stroke" d="M2.0 19.1V20.9M6.0 17.5V22.5M10.0 14.4V25.6M14.0 14.5V25.5M18.0 12.0V28.0M22.0 12.8V27.2M26.0 14.1V25.9M30.0 12.2V27.8M34.0 14.2V25.8M38.0 12.5V27.5M42.0 14.1V25.9M46.0 14.0V26.0M50.0 12.5V27.5M54.0 10.7V29.3M58.0 13.7V26.3M62.0 13.1V26.9M66.0 11.1V28.9M70.0 9.1V30.9M74.0 9.9V30.1M78.0 9.5V30.5M82.0 5.3V34.7M86.0 7.5V32.5M90.0 2.1V37.9M94.0 3.1V36.9M98.0 2.9V37.1M102.0 3.0V37.0M106.0 3.0V37.0M110.0 2.3V37.7M114.0 6.9V33.1M118.0 7.0V33.0M122.0 8.4V31.6M126.0 10.8V29.2M130.0 10.9V29.1M134.0 13.5V26.5M138.0 13.9V26.1M142.0 13.4V26.6M146.0 11.4V28.6M150.0 12.5V27.5M154.0 13.0V27.0M158.0 11.8V28.2M162.0 12.4V27.6M166.0 13.1V26.9M170.0 10.9V29.1M174.0 11.3V28.7M178.0 13.3V26.7M182.0 11.8V28.2M186.0 12.0V28.0M190.0 10.3V29.7M194.0 10.6V29.4M198.0 12.0V28.0M202.0 8.1V31.9M206.0 10.7V29.3M210.0 7.7V32.3M214.0 4.4V35.6M218.0 5.2V34.8M222.0 2.2V37.8M226.0 3.3V36.7M230.0 1.0V39.0M234.0 1.0V39.0M238.0 3.4V36.6M242.0 3.9V36.1M246.0 8.2V31.8M250.0 8.1V31.9M254.0 9.8V30.2M258.0 10.7V29.3M262.0 11.8V28.2M266.0 10.4V29.6M270.0 10.1V29.9M274.0 12.3V27.7M278.0 11.5V28.5M282.0 14.1V25.9M286.0 11.3V28.7M290.0 11.6V28.4M294.0 10.0V30.0M298.0 10.8V29.2M302.0 13.1V26.9M306.0 12.7V27.3M310.0 11.5V28.5M314.0 14.3V25.7M318.0 12.4V27.6M322.0 13.7V26.3M326.0 13.9V26.1M330.0 14.1V25.9M334.0 11.0V29.0M338.0 13.8V26.2M342.0 13.3V26.7M346.0 12.7V27.3M350.0 10.6V29.4M354.0 14.0V26.0M358.0 12.4V27.6M362.0 12.0V28.0M366.0 10.5V29.5M370.0 10.8V29.2M374.0 10.6V29.4M378.0 13.2V26.8M382.0 12.6V27.4M386.0 13.3V26.7M390.0 13.7V26.3M394.0 16.1V23.9M398.0 19.2V20.8"/></svg></span></div>
+        <div class="cabeca-area"><div class="cabeca"></div></div>
+      </div>
+      <figcaption id="ilha-leg"><span>Linha do tempo do loop ilustrativo de 8 s do topo da página. Um clipe real tem de 20 s a 90 s.</span><span class="lg-mk">punch-in nos picos de energia do áudio</span></figcaption>
+    </figure>
+
+    <div class="comp-grade">
+      <div>
+        <h3 class="sub">As camadas, de trás para frente</h3>
+        <ol class="camadas">
+          <li><span class="n">L1</span><div><b>Fundo</b><p>O próprio vídeo, borrado e escurecido.</p></div></li>
+          <li><span class="n">L2</span><div><b>Sombra</b><p>Sob o cartão.</p></div></li>
+          <li><span class="n">L3</span><div><b>Cartão arredondado</b><p>O recorte 9:16 em 75% da altura, com zoom contínuo até 1,06× e até 3 punch-ins por clipe nos picos de energia do áudio.</p></div></li>
+          <li><span class="n">L4</span><div><b>Fio de luz</b><p>Na borda do cartão.</p></div></li>
+          <li><span class="n">L5</span><div><b>Barra de progresso</b><p>Na base do cartão.</p></div></li>
+          <li><span class="n">L6</span><div><b>Pílula do gancho</b><p>No topo, nos 3 primeiros segundos; o fade de saída de 0,4 s acontece dentro deles, e o gancho nunca é cortado. Uma conclusão opcional aparece nos últimos segundos, no meio do quadro, com o mesmo visual da pílula.</p></div></li>
+          <li><span class="n">L7</span><div><b>Legenda karaokê</b><p>Uma palavra acesa por vez: branca antes de ser dita, amarela, com um pop até 112% do tamanho, quando ativa, e cinza claro depois. Palavras com menos de 3 letras não acendem. No máximo 3 palavras por bloco, quebradas em 2 linhas só quando a largura medida da fonte obriga.</p></div></li>
+          <li><span class="n">L8</span><div><b>Fade de 0,3 s</b><p>Na entrada e na saída — no tempo, não no quadro.</p></div></li>
+          <li class="au"><span class="n">A1</span><div><b>Áudio normalizado</b><p>EQ suave → <code class="i">loudnorm</code> com alvo de −14 LUFS, true peak −1,5 dBTP, LRA 11 → fades. Uma passagem só: erra o alvo em até 0,7 LU.</p></div></li>
+        </ol>
+        <p class="nota comp-pe"><code class="i">bold-amarelo</code> e <code class="i">clean-branco</code> não têm composição: recorte 9:16 cheio, legenda por cima e sem normalização de áudio.</p>
+      </div>
+
+      <div class="comp-dir">
+        <figure class="rosto">
+          <svg viewBox="0 0 160 90" role="img" aria-labelledby="rosto-t">
+            <title id="rosto-t">Diagrama: quadro 16:9 com as detecções de rosto agrupadas e o recorte 9:16 fixo na mediana</title>
+            <use href="#cena-pod" width="160" height="90"/>
+            <rect x="0" y="0" width="64.7" height="90" fill="#000" opacity=".62"/>
+            <rect x="115.3" y="0" width="44.7" height="90" fill="#000" opacity=".62"/>
+            <rect x="64.7" y=".4" width="50.6" height="89.2" fill="none" stroke="#ffe500" stroke-width=".7"/>
+            <g fill="none" stroke="#fff" stroke-width=".45" opacity=".95">
+              <rect x="80.5" y="28" width="19" height="25" rx="1"/>
+              <rect x="82.5" y="29" width="18" height="24" rx="1" opacity=".6"/>
+              <rect x="79" y="27.5" width="19" height="25" rx="1" opacity=".6"/>
+              <rect x="81.5" y="28.6" width="19" height="25" rx="1" opacity=".45"/>
+            </g>
+            <path d="M90 2v86" stroke="#ffe500" stroke-width=".55" stroke-dasharray="2 1.6"/>
+            <g font-family="JetBrains Mono, monospace" font-size="5" fill="#ffe500">
+              <text x="91.4" y="7.6">mediana</text>
+              <text x="117.4" y="86.6" font-size="4.8">recorte 9:16</text>
+            </g>
+            <g font-family="JetBrains Mono, monospace" font-size="5" fill="#c4ccd5">
+              <text x="3" y="7.6">fonte 16:9</text>
+            </g>
+          </svg>
+          <figcaption><b>Reenquadramento pelo rosto.</b> O render amostra quadros, detecta o rosto (BlazeFace/mediapipe) e usa a mediana como coluna do recorte. É um recorte fixo por clipe — não persegue o rosto. Sem rosto suficiente (tela compartilhada, b-roll, drone), o recorte fica no centro.</figcaption>
+        </figure>
+        <aside class="nota-tec" aria-label="Nota técnica">
+          <p class="nota-tec-t">Nota técnica</p>
+          <p>Medido nos cinco clipes de teste: SSIM de 0,41 a 0,73 contra o mesmo trecho da fonte — 1,00 seria idêntico. <strong>É medição técnica, não garantia:</strong> nada aqui promete passar por regra de plataforma. O ClipPro é para vídeos seus ou que você tem direito de usar.</p>
+        </aside>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ 04 ARQUIVOS -->
+<section class="sec" id="arquivos" aria-labelledby="arq-h">
+  <div class="caixa">
+    <p class="slate"><b>04</b> O que você recebe <span class="regua-mini" aria-hidden="true"></span></p>
+    <h2 id="arq-h">Três arquivos por clipe. Nenhum mistério na pasta.</h2>
+    <p class="lead">Tudo fica em <code class="i">out/&lt;slug&gt;/</code>, uma pasta por vídeo. O título escolhido para o clipe não é desenhado no vídeo: vai no nome do arquivo, no <code class="i">metadados.json</code> e no relatório.</p>
+
+    <div class="arq-grade">
+      <div class="janela">
+        <div class="janela-cab"><span class="pontos" aria-hidden="true"><i></i><i></i><i></i></span><span>uma pasta por vídeo</span></div>
+        <div class="arvore-corpo">
+          <p class="raiz">out/&lt;slug&gt;/</p>
+          <ul class="arvore">
+            <li><div class="no"><code class="dir">clips/</code></div><p class="d">Um trio por clipe:</p>
+              <ul>
+                <li><div class="no"><code class="mp4">01-titulo--cortes.mp4</code><span class="tam">~1,1 MB por segundo</span></div><p class="d"><b>O clipe</b>, 1080×1920. H.264 CRF 20 · AAC 160 kb/s · 48 kHz · +faststart. O preset entra no nome.</p></li>
+                <li><div class="no"><code>01-titulo--cortes.capa.jpg</code></div><p class="d"><b>A capa</b>, tirada do mp4 já renderizado — com cartão e legenda —, no instante sugerido ou 1 s após o início.</p></li>
+                <li><div class="no"><code>01-titulo--cortes.publicacao.md</code></div><p class="d"><b>A publicação</b>: título, arquivo, capa, duração, trechos da fonte, gancho, descrição, conclusão e um checklist com 7 itens.</p></li>
+              </ul>
+            </li>
+            <li><div class="no"><code>metadados.json</code></div><p class="d">Tudo sobre cada clipe: trecho, nota (score), enquadramento, estilo.</p></li>
+            <li><div class="no"><code>relatorio.md</code></div><p class="d">Ranking legível, com o gancho e o motivo de cada clipe.</p></li>
+            <li><div class="no"><code>fonte.mp4</code><span class="tam">~2 GB por hora</span></div><p class="d">O vídeo normalizado: 1,0 GB para 29 min em 1080p.</p></li>
+            <li><div class="no"><code>audio.wav</code><span class="tam">~115 MB por hora</span></div><p class="d">O áudio em 16 kHz mono, para a transcrição.</p></li>
+            <li><div class="no"><code>transcricao.json</code><code>.srt</code><code>energia.json</code></div><p class="d">A transcrição palavra a palavra, com tempo; a mesma transcrição em SRT; a curva de energia do áudio.</p></li>
+            <li><div class="no"><code>prompt_selecao.txt</code><code>selecao.json</code></div><p class="d">O prompt da seleção e os trechos escolhidos.</p></li>
+            <li><div class="no"><code>clipper.log</code><code>.estado.json</code></div><p class="d">O registro da rodada e o estado de cada estágio — é por isso que nada é refeito à toa.</p></li>
+          </ul>
+        </div>
+      </div>
+
+      <div>
+        <div class="pub">
+          <div class="janela-cab"><span class="pontos" aria-hidden="true"><i></i><i></i><i></i></span><span>01-titulo--cortes.publicacao.md</span></div>
+          <div class="pub-corpo">
+            <h3>Checklist de publicação (trecho)</h3>
+            <ul>
+              <li>Autorização/licença do material confirmada</li>
+              <li>O 1º segundo promete exatamente o que o clipe entrega</li>
+              <li>Título representa o que ocorreu (sem sensacionalismo falso)</li>
+            </ul>
+            <p class="nota">3 dos 7 itens que acompanham cada clipe.</p>
+          </div>
+        </div>
+        <div class="trio">
+          <p><b>Dois visuais, sem conflito.</b> Como o preset entra no nome, <code class="i">01-titulo--cortes.mp4</code> e o mesmo clipe em outro visual convivem na pasta.</p>
+          <p><b>A pasta <code class="i">_trabalho/</code> é descartável:</b> pode apagar quando quiser.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ 05 PRIVACIDADE -->
+<section class="sec-y" id="local" aria-labelledby="local-h">
+  <div class="caixa">
+    <p class="slate"><b>05</b> Privacidade <span class="regua-mini" aria-hidden="true"></span></p>
+    <h2 id="local-h">Nenhum vídeo sai do seu computador.</h2>
+    <p class="lead">Transcrever, compor e renderizar acontecem na sua máquina, com os arquivos no seu disco. Em vez de prometer “100% offline”, a tabela desta seção diz exatamente o que usa a rede ou sai da máquina — e quando.</p>
+
+    <div class="priv">
+      <div>
+        <h3>O que fica na sua máquina</h3>
+        <ul class="lista-ok">
+          <li><span>O vídeo, o áudio e os clipes, em <code class="i">out/&lt;slug&gt;/</code>, no seu disco. A transcrição também — mas o texto dela vai no prompt da seleção, para o chat ou a API que você escolher.</span></li>
+          <li><span>O trabalho pesado: a transcrição (<code class="i">faster-whisper</code>), a composição e o render rodam no seu computador.</span></li>
+          <li><span>O painel escuta <b>só em 127.0.0.1</b>: nenhuma outra máquina da rede o alcança. Como ele não pede senha e serve os seus vídeos, isso não é configurável.</span></li>
+          <li><span>Custo em dinheiro: <b>zero no modo padrão</b>. Sem conta nem cadastro no ClipPro.</span></li>
+        </ul>
+      </div>
+      <div class="rede">
+        <table>
+          <caption>o que usa a rede ou sai da máquina, e quando</caption>
+          <thead><tr><th scope="col">Item</th><th scope="col">Quando</th><th scope="col">Tamanho</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Download do vídeo</th><td data-rot="Quando:">Só se a entrada for um link (yt-dlp). Arquivo local não usa a rede.</td><td class="tm" data-rot="Tamanho:">o do vídeo</td></tr>
+            <tr><th scope="row">Modelo Whisper</th><td data-rot="Quando:">Uma vez; depois fica em cache.</td><td class="tm" data-rot="Tamanho:"><span class="nw">~75 MB <code>tiny</code></span><br><span class="nw">~1,5 GB <code>medium</code></span><br><span class="nw">~3 GB <code>large-v3</code></span></td></tr>
+            <tr><th scope="row">Detector de rosto</th><td data-rot="Quando:">Sozinho, na primeira renderização.</td><td class="tm" data-rot="Tamanho:">224 KB</td></tr>
+            <tr><th scope="row">Seleção no modo manual <span class="nw">(padrão)</span></th><td data-rot="Quando:">Você cola o prompt, com a transcrição, no chat que escolher; se for um chat online, a transcrição vai para ele. O ClipPro não usa a rede nesse passo.</td><td class="tm" data-rot="Tamanho:">o do prompt<br>~40 KB no exemplo do README</td></tr>
+            <tr><th scope="row">Seleção pela API</th><td data-rot="Quando:">Na linha de comando, só com <code>--api</code>. No painel, é automática quando <code>ANTHROPIC_API_KEY</code> está no ambiente — o painel avisa. Vai o prompt com a transcrição: numa contagem de tokens e numa chamada, ou em duas se a primeira resposta precisar de conserto.</td><td class="tm" data-rot="Tamanho:">o do prompt, a cada envio<br>~40 KB no exemplo do README</td></tr>
+          </tbody>
+        </table>
+        <p class="rede-pe">E nada disso envia o seu vídeo.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ 06 SELECAO -->
+<section class="sec" id="selecao" aria-labelledby="sel-h">
+  <div class="caixa">
+    <p class="slate"><b>06</b> A escolha dos trechos <span class="regua-mini" aria-hidden="true"></span></p>
+    <h2 id="sel-h">Um modelo de linguagem lê a transcrição. Você escolhe qual.</h2>
+    <p class="lead">Sem <code class="i">--api</code> (no painel: sem <code class="i">ANTHROPIC_API_KEY</code> no ambiente), o ClipPro para no estágio 3 e diz exatamente o que fazer. Funciona com qualquer modelo de chat.</p>
+
+    <ol class="passos">
+      <li><span class="tcx">PASSO 1</span><h3>O ClipPro para</h3><p>No estágio 3 ele grava <code>out/&lt;slug&gt;/prompt_selecao.txt</code>.</p></li>
+      <li><span class="tcx">PASSO 2</span><h3>Você cola num chat</h3><p>Abre o arquivo e cola o conteúdo num chat com qualquer modelo.</p></li>
+      <li><span class="tcx">PASSO 3</span><h3>Salva a resposta</h3><p>Grava o array JSON que ele devolver em <code>resposta.json</code>, na pasta <code>ClipPro</code>, onde você roda os comandos.</p></li>
+      <li><span class="tcx">PASSO 4</span><h3>Volta com <code>--resposta</code></h3><p>O ClipPro valida tudo e segue para o render.</p></li>
+    </ol>
+
+    <div class="sel-grade">
+      <div class="valida">
+        <span class="rotulo enc">encaixa</span>
+        <h3>O que dá para consertar, ele conserta</h3>
+        <p>Corte no meio de palavra ou de frase é encaixado na fronteira de frase mais próxima (até 15 s). Deslocamento de 3 s ou mais vira aviso.</p>
+        <p style="margin:0">Cada clipe dura de 20 s a 90 s e pode juntar de 1 a 3 trechos não contíguos do vídeo — para tirar a gordura.</p>
+      </div>
+      <div class="valida">
+        <span class="rotulo rec">recusa</span>
+        <h3>O que não tem conserto, ele recusa</h3>
+        <ul>
+          <li>tempo fora do vídeo;</li>
+          <li>clipe curto ou longo demais;</li>
+          <li>campo faltando;</li>
+          <li>dois clipes com material em comum.</li>
+        </ul>
+        <p style="margin:10px 0 0">Ele diz qual campo está errado em qual clipe — e não renderiza corte quebrado.</p>
+      </div>
+      <div class="caixa-api">
+        <span class="rotulo opc">opcional</span>
+        <h3>Ou deixe a conversa com <code class="nw">--api</code></h3>
+        <p>Com <code class="i">ANTHROPIC_API_KEY</code> no ambiente, <code class="i">--api</code> faz o ClipPro conversar sozinho com o modelo, sem ida e volta: <code class="i">--modelo haiku</code> (padrão) ou <code class="i">--modelo sonnet</code>. No painel, isso acontece sozinho sempre que a chave existe. Sem a chave, a biblioteca <code class="i">anthropic</code> nem é usada.</p>
+        <p class="forte">Nesse modo, sai da máquina o prompt com a transcrição — numa contagem de tokens e numa chamada, ou em duas se a primeira resposta precisar de conserto. Nunca o vídeo.</p>
+      </div>
+    </div>
+
+    <p class="nota" style="margin-top:24px">Cada clipe escolhido traz obrigatoriamente o trecho, título, nota, motivo e gancho sugerido. Descrição, instante da capa e conclusão são opcionais.</p>
+    <div class="campos"><span>trecho · início e fim, ou de 1 a 3 segmentos</span><span>título</span><span>nota 0–10</span><span>motivo</span><span>gancho sugerido</span><span class="o">descrição · até 200 caracteres</span><span class="o">instante da capa</span><span class="o">conclusão · até 90 caracteres</span></div>
+
+    <figure class="citacao">
+      <blockquote><p>“A qualidade dos clipes é a qualidade da seleção.”</p></blockquote>
+      <figcaption><cite>README do projeto.</cite> O ClipPro garante que o corte é válido. Quem julga se o trecho é bom é o modelo que lê a transcrição.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ================================================================ 07 PAINEL -->
+<section class="sec" id="painel" aria-labelledby="pain-h">
+  <div class="caixa">
+    <p class="slate"><b>07</b> O painel local <span class="regua-mini" aria-hidden="true"></span></p>
+    <h2 id="pain-h">Prefere clicar a digitar? Tem painel.</h2>
+    <p class="lead"><code class="i q"><span class="nw">.venv\Scripts\python</span> <span class="nw">-m</span> clipper ui</code> abre <code class="i">http://127.0.0.1:8765</code> no navegador. O painel chama as mesmas funções da linha de comando.</p>
+
+    <div class="painel-grade">
+      <figure class="mock" role="img" aria-label="Ilustração do painel local: formulário para link ou arquivo, linha do tempo dos estágios e grade de clipes prontos.">
+        <div class="mock-barra" aria-hidden="true"><span class="pontos"><i></i><i></i><i></i></span><span class="mock-url">127.0.0.1:8765</span></div>
+        <div class="mock-topo" aria-hidden="true"><span class="marca"><span class="marca-quadro"></span><span>Clip<b>Pro</b></span></span><small>painel local — 127.0.0.1</small></div>
+        <div class="mock-corpo" aria-hidden="true">
+          <div class="mk-cartao">
+            <span class="mk-rot">Link do vídeo</span>
+            <div class="mk-campo">https://youtu.be/…</div>
+            <div class="mk-solta"><b>Arraste um vídeo aqui</b>ou clique para escolher — mp4, mkv, mov…</div>
+            <div class="mk-linha">
+              <div><span class="mk-rot">Quantos cortes</span><div class="mk-campo">5</div></div>
+              <div><span class="mk-rot">Visual</span><div class="mk-campo">cortes</div></div>
+              <div><span class="mk-rot">Transcrição</span><div class="mk-campo">medium</div></div>
+            </div>
+            <span class="mk-rot">O que procurar nos cortes</span>
+            <div class="mk-campo">ganchos e punchlines</div>
+            <span class="mk-btn">Gerar cortes</span>
+          </div>
+          <div class="mk-cartao">
+            <ol class="trilha"><li class="ok">Baixar</li><li class="ok">Transcrever</li><li class="ok">Selecionar</li><li class="vai">Renderizar</li></ol>
+            <div class="mk-barra"><i></i></div>
+            <p class="mk-tempo">faltam ~4m12s · rodando</p>
+            <div class="mk-grade">
+              <div><div class="mk-player"><div class="fundo"><svg viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice"><use href="#cena-pod" width="160" height="90"/></svg></div><div class="cartao"><div class="kb"><svg viewBox="64.7 0 50.6 90" preserveAspectRatio="xMidYMid slice"><use href="#cena-pod" width="160" height="90"/></svg></div></div><span class="play"></span></div><div class="mk-acoes"><span>Baixar</span><span>Copiar gancho</span></div></div>
+              <div><div class="mk-player"><div class="fundo"><svg viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice"><use href="#cena-aula" width="160" height="90"/></svg></div><div class="cartao"><div class="kb"><svg viewBox="80.7 0 50.6 90" preserveAspectRatio="xMidYMid slice"><use href="#cena-aula" width="160" height="90"/></svg></div></div><span class="play"></span></div><div class="mk-acoes"><span>Baixar</span><span>Re-renderizar</span></div></div>
+              <div><div class="mk-player" style="opacity:.35"><div class="fundo"><svg viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice"><use href="#cena-obra" width="160" height="90"/></svg></div></div></div>
+            </div>
+            <p class="mk-manual"><b>Modo manual:</b> botão “Copiar prompt”, campo para colar a resposta e os erros da validação listados um a um.</p>
+          </div>
+        </div>
+        <figcaption class="mock-leg">Ilustração do painel — não é captura de tela.</figcaption>
+      </figure>
+
+      <ul class="painel-lista">
+        <li><span class="k">01</span><div><h3>Link ou arquivo</h3><p>Cole um link ou arraste um arquivo. Escolha quantos clipes (campo “Quantos cortes”, de 1 a 20, padrão 5), o visual, o modelo de transcrição e o que procurar.</p></div></li>
+        <li><span class="k">02</span><div><h3>Progresso ao vivo</h3><p>Linha do tempo dos estágios — Baixar, Transcrever, Selecionar, Renderizar — com progresso e estimativa.</p></div></li>
+        <li><span class="k">03</span><div><h3>Um trabalho por vez, em fila</h3><p>Dois vídeos ao mesmo tempo só disputariam CPU e disco. Fechou no meio? Na próxima vez ele retoma de onde parou, sem refazer o que estava pronto.</p></div></li>
+        <li><span class="k">04</span><div><h3>Clipes numa grade de players 9:16</h3><p>Cada um com os botões “Baixar”, “Re-renderizar” e “Copiar gancho”. Mais a lista “Vídeos já processados” e o botão “Abrir pasta”.</p></div></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ 08 INSTALAR -->
+<section class="sec" id="instalar" aria-labelledby="inst-h">
+  <div class="caixa">
+    <p class="slate"><b>08</b> Instalação <span class="regua-mini" aria-hidden="true"></span></p>
+    <h2 id="inst-h">Python 3.13, ffmpeg, Git e o PowerShell.</h2>
+    <p class="lead">Não há instalador nem executável <code class="i">clipper</code>: todo comando é <code class="i q"><span class="nw">.venv\Scripts\python</span> <span class="nw">-m</span> clipper …</code> — <code class="i">clipper</code> é o nome do módulo Python, e as mensagens e o <code class="i">--help</code> escrevem só <code class="i">clipper</code> para encurtar. São quatro blocos até o primeiro clipe: instalar, conferir, rodar e, no modo manual, voltar com a resposta.</p>
+
+    <div class="inst-grade">
+      <div class="inst-esq">
+        <div class="req">
+          <h3>Requisitos</h3>
+          <dl>
+            <div><dt>Sistema</dt><dd>Windows x64<small>Deve rodar em Linux/macOS trocando as fontes do preset, mas não foi testado lá.</small></dd></div>
+            <div><dt>Python</dt><dd>3.13</dd></div>
+            <div><dt>ffmpeg</dt><dd>via winget, no bloco 1</dd></div>
+            <div><dt>Git</dt><dd>para o <code class="i">git clone</code> do bloco 1<small>Não vem com o Windows.</small></dd></div>
+            <div><dt>Processador</dt><dd>CPU<small>Feito e medido para CPU; não precisa de placa de vídeo.</small></dd></div>
+            <div><dt>Primeira vez</dt><dd>~1,5 GB do Whisper <code class="i">medium</code> e 224 KB do detector de rosto, baixados uma vez.</dd></div>
+            <div><dt>Idioma</dt><dd>Português por padrão<small>Outros idiomas funcionam, mas as regras de quebra de frase foram medidas em PT-BR.</small></dd></div>
+          </dl>
+        </div>
+        <div class="tempos">
+          <h3>Quanto demora, medido</h3>
+          <p class="nota">Windows 11, CPU 12 núcleos, sem GPU, num vídeo de 29 min.</p>
+          <table>
+            <thead><tr><th scope="col">Estágio</th><th scope="col">Tempo</th><th scope="col">Fator</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">Ingestão</th><td class="t">35 s</td><td class="f">download 1,0 GB + remux; depende da sua internet</td></tr>
+              <tr><th scope="row">Transcrição</th><td class="t">19 min 56 s</td><td class="f">0,685× a duração do áudio (<code>medium</code>, CPU)</td></tr>
+              <tr><th scope="row">Energia</th><td class="t">0,3 s</td><td class="f">—</td></tr>
+              <tr><th scope="row">Seleção</th><td class="t">instantânea</td><td class="f">modo manual</td></tr>
+              <tr><th scope="row">Render</th><td class="t">42–80 s</td><td class="f">por clipe · ~1,2× a duração do clipe (<code>cortes</code>)</td></tr>
+            </tbody>
+          </table>
+          <p class="rodape-t">Um vídeo de 1 hora: ~41 min de transcrição e mais uns 6 min para renderizar 5 clipes de 1 minuto.</p>
+        </div>
+      </div>
+
+      <div class="cmds">
+        <figure class="codigo">
+          <figcaption><span><span class="n">1</span> <b>Instalar</b> — ffmpeg e o projeto</span></figcaption>
+          <pre><code><span class="l c"># 1. ffmpeg (abra um terminal novo depois de instalar)</span><span class="l">winget install <span class="nw">--id</span> Gyan.FFmpeg <span class="nw">--exact</span> <span class="nw">--scope</span> user</span><span class="l"><br></span><span class="l c"># 2. o projeto</span><span class="l">cd C:\caminho\onde\voce\quer</span><span class="l">git clone <span class="nw">https://github.com/Corrar/ClipPro</span> ClipPro</span><span class="l">cd ClipPro</span><span class="l">py <span class="nw">-3.13</span> <span class="nw">-m</span> venv .venv</span><span class="l">.venv\Scripts\pip install <span class="nw">-r</span> requirements.txt</span></code></pre>
+        </figure>
+        <figure class="codigo">
+          <figcaption><span><span class="n">2</span> <b>Conferir a instalação</b></span></figcaption>
+          <pre><code><span class="l">.venv\Scripts\python <span class="nw">-m</span> clipper <span class="nw">--versao</span></span><span class="l">ffmpeg <span class="nw">-version</span></span></code></pre>
+        </figure>
+        <figure class="codigo">
+          <figcaption><span><span class="n">3</span> <b>Primeiro uso</b> — com um link</span></figcaption>
+          <pre><code><span class="l">.venv\Scripts\python <span class="nw">-m</span> clipper run <span class="nw">"https://youtu.be/XXXXXXXXXXX"</span> <span class="nw">--n 5</span> <span class="nw">--estrategia</span> "ganchos e punchlines" <span class="nw">--preset cortes</span></span></code></pre>
+        </figure>
+        <figure class="codigo">
+          <figcaption><span><span class="n">3b</span> <b>Ou com um arquivo local</b></span></figcaption>
+          <pre><code><span class="l">.venv\Scripts\python <span class="nw">-m</span> clipper run <span class="nw">"C:\videos\live-de-ontem.mp4"</span> <span class="nw">--n 8</span></span></code></pre>
+        </figure>
+        <figure class="codigo">
+          <figcaption><span><span class="n">4</span> <b>Voltar do modo manual</b> — com a mesma entrada do bloco 3</span></figcaption>
+          <pre><code><span class="l">.venv\Scripts\python <span class="nw">-m</span> clipper run <span class="nw">"https://youtu.be/XXXXXXXXXXX"</span> <span class="nw">--resposta "resposta.json"</span></span></code></pre>
+        </figure>
+        <figure class="codigo">
+          <figcaption><span><span class="n">ui</span> <b>Abrir o painel</b></span></figcaption>
+          <pre><code><span class="l">.venv\Scripts\python <span class="nw">-m</span> clipper ui</span></code></pre>
+        </figure>
+        <div class="problema">
+          <p><b>O ClipPro não acha o ffmpeg?</b> A mensagem sai sem acento: <code class="i q">nao encontrei o executavel 'ffmpeg' nesta maquina.</code> (ou <code class="i">'ffprobe'</code>). Instale com o winget e abra um terminal <b>novo</b>, ou aponte direto para os dois binários — cada um tem a sua variável:</p>
+          <figure class="codigo">
+            <figcaption><span><b>Apontar o ffmpeg e o ffprobe</b> — PowerShell</span></figcaption>
+            <pre><code><span class="l">$env:CLIPPER_FFMPEG=<wbr>"C:\caminho\ffmpeg.exe"</span><span class="l">$env:CLIPPER_FFPROBE=<wbr>"C:\caminho\ffprobe.exe"</span></code></pre>
+          </figure>
+        </div>
+      </div>
+    </div>
+
+    <div class="comandos">
+      <div class="comandos-cab"><h3>Os sete comandos</h3><p>Todos começam com <code class="i q"><span class="nw">.venv\Scripts\python</span> <span class="nw">-m</span> clipper</code></p></div>
+      <ul>
+        <li><code>run</code>pipeline completo</li>
+        <li><code>ingest</code>só baixa/normaliza</li>
+        <li><code>transcribe</code>transcreve e calcula a energia</li>
+        <li><code>select</code>escolhe os trechos</li>
+        <li><code>render</code>renderiza a partir de uma seleção pronta</li>
+        <li><code>info</code>mostra o que já existe, sem processar nada</li>
+        <li><code>ui</code>abre o painel web local</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ 09 LIMITES -->
+<section class="sec" id="limites" aria-labelledby="lim-h">
+  <div class="caixa">
+    <p class="slate"><b>09</b> Limites <span class="regua-mini" aria-hidden="true"></span></p>
+    <h2 id="lim-h">O que ele não faz, dito com todas as letras.</h2>
+    <ul class="limites">
+      <li><b>Não persegue o rosto.</b>O recorte é fixo por clipe. Se a pessoa atravessa o quadro, sai do enquadramento.</li>
+      <li><b>Sem rosto, centro.</b>Tela compartilhada, b-roll ou drone ficam com o recorte no meio.</li>
+      <li><b>Respiro nas pontas.</b>O corte na fronteira de frase deixa 1–2 s de sobra no começo e no fim.</li>
+      <li><b>A seleção decide a qualidade.</b>O ClipPro garante que o corte é válido; quem julga se o trecho é bom é o modelo que lê a transcrição.</li>
+      <li><b>Feito para CPU.</b>Não precisa de placa de vídeo. Transcrever levou 0,685× a duração do áudio no <code class="i">medium</code>, numa CPU de 12 núcleos.</li>
+      <li><b>−14 LUFS, não exato.</b>O <code class="i">loudnorm</code> de uma passagem erra até 0,7 LU — e só vale nos presets com composição.</li>
+      <li><b>Testado no Windows.</b>Linux e macOS devem funcionar trocando as fontes do preset, mas não foram testados.</li>
+      <li><b><code class="i">--pitch</code> é experimental.</b>Vem desligado. Sobe o tom em 0,5% sem mudar a duração (medido: +0,479%).</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ================================================================ 10 FAQ -->
+<section class="sec" id="faq" aria-labelledby="faq-h">
+  <div class="caixa">
+    <div class="faq-grade">
+    <div class="faq-cab">
+      <p class="slate"><b>10</b> Perguntas frequentes <span class="regua-mini" aria-hidden="true"></span></p>
+      <h2 id="faq-h">Perguntas diretas, respostas diretas.</h2>
+    </div>
+    <div class="faq">
+      <details>
+        <summary>É um aplicativo que eu instalo com dois cliques?</summary>
+        <div class="r"><p>Não. É uma ferramenta de linha de comando com um painel web local em <code class="i">127.0.0.1</code>. Não há instalador nem versão na nuvem: você instala Python 3.13, ffmpeg e Git, clona o repositório e roda os comandos da seção 08.</p></div>
+      </details>
+      <details>
+        <summary>Meu vídeo é enviado para algum lugar?</summary>
+        <div class="r"><p>O vídeo, não: nenhum vídeo sai do seu computador. A rede entra para baixar o vídeo quando a entrada é um link e para baixar uma vez o modelo Whisper e o detector de rosto.</p><p>A transcrição sai na escolha dos trechos. No modo manual, é você quem cola o prompt, com a transcrição, no chat que escolher. Na seleção pela API (<code class="i">--api</code> na linha de comando; automática no painel quando há <code class="i">ANTHROPIC_API_KEY</code>), o ClipPro envia esse prompt. Em nenhum dos dois o vídeo vai junto.</p></div>
+      </details>
+      <details>
+        <summary>Precisa pagar alguma coisa?</summary>
+        <div class="r"><p>No modo padrão, não: custo zero. Só a seleção pela API usa a sua chave da Anthropic, com cobrança do próprio provedor.</p></div>
+      </details>
+      <details>
+        <summary>Preciso de chave de API?</summary>
+        <div class="r"><p>Não. No modo manual, o ClipPro grava o prompt, você cola num chat com qualquer modelo, salva o JSON da resposta e volta com <code class="i">--resposta</code>.</p></div>
+      </details>
+      <details>
+        <summary>Roda no Mac ou no Linux?</summary>
+        <div class="r"><p>O alvo é Windows x64. Segundo o README, deve rodar em Linux/macOS trocando as fontes do preset, mas não foi testado lá.</p></div>
+      </details>
+      <details>
+        <summary>Usa a placa de vídeo?</summary>
+        <div class="r"><p>Não precisa. O ClipPro foi feito e medido para CPU, e o render roda sempre nela. Para ganhar tempo na transcrição, <code class="i">--modelo-whisper small</code> corta o tempo pela metade, com alguma perda de precisão nos nomes próprios.</p></div>
+      </details>
+      <details>
+        <summary>O enquadramento acompanha quem está falando?</summary>
+        <div class="r"><p>Não. O render detecta o rosto em quadros amostrados e fixa o recorte na mediana — um recorte por clipe. Sem rosto suficiente, o recorte fica no centro.</p></div>
+      </details>
+      <details>
+        <summary>O título do clipe aparece no vídeo?</summary>
+        <div class="r"><p>Não. O topo do quadro é do gancho, nos 3 primeiros segundos. O título vai no nome do arquivo, no <code class="i">metadados.json</code> e no relatório.</p></div>
+      </details>
+      <details>
+        <summary>Funciona com vídeo em outro idioma?</summary>
+        <div class="r"><p>Funciona: troque com <code class="i">--idioma</code> (o padrão é <code class="i">pt</code>). Mas as regras de quebra de frase foram medidas em PT-BR.</p></div>
+      </details>
+      <details>
+        <summary>Posso cortar vídeo de qualquer canal?</summary>
+        <div class="r"><p>O ClipPro é para vídeos seus ou que você tem direito de usar. O checklist de publicação de cada clipe inclui “Autorização/licença do material confirmada”. A composição muda o quadro inteiro, mas o SSIM é medição técnica, não garantia diante das regras de nenhuma plataforma.</p></div>
+      </details>
+      <details>
+        <summary>Ele publica direto nas redes?</summary>
+        <div class="r"><p>Não. Ele entrega o mp4, a capa e um arquivo de publicação com título, gancho, descrição e checklist. Postar é com você.</p></div>
+      </details>
+      <details>
+        <summary>E se eu não gostar de um clipe?</summary>
+        <div class="r"><p>Peça outra resposta ao chat, salve num arquivo e rode de novo com <code class="i q"><span class="nw">--resposta</span> &lt;arquivo&gt;</code> (ou use <code class="i">--api</code>): a seleção é refeita sem baixar nem transcrever o vídeo de novo. Só <code class="i">--force</code> não basta — sem uma resposta nova, a seleção atual é mantida.</p><p>Para renderizar de novo só alguns clipes, use <code class="i">--clipe N</code>; no painel, cada clipe tem o botão “Re-renderizar”.</p></div>
+      </details>
+      <details>
+        <summary>Dá para criar meu próprio visual?</summary>
+        <div class="r"><p>Sim. Os presets são JSON em <code class="i">clipper/presets/</code>: copie um, mude cores e tamanhos, e ele aparece sozinho no <code class="i">--help</code>.</p></div>
+      </details>
+    </div>
+    </div>
+  </div>
+</section>
+
+<section class="final" aria-labelledby="final-h">
+  <div class="caixa final-in">
+    <div>
+      <h2 id="final-h">O código está no GitHub. O resto roda no seu computador.</h2>
+      <p>Clone o repositório, instale com os comandos da seção 08 e rode no seu Windows. Custo zero no modo padrão.</p>
+    </div>
+    <div class="final-acoes">
+      <a class="btn btn-pri" href="https://github.com/Corrar/ClipPro" target="_blank" rel="noopener">
+        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Baixar no GitHub
+      </a>
+      <a class="btn btn-sec" href="#instalar">Ver a instalação</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="caixa rod">
+    <div>
+      <a class="marca" href="#topo"><span class="marca-quadro" aria-hidden="true"></span><span>Clip<b>Pro</b></span></a>
+      <p>As telas desta página são ilustrações feitas em CSS e SVG; ganchos e legendas foram inventados para ela. Os números vêm do código e das medições publicadas no README do projeto.</p>
+    </div>
+    <dl class="carimbo">
+      <div><dt>Projeto</dt><dd>ClipPro<small>vídeo longo em clipes 9:16</small></dd></div>
+      <div><dt>Versão</dt><dd>clipper 0.1.0</dd></div>
+      <div><dt>Alvo</dt><dd>Windows x64 · Python 3.13 · CPU</dd></div>
+      <div><dt>Código-fonte</dt><dd><a href="https://github.com/Corrar/ClipPro" target="_blank" rel="noopener">github.com/Corrar/ClipPro</a><small>Público; o repositório ainda não declara uma licença.</small></dd></div>
+    </dl>
+    <ul class="rod-links">
+      <li><a href="#visuais">Visuais</a></li>
+      <li><a href="#como">Como funciona</a></li>
+      <li><a href="#instalar">Instalar</a></li>
+      <li><a href="#faq">Perguntas</a></li>
+      <li><a href="https://github.com/Corrar/ClipPro" target="_blank" rel="noopener">Repositório ↗</a></li>
+    </ul>
+  </div>
+</footer>
+
+<script>
+/* copiar: aprimoramento progressivo; sem JS os blocos continuam selecionaveis */
+(function(){
+  if(!navigator.clipboard) return;
+  /* o retorno visual ("Copiado") tambem precisa chegar ao leitor de tela */
+  var aviso=document.createElement('p');
+  aviso.className='vh'; aviso.setAttribute('aria-live','polite');
+  document.body.appendChild(aviso);
+  var n=0;
+  document.querySelectorAll('.codigo').forEach(function(fig){
+    var cab=fig.querySelector('figcaption'), code=fig.querySelector('code');
+    if(!cab||!code) return;
+    /* a figure se nomeia pelo titulo, sem herdar o texto do botao */
+    var tit=cab.querySelector('span');
+    if(tit){ if(!tit.id) tit.id='cmd-t'+(++n); fig.setAttribute('aria-labelledby',tit.id); }
+    var nome=(cab.querySelector('b')||cab).textContent.trim();
+    var b=document.createElement('button'), t;
+    b.type='button'; b.className='copiar'; b.textContent='Copiar';
+    b.setAttribute('aria-label','Copiar comando: '+nome);
+    function volta(){ clearTimeout(t); t=setTimeout(function(){b.textContent='Copiar'; b.classList.remove('ok');},1800); }
+    b.addEventListener('click',function(){
+      var txt=code.innerText.replace(/\u00a0/g,' ').replace(/\n{3,}/g,'\n\n').trim();
+      navigator.clipboard.writeText(txt).then(function(){
+        b.textContent='Copiado'; b.classList.add('ok');
+        aviso.textContent='Comando copiado: '+nome+'.';
+        volta();
+      },function(){
+        b.textContent='Selecione e copie';
+        aviso.textContent='Não deu para copiar. Selecione o comando e copie.';
+        volta();
+      });
+    });
+    cab.appendChild(b);
+  });
+})();
+</script>
+</body>
+</html>
