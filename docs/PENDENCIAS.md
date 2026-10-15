@@ -27,6 +27,9 @@ F1–F4 → F9 "paridade". F7 (narração) guardada.
 > (`relatorio-n1.md`, §27.2). Abertas: **P1** (Supabase + R2?) e **P2** (tokens
 > por trabalho). Ação do Bruno: teto de gasto no console da Anthropic;
 > `.venv\Scripts\python provas\prova_n1.py --fisicas` no Windows.
+> **§28: P1 = Supabase + R2, P2 = tokens por trabalho — feitos** (relatório
+> da N-1 §7). Pendente do Bruno: criar as contas e rodar a N-F4 seguindo
+> `docs/nuvem/roteiro-contas.md`. Próximo: N-2 (app), com a palavra do Bruno.
 
 ---
 

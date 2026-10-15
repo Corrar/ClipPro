@@ -137,4 +137,86 @@ Os limites do Supabase vêm de sites terceiros e divergem entre si (500 MB ou
 1 GB de arquivos). A página oficial deve ser conferida na hora de criar a
 conta.
 
-PARE aqui.
+---
+
+## 7. Segundo checkpoint — P1 e P2 (RULINGS §28)
+
+### 7.1 O que entrou
+
+| Arquivo | Papel |
+|---|---|
+| `clipper/pipeline/select.py` | **P2.** A seleção soma os tokens que a API **informa** ter cobrado (entrada, saída e cache, inclusive na ida de conserto) e devolve a soma no resultado do estágio (`uso_api`). `selecao.json` e `.estado.json` não mudam de formato; `VERSAO` intocada. |
+| `worker/executor.py` | Grava `uso_api` no resultado de cada trabalho. |
+| `nuvem/supabase/001_fila.sql` | Tabela `trabalhos` + 4 funções (reservar, renovar, encerrar, devolver). A reserva usa `SKIP LOCKED`; dono e tentativa são conferidos no encerramento; RLS ligado sem policy; só a chave secreta executa. Idempotente. |
+| `worker/nuvem.py` | `FilaSupabase` (as 4 funções pela API REST) e `DepositoR2` (API S3 com assinatura SigV4). Só biblioteca padrão: zero dependência nova. |
+| `worker/__main__.py` | `--nuvem`: as chaves vêm do ambiente, e o worker lista as que faltam. Fila fora do ar não derruba o worker; a entrega do resultado insiste por ~1 min se a rede piscar. |
+| `docs/nuvem/roteiro-contas.md` | Passo a passo das contas (Anthropic, Supabase, R2) e das variáveis no Windows. |
+
+### 7.2 Placar
+
+| Prova | Resultado |
+|---|---|
+| `prova_n1.py --fisicas` (Postgres 16 local) | **16 passaram, 1 pulou, 0 falharam** — a que pulou é a N-F4, **pendente** (contas reais) |
+| `prova_n1.py` (estruturais, sem Postgres, como no Windows) | 13 passaram, 0 pularam, 0 falharam |
+| `prova_f6.py --fisicas` (depois da mudança na seleção) | 44 passaram, 0 pularam, 0 falharam |
+| `prova_f61.py --fisicas` | 13 passaram, 0 pularam, 0 falharam |
+
+**Conferido contra fonte externa:** a assinatura reproduz exatamente o exemplo
+oficial da AWS ("GET Object", `Signature=f0e8bdb8…`). O depósito R2 roda
+contra um S3 falso que **recalcula a assinatura** de cada requisição recebida.
+O SQL roda num **Postgres de verdade**, com os papéis do Supabase imitados.
+
+**Mutantes: 13 de 13 mordem.** Cada regra foi quebrada no código e a prova
+correspondente falhou:
+
+- SigV4 sem ordenar os cabeçalhos → N-E10
+- R2 sem o mtime do objeto → N-E11
+- R2 baixando sempre → N-E11
+- Bearer com a chave nova → N-E12
+- pedido torto não recusado → N-E12
+- `--nuvem` sem conferir as variáveis → N-E13
+- SQL sem `SKIP LOCKED` → N-F3
+- SQL encerrando sem conferir o dono → N-F3
+- SQL sem o revoke do anon → N-F3
+- SQL com tentativas infinitas → N-F3
+- SQL sem RLS → N-F3
+- seleção sem contar os tokens → N-F1
+- (e os 12 do primeiro checkpoint seguem valendo)
+
+**Um mutante sobreviveu na primeira rodada, e a prova foi corrigida.** Tirar
+o `SKIP LOCKED` **não** duplica reserva; o que ele garante é que um worker não
+espera o outro. A N-F3 passou a medir isso: com uma sessão segurando a
+reserva, a outra pega outro trabalho em **0,06 s**. Sem `SKIP LOCKED`,
+esperou **1,57 s** e a prova falhou.
+
+### 7.3 Decisões do executor (declaradas)
+
+1. **A chave secreta do Supabase passa por cima do RLS.** O worker só chama
+   as 4 funções, que conferem dono e tentativa. A chave fica no PC do Bruno
+   (G3).
+2. **Formato da chave.** A chave nova (`sb_secret_…`) vai só no cabeçalho
+   `apikey`; a `service_role` antiga vai também no `Authorization`, como
+   manda a documentação do Supabase.
+3. **No Supabase, devolver a reserva vencida acontece dentro de
+   `reservar_trabalho`**, na mesma transação: não há janela entre devolver e
+   reservar.
+4. **A regra das 3 tentativas existe nos dois lados** (pasta e SQL), com a
+   mesma mensagem. A N-E6 cobre um lado e a N-F3 cobre o outro.
+5. **Tokens só aparecem no sucesso.** Se a seleção falhar depois de chamar a
+   API (resposta inválida mesmo após o conserto), o gasto daquela tentativa
+   não chega ao resultado. O C2 fica coberto em parte.
+6. **A N-F4 foi escrita, mas não executada:** não há contas. O primeiro uso
+   real dela é no Windows do Bruno. Ela recusa rodar se a fila real tiver
+   outros pendentes e apaga o que criou.
+
+### 7.4 ⚠ Pendências
+
+| # | Pendência | Quem |
+|---|---|---|
+| K1 | Criar as contas e rodar a N-F4 (`docs/nuvem/roteiro-contas.md`) | Bruno |
+| K2 | Teto de gasto mensal no console da Anthropic (C5) | Bruno |
+| K3 | O worker consultando a fila conta como "atividade" para o Supabase não pausar? | executor, na N-2 |
+| K4 | Ninguém insere trabalhos na tabela ainda: é o app (N-2) | N-2 |
+
+PARE aqui. A N-1 fecha com a N-F4 verde no Windows. A N-2 (app com login e
+telas) abre com a palavra do Bruno e traz as perguntas dela.

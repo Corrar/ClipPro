@@ -84,7 +84,7 @@ def executar(
     base, pasta_entrada = pastas(trabalho_dir, trabalho.id)
     base.mkdir(parents=True, exist_ok=True)
     medidos: dict[str, float] = {}
-    contexto: dict[str, Any] = {"saida": None, "duracao": None}
+    contexto: dict[str, Any] = {"saida": None, "duracao": None, "uso_api": None}
     resultado: dict[str, Any] = {
         "worker": worker,
         "iniciado_em": agora(),
@@ -123,6 +123,9 @@ def executar(
             log.info(f"trabalho {trabalho.id} falhou: {resultado['erro']['mensagem']}")
 
     resultado["duracao_video_s"] = contexto["duracao"]
+    # Tokens que a API cobrou neste trabalho (§28, P2). None = a selecao foi
+    # reaproveitada ou nem chegou a rodar (ex.: recusa por saldo).
+    resultado["uso_api"] = contexto["uso_api"]
     resultado["segundos_total"] = round(time.monotonic() - t0, 2)
     resultado["terminado_em"] = agora()
     _limpar(base, pasta_entrada, contexto["saida"], sucesso=resultado["status"] == "concluido")
@@ -179,8 +182,13 @@ def _rodar(
             detalhe=f"duração medida {duracao:.1f} s",
         )
 
+    def ao_concluir(est: motor.Estagio, res: Any, _segundos: float) -> None:
+        if isinstance(res, dict) and res.get("uso_api"):
+            contexto["uso_api"] = res["uso_api"]
+
     parada = motor.rodar_estagios(
-        [estagios[n] for n in resto if n in estagios], medidos, tolerar_pendentes=False
+        [estagios[n] for n in resto if n in estagios], medidos,
+        tolerar_pendentes=False, ao_concluir=ao_concluir,
     )
     if parada is not None:
         raise ErroTrabalho("a escolha dos cortes não terminou.",

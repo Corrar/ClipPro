@@ -1545,7 +1545,32 @@ def _logar_estimativa(client: Any, modelo_id: str, prompt: str) -> None:
     )
 
 
-def _enviar(client: Any, anthropic: Any, mensagens: list[dict[str, Any]], modelo_id: str) -> str:
+def _somar_uso(uso: dict[str, Any] | None, resposta: Any) -> None:
+    """Acumula os tokens que a API DIZ ter cobrado (RULINGS §28, P2).
+
+    E o numero real da fatura, nao a ESTIMATIVA de _logar_estimativa: e ele
+    que define o preco do credito antes da N-3. Campo ausente conta zero.
+    """
+    if uso is None:
+        return
+    consumo = getattr(resposta, "usage", None)
+    uso["chamadas"] = int(uso.get("chamadas", 0)) + 1
+    for campo, chave in (
+        ("input_tokens", "tokens_entrada"),
+        ("output_tokens", "tokens_saida"),
+        ("cache_creation_input_tokens", "tokens_cache_escrita"),
+        ("cache_read_input_tokens", "tokens_cache_leitura"),
+    ):
+        uso[chave] = int(uso.get(chave, 0)) + int(getattr(consumo, campo, 0) or 0)
+
+
+def _enviar(
+    client: Any,
+    anthropic: Any,
+    mensagens: list[dict[str, Any]],
+    modelo_id: str,
+    uso: dict[str, Any] | None = None,
+) -> str:
     """Uma ida a API, com 3 tentativas para falhas que valem retentar.
 
     4xx nao repete (exceto 429): tentar de novo uma chave invalida so gasta
@@ -1564,6 +1589,7 @@ def _enviar(client: Any, anthropic: Any, mensagens: list[dict[str, Any]], modelo
                     "format": {"type": "json_schema", "schema": ESQUEMA_JSON}
                 },
             )
+            _somar_uso(uso, resposta)
             return _texto_da_resposta(resposta)
         except anthropic.AuthenticationError as exc:
             raise ErroSelecao(
@@ -1645,8 +1671,13 @@ def _selecao_via_api(
     fronteiras: Fronteiras,
     energia: dict[str, Any],
     n: int,
+    uso: dict[str, Any] | None = None,
 ) -> tuple[str, list[dict[str, Any]], list[str]]:
-    """Conversa com a API e faz UMA rodada de conserto se precisar."""
+    """Conversa com a API e faz UMA rodada de conserto se precisar.
+
+    'uso', quando vem, acumula os tokens das DUAS idas (a do conserto tambem
+    e cobrada).
+    """
     log = obter()
     _exigir_chave()
     anthropic = _carregar_sdk()
@@ -1654,7 +1685,7 @@ def _selecao_via_api(
     _logar_estimativa(client, modelo_id, prompt)
 
     mensagens: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
-    texto = _enviar(client, anthropic, mensagens, modelo_id)
+    texto = _enviar(client, anthropic, mensagens, modelo_id, uso)
     clipes, problemas = validar(
         extrair_json(texto), fronteiras, energia, n=n
     )
@@ -1671,7 +1702,7 @@ def _selecao_via_api(
         {"role": "assistant", "content": texto},
         {"role": "user", "content": conserto},
     ]
-    texto = _enviar(client, anthropic, mensagens, modelo_id)
+    texto = _enviar(client, anthropic, mensagens, modelo_id, uso)
     clipes, problemas = validar(extrair_json(texto), fronteiras, energia, n=n)
     return texto, clipes, problemas
 
@@ -1689,6 +1720,9 @@ class _Preparado:
     payload: dict[str, Any] = field(default_factory=dict)
     assinatura: dict[str, Any] = field(default_factory=dict)
     resumo: dict[str, Any] = field(default_factory=dict)
+    # Tokens da API nesta execucao (P2). NAO entra no resumo: o resumo vai
+    # para o .estado.json, e nenhum arquivo muda de formato por causa disto.
+    uso: dict[str, Any] | None = None
 
 
 def selecionar(
@@ -1734,6 +1768,8 @@ def selecionar(
         f"{pronto.resumo['duracao_total']:.0f}s no total, score médio "
         f"{pronto.resumo['score_medio']:.1f} — {saida.selecao_json.name} gravado."
     )
+    if pronto.uso is not None:
+        return {**pronto.resumo, "reaproveitado": False, "uso_api": pronto.uso}
     return {**pronto.resumo, "reaproveitado": False}
 
 
@@ -1860,17 +1896,20 @@ def _preparar(
             }
         )
 
+    uso: dict[str, Any] | None = None
     if resposta is not None:
         clipes, problemas = validar(
             extrair_json(resposta), fronteiras, energia, n=n
         )
     else:
+        uso = {"modelo": str(modelo_id), "chamadas": 0}
         resposta, clipes, problemas = _selecao_via_api(
             prompt=prompt,
             modelo_id=str(modelo_id),
             fronteiras=fronteiras,
             energia=energia,
             n=n,
+            uso=uso,
         )
         digest = _digest_resposta(resposta)
 
@@ -1908,7 +1947,7 @@ def _preparar(
         # que o mesmo arquivo agora tem outro conteudo.
         "resposta_digest": digest,
     }
-    return _Preparado(payload=payload, assinatura=assinatura, resumo=resumo)
+    return _Preparado(payload=payload, assinatura=assinatura, resumo=resumo, uso=uso)
 
 
 def _para_esquema(indice: int, clipe: dict[str, Any]) -> dict[str, Any]:

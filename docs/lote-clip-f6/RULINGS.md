@@ -1361,3 +1361,14 @@ verbatim (pergunta → resposta).
 - Próximo passo da N-1: fila no Supabase e depósito no R2, com as mesmas
   provas por dentro; a física contra as contas reais fica **pendente** até
   as contas existirem.
+
+### 28.2 Resultado do segundo checkpoint da N-1
+
+- P2 na seleção (`uso_api`, nenhum arquivo muda de formato); `worker/nuvem.py`
+  (Supabase + R2, só biblioteca padrão); `nuvem/supabase/001_fila.sql`;
+  `--nuvem`; roteiro de contas em `docs/nuvem/roteiro-contas.md`.
+- Placar: N-1 **16 passaram, 1 pendente (N-F4, contas reais), 0 falharam**;
+  F6 44/0/0; F6.1 13/0/0; 13 de 13 mutantes novos mordem. Relatório:
+  `docs/lote-clip-f6/relatorio-n1.md` §7.
+- **PARE.** A N-1 fecha com a N-F4 verde no Windows; a N-2 abre com a palavra
+  do Bruno.
