@@ -1324,3 +1324,12 @@ verbatim (pergunta → resposta).
   `main(argv)`, zero dependência nova sem decisão), §5 e §6; o worker **não
   duplica regra de estágio** — chama as mesmas funções do `clipper`, como o
   painel.
+
+### 27.2 Resultado do primeiro checkpoint da N-1
+
+- `worker/` (contrato, fila e depósito em pasta, executor, `python -m
+  worker`) + `provas/prova_n1.py`. Motor e painel intocados.
+- Placar (Linux, físicas): N-1 **11/0/0**, F6.1 13/0/0, F6 44/0/0; 12 de 12
+  mutantes mordem. Relatório: `docs/lote-clip-f6/relatorio-n1.md`.
+- **PARE** até P1 (fornecedor da fila, arquivos e login) e P2 (medir tokens
+  por trabalho).

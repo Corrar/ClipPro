@@ -22,6 +22,11 @@ F1–F4 → F9 "paridade". F7 (narração) guardada.
 > 5 h de vídeo por cadastro), N8 A, N9 B, N10 "sem CNPJ; redija, eu reviso".
 > Abertas: **G1–G4** ("tudo free tier" colide com Vercel Hobby não comercial,
 > servidor grátis pequeno e IA paga), em `relatorio-pedido-nuvem.md` §6.
+> G1–G4 respondidas no §27 (beta fechado grátis, Anthropic com teto, PC do
+> Bruno como worker, N-1 aberta). **N-1: worker pronto e provado**
+> (`relatorio-n1.md`, §27.2). Abertas: **P1** (Supabase + R2?) e **P2** (tokens
+> por trabalho). Ação do Bruno: teto de gasto no console da Anthropic;
+> `.venv\Scripts\python provas\prova_n1.py --fisicas` no Windows.
 
 ---
 
