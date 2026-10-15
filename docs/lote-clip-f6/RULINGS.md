@@ -1419,3 +1419,33 @@ O restante faça com oq achar recomendado
   que não foi usado. A N-3 acrescenta só a compra (Mercado Pago).
 - **Beta fechado (G1) por convite:** só e-mail convidado recebe os 300
   créditos e pode pedir clipes. O convite é uma linha na tabela `convites`.
+
+### 29.3 Desenho da N-2 (app), decidido por delegação (§29)
+
+- **App estático sem build** em `app/` (HTML + CSS + JS puro, como o painel e
+  o site), com o `supabase-js` **2.117.2 embutido** em `app/vendor/`
+  (integridade sha512 conferida com o registro do npm; nada de CDN em tempo
+  de execução).
+- **Funções Python da Vercel** em `api/`, só com a biblioteca padrão:
+  - `config` (entrega URL e chave **pública** do Supabase, que vêm do
+    ambiente da Vercel);
+  - `upload` (URL assinada para enviar o vídeo ao R2);
+  - `clipes` (URLs assinadas para ver e baixar os clipes do próprio usuário).
+- **Código compartilhado em `nuvem/`** (`s3.py`, `rest.py`), usado pelo
+  worker e pelas funções: a assinatura S3 existe num lugar só.
+- **Projeto Vercel novo** (`clippro-app`) com raiz na raiz do repositório e
+  um `.vercelignore` que só deixa entrar `app/`, `api/` e `nuvem/`. O
+  `requirements.txt` pesado do motor fica fora do deploy.
+- **Banco** (`nuvem/supabase/002_contas.sql`):
+  - perfis, convites e movimentos de crédito;
+  - saldo = soma dos movimentos;
+  - o cadastro convidado ganha 300;
+  - `criar_trabalho` reserva até 600 min do saldo e devolve o que não foi
+    usado quando o trabalho termina (uma trigger, idempotente);
+  - RLS: cada conta só lê o que é seu.
+- **Provas:**
+  - `provas/prova_n2.py` (SQL num Postgres real, funções contra Supabase e
+    S3 falsos);
+  - interface pelo Playwright num Chromium real, contra um backend falso
+    local. A prova de interface **pula** onde não há Node + Playwright, como
+    as de ffmpeg pulam sem ffmpeg.
