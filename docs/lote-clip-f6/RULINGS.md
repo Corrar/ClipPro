@@ -1372,3 +1372,50 @@ verbatim (pergunta → resposta).
   `docs/lote-clip-f6/relatorio-n1.md` §7.
 - **PARE.** A N-1 fecha com a N-F4 verde no Windows; a N-2 abre com a palavra
   do Bruno.
+
+---
+
+## 29. Delegação — "O restante faça com oq achar recomendado"
+
+Recebida em 15/10/2026. Transcrição verbatim.
+
+```
+O restante faça com oq achar recomendado
+```
+
+### 29.1 Leitura do executor (declarada)
+
+- **Delegação ampla.** No que resta do plano (N-2, N-3, N-4 e os itens que já
+  têm recomendação registrada), **a recomendação do executor vale como
+  decisão**. Cada uma é registrada aqui como "decidida por delegação (§29)"
+  **antes** de ser executada e é relatada no checkpoint. O Bruno pode
+  reverter qualquer uma: vence o item mais recente.
+- **Fora da delegação** (só o Bruno faz ou decide):
+  - criar contas, chaves e cartão;
+  - o teto de gasto da Anthropic;
+  - CNPJ e nota fiscal;
+  - a revisão jurídica dos termos;
+  - o **preço dos pacotes de crédito** (é dinheiro: a recomendação vem com o
+    custo medido, mas a decisão é dele);
+  - o **merge em `master`** (o CLAUDE.md §2 exige palavra explícita e provas
+    físicas verdes no Windows).
+  Comando destrutivo continua vedado, e chave não vai para o chat nem para o
+  repositório.
+- **Deploy do app:** só quando as contas existirem, porque sem as chaves o app
+  não funciona. Publicar é um passo do roteiro.
+
+### 29.2 Decidido por delegação (§29) agora
+
+- **F8a:** Q1–Q19 = as recomendações da folha de resposta de
+  `perguntas-f8a.md`. A implementação vem depois do núcleo da nuvem (N8 A) e
+  começa pela Q17 (regressão que morde).
+- **Site:**
+  - S1 = manter a produção pública e os previews com login (é página pública);
+  - S3 = `og:url` + `canonical` no repositório, publicados junto com a
+    atualização da N-4 (N9 B);
+  - S5 = sem `LICENSE`, o que por lei é "todos os direitos reservados", até o
+    dono decidir.
+- **Créditos entram já na N-2:** saldo, reserva por trabalho e devolução do
+  que não foi usado. A N-3 acrescenta só a compra (Mercado Pago).
+- **Beta fechado (G1) por convite:** só e-mail convidado recebe os 300
+  créditos e pode pedir clipes. O convite é uma linha na tabela `convites`.
