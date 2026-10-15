@@ -360,10 +360,14 @@ class Fila:
                 self._fila.task_done()
 
     def _executar(self, pedido: Pedido) -> None:
-        from clipper.pipeline import ingest
-
         saida = Saida.para(pedido.slug, pedido.opcoes.out)
         saida.criar_dirs()
+        with registro.em_arquivo(saida.log):
+            self._executar_com_log(pedido, saida)
+
+    def _executar_com_log(self, pedido: Pedido, saida: Saida) -> None:
+        from clipper.pipeline import ingest
+
         estado = Estado(saida.estado_json)
         job = ler_job(saida.base) or {}
 

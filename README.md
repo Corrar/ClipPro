@@ -9,7 +9,7 @@ que pode usar internet é a escolha dos trechos, e mesmo ela é opcional
 (o modo padrão é você colar o prompt num chat qualquer).
 
 ```
-clipper run "https://youtu.be/XXXXXXXXXXX" --n 5 --estrategia "ganchos e punchlines" --preset cortes
+.venv\Scripts\python -m clipper run "https://youtu.be/XXXXXXXXXXX" --n 5 --estrategia "ganchos e punchlines" --preset cortes
 ```
 
 ---
@@ -82,9 +82,12 @@ o conteúdo num chat com qualquer modelo, salva o array JSON que ele devolver em
 .venv\Scripts\python -m clipper run "https://youtu.be/XXXXXXXXXXX" --resposta "resposta.json"
 ```
 
-Se a resposta vier torta (tempo fora do vídeo, clipe curto demais, corte no meio
-de uma palavra), o clipper **recusa e diz qual campo está errado em qual clipe** —
-ele não renderiza um corte quebrado.
+Corte no meio de uma palavra ou de uma frase é **encaixado** sozinho na
+fronteira de frase mais próxima (até 15 s; deslocamento de 3 s ou mais vira
+aviso). O que não tem conserto — tempo fora do vídeo, clipe curto ou longo
+demais, campo faltando, dois clipes com material em comum — é **recusado**, e o
+clipper diz qual campo está errado em qual clipe: ele não renderiza um corte
+quebrado.
 
 Com `ANTHROPIC_API_KEY` no ambiente, use `--api` e o clipper conversa sozinho com
 o modelo, sem ida e volta.
@@ -114,14 +117,17 @@ não pede senha e serve os seus vídeos, então isso não é configurável.
 
 ### Comandos
 
+Não existe um executável `clipper`: todo comando é `.venv\Scripts\python -m
+clipper ...`. As mensagens e o `--help` escrevem só `clipper` para encurtar.
+
 ```
-clipper run <entrada>         pipeline completo
-clipper ingest <entrada>      só baixa/normaliza
-clipper transcribe <entrada>  transcreve e calcula a energia
-clipper select <entrada>      escolhe os trechos
-clipper render <entrada>      renderiza a partir de uma seleção pronta
-clipper info <entrada>        mostra o que já existe, sem processar nada
-clipper ui                    abre o painel web local
+python -m clipper run <entrada>         pipeline completo
+python -m clipper ingest <entrada>      só baixa/normaliza
+python -m clipper transcribe <entrada>  transcreve e calcula a energia
+python -m clipper select <entrada>      escolhe os trechos
+python -m clipper render <entrada>      renderiza a partir de uma seleção pronta
+python -m clipper info <entrada>        mostra o que já existe, sem processar nada
+python -m clipper ui                    abre o painel web local
 ```
 
 `render` e `info` leem **apenas** `out/<slug>/`: aceitam o nome da pasta no lugar

@@ -827,8 +827,11 @@ def validar(
 
     if not isinstance(dados, list):
         tipo = type(dados).__name__
+        # As duas formas (CLIP-F6.1 item 11): um v2 solto nao tem inicio/fim
+        # e caia na mensagem generica, que nao diz o que fazer.
         um_clipe_solto = isinstance(dados, dict) and all(
-            dados.get(campo) is not None for campo in _CAMPOS_OBRIGATORIOS
+            dados.get(campo) is not None
+            for campo in (_CAMPOS_OBRIGATORIOS_V2 if e_v2(dados) else _CAMPOS_OBRIGATORIOS)
         )
         if um_clipe_solto:
             # Nao acuse o usuario de nao ter mandado uma lista: o mais provavel
@@ -860,8 +863,9 @@ def validar(
         if not isinstance(item, dict):
             problemas.append(
                 f"{rotulo}: cada item do array tem que ser um objeto JSON com os "
-                f"campos {', '.join(_CAMPOS_OBRIGATORIOS)} (veio um "
-                f"{type(item).__name__})."
+                f"campos {', '.join(_CAMPOS_COMUNS)} e o trecho — `inicio` e `fim` "
+                f"para um trecho contínuo, ou `segmentos` para 1 a "
+                f"{MAX_SEGMENTOS} trechos separados (veio um {type(item).__name__})."
             )
             continue
 
@@ -1220,13 +1224,23 @@ def validar(
         conflito = _primeiro_conflito(resultado, clipe)
         if conflito is not None:
             outro, comum = conflito
+            # O conserto acima ja mexeu no inicio. Sem dizer isso, a faixa
+            # citada nao bate com a que o modelo mandou e o usuario procura um
+            # erro que nao esta na resposta dele (CLIP-F6.1 item 10).
+            nota_deslocamento = (
+                f" (o início do {clipe['rotulo']} já tinha sido movido de "
+                f"{mmss(clipe['inicio_pedido'])} para {mmss(clipe['inicio'])} "
+                f"para não encostar no {anterior['rotulo']})"
+                if desfeita and anterior is not None
+                else ""
+            )
             problemas.append(
                 f"{outro['rotulo']} e {clipe['rotulo']} compartilham material "
                 f"({mmss(comum[0])}–{mmss(comum[1])}): "
                 f"{_faixas(intervalos_do_clipe(outro))} contra "
-                f"{_faixas(intervalos_do_clipe(clipe))}. Dois clipes não podem "
-                "ter nenhum segundo em comum — escolha outro trecho para um dos "
-                "dois."
+                f"{_faixas(intervalos_do_clipe(clipe))}{nota_deslocamento}. Dois "
+                "clipes não podem ter nenhum segundo em comum — escolha outro "
+                "trecho para um dos dois."
             )
             continue
         if desfeita:

@@ -38,14 +38,14 @@ from clipper.motor import (
 )
 
 _EPILOGO = """\
-exemplos:
+exemplos (no Windows, "clipper" = .venv\\Scripts\\python -m clipper):
   clipper run aula.mp4
   clipper run "https://youtu.be/XXXXXXXXXXX" --n 8 --preset bold-amarelo
   clipper transcribe aula.mp4 --modelo-whisper small --threads 8
   clipper select aula.mp4 --estrategia "ganchos e punchlines"
   clipper select aula.mp4 --resposta "resposta.json"
   clipper select aula.mp4 --api --modelo sonnet
-  clipper render aula.mp4 --preset cortes-feed
+  clipper render aula.mp4 --preset cortes
   clipper render aula.mp4 --preset cortes-editorial --clipe 1 --clipe 2
   clipper render aula.mp4 --preset clean-branco --clipe 2 --clipe 4
   clipper render "aula-de-fisica-qp3uNTpf" --preset clean-branco
@@ -60,7 +60,7 @@ observações:
   - render e info só leem out/<slug>/: aceitam o nome da pasta no lugar do vídeo
     e funcionam offline, mesmo que o arquivo original já tenha sido apagado.
   - os presets se dividem em dois tipos. bold-amarelo e clean-branco entregam o
-    recorte 9:16 cheio com a legenda por cima. cortes-feed e cortes-editorial
+    recorte 9:16 cheio com a legenda por cima. cortes e cortes-editorial
     montam a composição anti-duplicata: fundo borrado, cartão arredondado com
     zoom, barra de título, barra de progresso e áudio normalizado — o clipe sai
     visualmente distinto do vídeo de origem, ao custo de ~1x a duração em CPU.
