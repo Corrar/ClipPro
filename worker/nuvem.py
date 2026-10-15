@@ -16,8 +16,6 @@ ao usuario em PT-BR com acentuacao correta.
 from __future__ import annotations
 
 import hashlib
-import hmac
-import json
 import os
 import shutil
 import urllib.error
@@ -27,11 +25,18 @@ from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote, urlsplit
 
+from nuvem import rest
+from nuvem.rest import ErroNuvem
+from nuvem.s3 import assinar_s3
 from worker.contrato import _RE_CHAVE, _RE_ID, ErroContrato, Trabalho
 from worker.deposito import ErroDeposito
 from worker.fila import Reserva
+
+# assinar_s3 e ErroNuvem moram em nuvem/ (um lugar so, §29.3) e seguem
+# exportados daqui para quem ja importava do worker.
+__all__ = ["VARIAVEIS", "DepositoR2", "ErroNuvem", "FilaSupabase", "assinar_s3",
+           "variaveis_faltando"]
 
 VARIAVEIS = {
     "SUPABASE_URL": "endereço do projeto (https://<projeto>.supabase.co)",
@@ -46,78 +51,11 @@ _VAZIO_SHA256 = hashlib.sha256(b"").hexdigest()
 _BLOCO = 1024 * 1024
 
 
-class ErroNuvem(Exception):
-    def __init__(self, mensagem: str, detalhe: str = "") -> None:
-        self.mensagem, self.detalhe = mensagem, detalhe
-        super().__init__(f"{mensagem} {detalhe}".strip())
 
 
 def variaveis_faltando(ambiente: dict[str, str] | None = None) -> list[str]:
     amb = os.environ if ambiente is None else ambiente
     return [nome for nome in VARIAVEIS if not (amb.get(nome) or "").strip()]
-
-
-# ==========================================================================
-# Assinatura S3 (SigV4) -- o R2 fala a API do S3
-# ==========================================================================
-
-
-def _hmac(chave: bytes, texto: str) -> bytes:
-    return hmac.new(chave, texto.encode("utf-8"), hashlib.sha256).digest()
-
-
-def assinar_s3(
-    metodo: str,
-    url: str,
-    cabecalhos: dict[str, str],
-    carga_sha256: str,
-    *,
-    chave_id: str,
-    segredo: str,
-    regiao: str,
-    quando: datetime,
-    servico: str = "s3",
-) -> dict[str, str]:
-    """Devolve os cabecalhos assinados (Authorization, x-amz-date, ...).
-
-    Algoritmo AWS Signature Version 4, conferido pela prova contra o exemplo
-    oficial da AWS (GET Object com Range). 'cabecalhos' sao os que vao na
-    requisicao alem de host/x-amz-*; todos entram na assinatura.
-    """
-    partes = urlsplit(url)
-    data_hora = quando.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    data = data_hora[:8]
-    todos = {k.lower(): " ".join(str(v).split()) for k, v in cabecalhos.items()}
-    todos["host"] = partes.netloc
-    todos["x-amz-content-sha256"] = carga_sha256
-    todos["x-amz-date"] = data_hora
-    nomes = sorted(todos)
-    caminho = quote(partes.path or "/", safe="/-_.~")
-    consulta = "&".join(sorted(
-        f"{quote(k, safe='-_.~')}={quote(v, safe='-_.~')}"
-        for k, _, v in (p.partition("=") for p in partes.query.split("&") if p)
-    ))
-    canonica = "\n".join([
-        metodo.upper(), caminho, consulta,
-        "".join(f"{n}:{todos[n]}\n" for n in nomes),
-        ";".join(nomes), carga_sha256,
-    ])
-    escopo = f"{data}/{regiao}/{servico}/aws4_request"
-    a_assinar = "\n".join([
-        "AWS4-HMAC-SHA256", data_hora, escopo,
-        hashlib.sha256(canonica.encode("utf-8")).hexdigest(),
-    ])
-    chave = _hmac(_hmac(_hmac(_hmac(f"AWS4{segredo}".encode("utf-8"), data), regiao),
-                        servico), "aws4_request")
-    assinatura = hmac.new(chave, a_assinar.encode("utf-8"), hashlib.sha256).hexdigest()
-    saida = {k: v for k, v in cabecalhos.items()}
-    saida["x-amz-content-sha256"] = carga_sha256
-    saida["x-amz-date"] = data_hora
-    saida["Authorization"] = (
-        f"AWS4-HMAC-SHA256 Credential={chave_id}/{escopo}, "
-        f"SignedHeaders={';'.join(nomes)}, Signature={assinatura}"
-    )
-    return saida
 
 
 def _sha256_arquivo(caminho: Path) -> str:
@@ -242,26 +180,13 @@ class FilaSupabase:
                    os.environ["SUPABASE_SECRET_KEY"].strip(), prazo_s)
 
     def _rpc(self, funcao: str, parametros: dict[str, Any]) -> Any:
-        # As chaves novas (sb_secret_...) NAO sao JWT: vao so no 'apikey'.
-        # A service_role antiga e JWT (comeca com 'eyJ') e vai tambem no
-        # Authorization, como a documentacao do Supabase manda.
-        cab = {"apikey": self.chave, "Content-Type": "application/json",
-               "Accept": "application/json"}
-        if self.chave.startswith("eyJ"):
-            cab["Authorization"] = f"Bearer {self.chave}"
-        pedido = urllib.request.Request(
-            f"{self.url}/rest/v1/rpc/{funcao}", method="POST", headers=cab,
-            data=json.dumps(parametros, ensure_ascii=False).encode("utf-8"),
-        )
         try:
-            with urllib.request.urlopen(pedido, timeout=TIMEOUT_S) as r:
-                corpo = r.read()
-        except urllib.error.HTTPError as exc:
-            detalhe = exc.read().decode("utf-8", "replace")[:300]
-            raise ErroNuvem(f"a fila recusou '{funcao}' (HTTP {exc.code}).", detalhe) from None
-        except urllib.error.URLError as exc:
-            raise ErroNuvem(f"não consegui falar com a fila ({exc.reason}).") from None
-        return json.loads(corpo.decode("utf-8")) if corpo else None
+            return rest.rpc(self.url, self.chave, funcao, parametros)
+        except ErroNuvem as exc:
+            # A mensagem do worker fala de FILA, nao de Supabase generico.
+            raise ErroNuvem(f"a fila recusou '{funcao}' (HTTP {exc.status}).", exc.detalhe,
+                            exc.status) if exc.status else ErroNuvem(
+                "não consegui falar com a fila.", exc.mensagem) from None
 
     def reservar(self, worker: str) -> Reserva | None:
         while True:

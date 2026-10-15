@@ -1,0 +1,292 @@
+"""Provas da fase N-2 -- o app na nuvem (RULINGS §29.3). Espelha prova_n1.py.
+
+    python provas/prova_n2.py                # estruturais
+    python provas/prova_n2.py --fisicas      # + fisicas
+    python provas/prova_n2.py N2-E1 N2-F1    # casos escolhidos
+
+Fisicas e o que cada uma precisa:
+  N2-F1  banco das contas  -> CLIPPRO_PROVA_PG (Postgres de TESTE) + psql
+  N2-F2  interface         -> node + playwright (Chromium), backend falso local
+
+Nada aqui fala com o Supabase, o R2 ou a Anthropic de verdade.
+
+Convencao: comentarios e docstrings em PT-BR sem acento; mensagens dirigidas
+ao usuario em PT-BR com acentuacao correta.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+import time
+from pathlib import Path
+from typing import Any, Callable
+
+RAIZ = Path(__file__).resolve().parent.parent
+if str(RAIZ) not in sys.path:
+    sys.path.insert(0, str(RAIZ))
+
+from provas.prova_f6 import (  # noqa: E402
+    Falhou,
+    Pulou,
+    _amarelo,
+    _verde,
+    _vermelho,
+    _zero,
+    confere,
+)
+from provas.prova_n1 import _SUPABASE_IMITADO, _pasta  # noqa: E402
+
+# O esquema auth do Supabase, no minimo que as migracoes usam: a tabela de
+# usuarios (com a confirmacao de e-mail) e auth.uid().
+_AUTH_IMITADO = """
+create schema if not exists auth;
+create table if not exists auth.users (
+    id uuid primary key, email text, email_confirmed_at timestamptz);
+create or replace function auth.uid() returns uuid language sql stable as
+    $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+grant usage on schema auth to anon, authenticated, service_role;
+grant execute on function auth.uid() to anon, authenticated, service_role;
+drop table if exists public.movimentos, public.perfis, public.convites cascade;
+drop trigger if exists clippro_ao_criar_usuario on auth.users;
+drop trigger if exists clippro_ao_confirmar_usuario on auth.users;
+delete from auth.users;
+"""
+
+ANA = "a0000000-0000-4000-8000-00000000000a"
+BIA = "b0000000-0000-4000-8000-00000000000b"
+CAIO = "c0000000-0000-4000-8000-00000000000c"
+LINK = """'{"tipo": "link", "valor": "https://www.youtube.com/watch?v=abc"}'::jsonb"""
+
+
+def _psql_ou_pula() -> tuple[str, str]:
+    url, psql = os.environ.get("CLIPPRO_PROVA_PG"), shutil.which("psql")
+    if not url or not psql:
+        raise Pulou("pendente: defina CLIPPRO_PROVA_PG com a URL de um Postgres de TESTE "
+                    "(a prova apaga e recria as tabelas) e tenha o psql no PATH.")
+    return url, psql
+
+
+class _Banco:
+    def __init__(self, url: str, psql: str) -> None:
+        self.url, self.psql = url, psql
+        self.env = {**os.environ, "PGOPTIONS": "-c client_min_messages=warning"}
+
+    def args(self, *comandos: str, como: str | None = None,
+             arquivo: Path | None = None) -> list[str]:
+        a = [self.psql, self.url, "-X", "-q", "-At", "-v", "ON_ERROR_STOP=1"]
+        if como == "anon":
+            a += ["-c", "set role anon"]
+        elif como == "worker":
+            a += ["-c", "set role service_role"]
+        elif como:
+            a += ["-c", f"set request.jwt.claim.sub = '{como}'", "-c", "set role authenticated"]
+        if arquivo:
+            a += ["-f", str(arquivo)]
+        for c in comandos:
+            a += ["-c", c]
+        return a
+
+    def __call__(self, *comandos: str, como: str | None = None,
+                 arquivo: Path | None = None) -> subprocess.CompletedProcess:
+        return subprocess.run(self.args(*comandos, como=como, arquivo=arquivo),
+                              capture_output=True, text=True, encoding="utf-8",
+                              errors="replace", timeout=120, env=self.env)
+
+    def valor(self, comando: str, como: str | None = None) -> str:
+        p = self(comando, como=como)
+        if p.returncode:
+            raise Falhou(f"SQL falhou: {comando[:60]} -> {_erro(p)}")
+        return p.stdout.strip()
+
+
+def _erro(p: subprocess.CompletedProcess) -> str:
+    """A linha ERROR do psql (o resto e contexto tecnico)."""
+    linhas = [l for l in (p.stderr or "").splitlines() if "ERROR" in l]
+    return (linhas[0].split("ERROR:", 1)[-1].strip() if linhas else "")[:90]
+
+
+def _saldo(db: _Banco, conta: str) -> int:
+    return int(db.valor("select meu_saldo()", como=conta))
+
+
+# ==========================================================================
+# Fisicas
+# ==========================================================================
+
+
+def f_banco_das_contas(raiz: Path) -> None:
+    """N2-F1: convites, créditos, RLS e corrida de pedidos num Postgres real."""
+    db = _Banco(*_psql_ou_pula())
+    pasta = RAIZ / "nuvem" / "supabase"
+
+    p = db(_SUPABASE_IMITADO + _AUTH_IMITADO)
+    confere(p.returncode == 0, "o banco de teste imita o Supabase (papéis + auth)",
+            p.stderr[-120:] if p.returncode else "")
+    for rodada in (1, 2):
+        p1 = db(arquivo=pasta / "001_fila.sql")
+        p2 = db(arquivo=pasta / "002_contas.sql")
+        confere(p1.returncode == 0 and p2.returncode == 0,
+                f"001 + 002 rodam em ordem (rodada {rodada}: idempotentes)",
+                (p1.stderr or p2.stderr)[-140:] if (p1.returncode or p2.returncode) else "")
+
+    # Convite + e-mail confirmado = liberado com 300.
+    db.valor("insert into convites (email) values ('ana@exemplo.com'), ('caio@exemplo.com')")
+    db.valor(f"insert into auth.users values ('{ANA}', 'Ana@Exemplo.com', now())")
+    confere(_saldo(db, ANA) == 300, "convidada com e-mail confirmado ganha 300 créditos")
+
+    db.valor(f"insert into auth.users values ('{BIA}', 'bia@exemplo.com', now())")
+    p = db(f"select criar_trabalho({LINK}, 3, 'cortes')", como=BIA)
+    confere(_saldo(db, BIA) == 0 and p.returncode != 0 and "só para convidados" in p.stderr,
+            "sem convite: saldo 0 e o pedido é recusado com a mensagem do beta",
+            _erro(p))
+
+    db.valor(f"insert into auth.users values ('{CAIO}', 'caio@exemplo.com', null)")
+    confere(_saldo(db, CAIO) == 0,
+            "convidado que NÃO confirmou o e-mail ainda não ganha nada")
+    db.valor(f"update auth.users set email_confirmed_at = now() where id = '{CAIO}'")
+    db.valor(f"update auth.users set email_confirmed_at = now() where id = '{CAIO}'")
+    confere(_saldo(db, CAIO) == 300, "ao confirmar, ganha 300 — uma vez só, mesmo confirmando 2x")
+
+    db.valor("insert into convites (email) values ('bia@exemplo.com')")
+    confere(_saldo(db, BIA) == 300, "convite que chega depois do cadastro libera quem já confirmou")
+
+    # Pedido: reserva o saldo (até 600) e devolve o que sobrou no fim.
+    id1 = db.valor(f"select criar_trabalho({LINK}, 3, 'cortes')", como=ANA)
+    confere(bool(id1) and _saldo(db, ANA) == 0, "pedir clipes reserva o saldo inteiro (300 < 600)")
+    p = db(f"select criar_trabalho({LINK}, 3, 'cortes')", como=ANA)
+    confere(p.returncode != 0 and "créditos acabaram" in p.stderr,
+            "sem saldo livre, o 2º pedido é recusado", _erro(p))
+    reservado = db.valor("select id from reservar_trabalho('w1', 600)", como="worker")
+    ok = db.valor(f"""select encerrar_trabalho('{id1}', 'w1', 1, 'concluido',
+                      '{{"status": "concluido", "creditos": 2}}'::jsonb)""", como="worker")
+    confere(reservado == id1 and ok == "t" and _saldo(db, ANA) == 298,
+            "o worker conclui com 2 créditos e a conta fica com 298", f"saldo {_saldo(db, ANA)}")
+
+    id2 = db.valor(f"select criar_trabalho({LINK}, 3, 'cortes')", como=ANA)
+    db.valor("select id from reservar_trabalho('w1', 600)", como="worker")
+    db.valor(f"""select encerrar_trabalho('{id2}', 'w1', 1, 'falhou',
+                 '{{"status": "falhou", "creditos": 0}}'::jsonb)""", como="worker")
+    confere(_saldo(db, ANA) == 298, "falha devolve a reserva inteira")
+    db.valor(f"update trabalhos set status = 'pendente' where id = '{id2}'")
+    db.valor(f"update trabalhos set status = 'falhou' where id = '{id2}'")
+    confere(_saldo(db, ANA) == 298, "a devolução não se repete se o status oscilar")
+
+    id3 = db.valor(f"select criar_trabalho({LINK}, 3, 'cortes')", como=ANA)
+    db.valor("select id from reservar_trabalho('w1', 600)", como="worker")
+    db.valor(f"""select encerrar_trabalho('{id3}', 'w1', 1, 'concluido',
+                 '{{"status": "concluido", "creditos": "dois"}}'::jsonb)""", como="worker")
+    confere(_saldo(db, ANA) == 298, "crédito torto no resultado cobra zero (a favor do usuário)")
+
+    # RLS e colunas internas.
+    meus = db.valor("select count(*) from trabalhos", como=ANA)
+    alheios = db.valor("select count(*) from trabalhos", como=BIA)
+    confere(meus == "3" and alheios == "0", "cada conta só vê os próprios trabalhos",
+            f"ana {meus}, bia {alheios}")
+    p = db("select worker from trabalhos", como=ANA)
+    confere(p.returncode != 0 and "permission denied" in p.stderr,
+            "colunas internas da fila (worker) não são legíveis pelo usuário")
+    p = db(f"insert into movimentos (conta, delta, motivo) values ('{ANA}', 999, 'ajuste')",
+           como=ANA)
+    confere(p.returncode != 0, "o usuário não consegue se dar créditos")
+    p = db(f"select criar_trabalho({LINK}, 3, 'cortes')", como="anon")
+    confere(p.returncode != 0 and "permission denied" in p.stderr,
+            "sem login (anon) não se pede clipe")
+    p = db(f"select criar_trabalho({LINK}, 0, 'cortes')", como=BIA)
+    confere(p.returncode != 0 and "1 a 20" in p.stderr, "n fora de 1–20 é recusado com mensagem")
+
+    # Limite de 3 na fila.
+    db.valor(f"insert into movimentos (conta, delta, motivo) values ('{ANA}', 2000, 'ajuste')")
+    for _ in range(3):
+        db.valor(f"select criar_trabalho({LINK}, 3, 'cortes')", como=ANA)
+    p = db(f"select criar_trabalho({LINK}, 3, 'cortes')", como=ANA)
+    confere(p.returncode != 0 and "3 vídeos na fila" in p.stderr,
+            "no máximo 3 vídeos na fila por conta", _erro(p))
+
+    # Corrida: dois pedidos da mesma conta ao mesmo tempo não gastam o mesmo saldo.
+    db.valor("delete from trabalhos")
+    db.valor(f"delete from movimentos where conta = '{CAIO}'")
+    db.valor(f"insert into movimentos (conta, delta, motivo) values ('{CAIO}', 10, 'ajuste')")
+    segura = subprocess.Popen(
+        db.args("begin", f"select criar_trabalho({LINK}, 3, 'cortes')", "select pg_sleep(2)",
+                "commit", como=CAIO),
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=db.env)
+    time.sleep(0.5)
+    p = db(f"select criar_trabalho({LINK}, 3, 'cortes')", como=CAIO)
+    segura.communicate(timeout=30)
+    confere(p.returncode != 0 and "créditos acabaram" in p.stderr and _saldo(db, CAIO) == 0,
+            "dois pedidos simultâneos: um reserva, o outro espera e é recusado; saldo nunca "
+            "fica negativo", f"saldo {_saldo(db, CAIO)}")
+
+
+FISICAS: dict[str, tuple[str, Callable[[Path], None]]] = {
+    "N2-F1": ("banco das contas num Postgres real", f_banco_das_contas),
+}
+
+ESTRUTURAIS: dict[str, tuple[str, Callable[[Path], None]]] = {}
+
+
+# ==========================================================================
+
+
+def main(argv: list[str]) -> int:
+    quer_fisicas = "--fisicas" in argv
+    nomes = [a.upper() for a in argv if not a.startswith("--")]
+
+    casos: dict[str, tuple[str, Callable[[Path], None]]] = dict(ESTRUTURAIS)
+    if quer_fisicas:
+        casos.update(FISICAS)
+    desconhecidos = [n for n in nomes if n not in casos]
+    if desconhecidos:
+        print(f"prova desconhecida: {', '.join(desconhecidos)}. Disponíveis: {', '.join(casos)}")
+        return 2
+    pedidos = nomes or list(casos)
+    raiz = RAIZ / "_teste" / "out-prova-n2"
+
+    titulo = "PROVAS DA N-2 — app na nuvem"
+    if not quer_fisicas:
+        titulo += "  (só ESTRUTURAIS; use --fisicas para as demais)"
+    print(f"\n{'=' * 78}\n{titulo}\n{'=' * 78}\n")
+
+    resultados: list[tuple[str, str, float, str]] = []
+    for nome in pedidos:
+        descricao, funcao = casos[nome]
+        print(f"{_amarelo}{nome}{_zero}  {descricao}")
+        t0 = time.monotonic()
+        try:
+            funcao(raiz)
+            resultados.append((nome, "passou", time.monotonic() - t0, ""))
+        except Pulou as exc:
+            print(f"    {_amarelo}pulou{_zero}  {exc}")
+            resultados.append((nome, "pulou", time.monotonic() - t0, str(exc)[:160]))
+        except BaseException as exc:  # noqa: BLE001 - a prova relata, nao propaga
+            if not isinstance(exc, Falhou):
+                import traceback
+
+                traceback.print_exc()
+            resultados.append((nome, "falhou", time.monotonic() - t0, str(exc)[:160]))
+        print()
+
+    print("=" * 78)
+    marcas = {
+        "passou": f"{_verde}PASSOU{_zero}",
+        "pulou": f"{_amarelo}PULOU {_zero}",
+        "falhou": f"{_vermelho}FALHOU{_zero}",
+    }
+    for nome, estado, segundos, motivo in resultados:
+        print(f"  {nome:6} {marcas[estado]}  {segundos:6.2f}s  {motivo}")
+    passaram = sum(1 for _, e, _, _ in resultados if e == "passou")
+    pularam = sum(1 for _, e, _, _ in resultados if e == "pulou")
+    falharam = sum(1 for _, e, _, _ in resultados if e == "falhou")
+    print("=" * 78)
+    print(f"  {passaram} passaram, {pularam} pularam, {falharam} falharam")
+    if not quer_fisicas:
+        print(f"  {len(FISICAS)} prova(s) FÍSICA(S) não executada(s).")
+    return 1 if falharam else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))
