@@ -34,8 +34,10 @@
   const N_MAX = 10;
   const INTERVALO_MS = 8000;
 
+  const MOTIVOS = { cadastro: "Bônus de boas-vindas", reserva: "Reserva para um vídeo",
+                    devolucao: "Devolução do que sobrou", compra: "Compra de créditos", ajuste: "Ajuste" };
   const estado = {
-    sb: null, sessao: null, saldo: null, vez: 0, timer: null, recuperando: false,
+    sb: null, sessao: null, saldo: null, vez: 0, timer: null, recuperando: false, compras: false,
     modoConta: "entrar", via: "link", arquivo: null, duracaoArquivo: null,
   };
 
@@ -150,6 +152,7 @@
       if (e && e.message) $("#config-msg", no).textContent = legivel(e);
       return;
     }
+    estado.compras = Boolean(cfg.compras);
     estado.sb = window.supabase.createClient(cfg.supabase_url, cfg.supabase_chave, {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: "pkce" },
     });
@@ -190,7 +193,12 @@
     if (!perfil || !perfil.liberado) return telaBeta(perfil ? perfil.email : estado.sessao.user.email);
     atualizarSaldo();
     const m = location.hash.match(/^#\/rolo\/([0-9a-f-]{36})$/i);
-    return m ? telaTrabalho(m[1].toLowerCase(), vez) : telaPainel(vez);
+    if (m) return telaTrabalho(m[1].toLowerCase(), vez);
+    if (location.hash === "#/creditos") return telaCreditos(vez);
+    // O Mercado Pago volta com parametros depois do hash (?payment_id=...).
+    const volta = location.hash.match(/^#\/compra\/(aprovada|pendente|recusada)(?:\?(.*))?$/);
+    if (volta) return telaVoltaCompra(volta[1], new URLSearchParams(volta[2] || ""), vez);
+    return telaPainel(vez);
   }
 
   async function sair() {
@@ -656,6 +664,106 @@
       duracao ? el("p", { class: "clipe-meta", texto: `Clipe ${i + 1} · ${duracao}` }) : null,
       c.gancho ? el("p", { class: "clipe-gancho", texto: c.gancho }) : null,
       acoes);
+  }
+
+  // ------------------------------------------------------------ creditos
+  function reais(centavos) {
+    return (centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  }
+
+  async function telaCreditos(vez) {
+    const no = montar("t-creditos");
+    const aviso = $("#msg-pacotes", no);
+    const [saldo, pacotes, extrato] = await Promise.all([
+      estado.sb.rpc("meu_saldo"),
+      estado.compras
+        ? estado.sb.from("pacotes").select("id,nome,minutos,preco_centavos").order("ordem")
+        : Promise.resolve({ data: [] }),
+      estado.sb.from("movimentos").select("delta,motivo,criado_em")
+        .order("criado_em", { ascending: false }).limit(50),
+    ]);
+    if (vez !== estado.vez) return;
+    $("#cr-saldo", no).textContent = String(Number(saldo.data) || 0);
+
+    const lista = (pacotes && pacotes.data) || [];
+    $("#pacotes-fechado", no).hidden = estado.compras && lista.length > 0;
+    $("#pacotes-nota", no).hidden = !(estado.compras && lista.length > 0);
+    $("#pacotes", no).replaceChildren(...lista.map((p) => el("article", { class: "ingresso" },
+      el("p", { class: "ingresso-nome", texto: p.nome }),
+      el("p", { class: "ingresso-min", texto: String(p.minutos) }, el("small", { texto: "minutos" })),
+      el("p", { class: "ingresso-preco", texto: reais(p.preco_centavos) },
+        el("small", { texto: `${reais(p.preco_centavos / p.minutos)} por minuto de vídeo` })),
+      el("button", { class: "btn primario", type: "button", "data-pacote": p.id, texto: "Comprar",
+        onclick: (ev) => comprar(p.id, ev.currentTarget, aviso) }))));
+
+    const itens = (extrato && extrato.data) || [];
+    $("#extrato", no).replaceChildren(...(itens.length ? itens.map((m) => el("li", {},
+      el("span", { class: "extrato-motivo", texto: MOTIVOS[m.motivo] || m.motivo }),
+      el("span", { class: "extrato-quando", texto: new Date(m.criado_em).toLocaleString("pt-BR",
+        { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) }),
+      el("span", { class: `extrato-delta ${m.delta >= 0 ? "mais" : "menos"}`,
+        texto: `${m.delta >= 0 ? "+" : "−"}${Math.abs(m.delta)} min` })))
+      : [el("li", {}, el("span", { class: "extrato-quando", texto: "Nada por aqui ainda." }))]));
+  }
+
+  async function comprar(pacote, botao, aviso) {
+    botao.disabled = true;
+    botao.textContent = "Abrindo o Mercado Pago…";
+    msg(aviso, "");
+    try {
+      const r = await fetch("/api/comprar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${await token()}` },
+        body: JSON.stringify({ pacote }),
+      });
+      const dados = await r.json().catch(() => ({}));
+      if (!r.ok || !dados.url) throw new Error(dados.erro || "Não consegui abrir o pagamento.");
+      location.href = dados.url;
+    } catch (e) {
+      msg(aviso, legivel(e));
+      botao.disabled = false;
+      botao.textContent = "Comprar";
+    }
+  }
+
+  function telaVoltaCompra(tipo, params, vez) {
+    const no = montar("t-compra");
+    const titulo = $("#cp-titulo", no);
+    const texto = $("#cp-texto", no);
+    if (tipo === "recusada") {
+      titulo.textContent = "Pagamento não concluído";
+      texto.textContent = "Nada foi cobrado. Você pode tentar de novo em Créditos.";
+      return;
+    }
+    titulo.textContent = tipo === "aprovada" ? "Pagamento aprovado" : "Pagamento em processamento";
+    texto.textContent = tipo === "aprovada"
+      ? "Conferindo com o Mercado Pago… os minutos entram em segundos."
+      : "Pix ou boleto ainda não compensou. Os minutos entram sozinhos quando o Mercado Pago aprovar; pode fechar esta página.";
+    const compra = params.get("external_reference") || "";
+    if (!/^[0-9a-f-]{36}$/i.test(compra)) return;
+    let tentativas = 0;
+    const conferir = async () => {
+      if (vez !== estado.vez) return;
+      const { data } = await estado.sb.from("compras").select("status,minutos").eq("id", compra).limit(1);
+      if (vez !== estado.vez) return;
+      const c = data && data[0];
+      if (c && c.status === "aprovada") {
+        titulo.textContent = "Minutos na conta";
+        texto.textContent = `Pronto: ${c.minutos} minutos entraram no seu saldo.`;
+        await atualizarSaldo();
+        $("#cp-saldo", no).textContent = String(estado.saldo);
+        $("#cp-saldo-caixa", no).hidden = false;
+        return;
+      }
+      if (c && c.status === "recusada") {
+        titulo.textContent = "Pagamento não aprovado";
+        texto.textContent = "O Mercado Pago recusou o pagamento. Nada foi cobrado.";
+        return;
+      }
+      if (++tentativas < 40) estado.timer = setTimeout(conferir, 3000);
+      else texto.textContent = "Ainda não recebemos a confirmação. Os minutos entram sozinhos quando ela chegar.";
+    };
+    conferir();
   }
 
   iniciar();

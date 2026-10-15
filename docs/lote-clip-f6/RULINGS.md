@@ -1487,3 +1487,14 @@ O restante faça com oq achar recomendado
 - **Extrato visível ao usuário:** cadastro, reservas, devoluções e compras.
 - Estorno ou chargeback não debita automaticamente no beta; fica registrado
   como pendência.
+
+### 29.6 Resultado da N-3 (decidida por delegação)
+
+- `003_compras.sql`, `nuvem/mercadopago.py`, `api/comprar.py`,
+  `api/mp_webhook.py`, e as telas Créditos e Volta do pagamento.
+- **Desligada por padrão** (`COMPRAS_ATIVAS`).
+- Placar: N-3 **6/0/0**; N-2 7/0/0; 11 de 11 mutantes de dinheiro mordem.
+  Relatório: `docs/lote-clip-f6/relatorio-n3.md`. Roteiro do Mercado Pago:
+  `docs/nuvem/roteiro-contas.md` §8.
+- **Ligar as vendas** exige V1–V6, que ficam com o Bruno: preço, Vercel Pro,
+  termos, credenciais, sandbox e nota fiscal.

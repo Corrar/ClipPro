@@ -99,8 +99,9 @@ button { font: inherit; }
 .topo-conta { display: flex; align-items: center; gap: 14px; }
 .saldo {
   display: flex; align-items: baseline; gap: 10px; padding: 6px 12px; border-radius: 8px;
-  border: 1px solid var(--linha2); background: var(--bg2);
+  border: 1px solid var(--linha2); background: var(--bg2); text-decoration: none;
 }
+a.saldo:hover { border-color: var(--y); }
 .saldo-rot { font-family: var(--f-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--fraco); }
 .saldo-tc { font-family: var(--f-mono); font-weight: 700; color: var(--y); font-variant-numeric: tabular-nums; letter-spacing: .04em; }
 .saldo.mudou { animation: realce .9s ease-out; }
@@ -334,6 +335,44 @@ a.rolo:hover { border-color: var(--linha2); transform: translateX(2px); }
 .clipe-acoes { display: flex; flex-wrap: wrap; gap: 8px; margin: 2px 4px 0; }
 .clipe-acoes .btn { flex: 1 1 auto; }
 
+/* ------------------------------------------------------------ creditos */
+.creditos { max-width: 1080px; margin: 0 auto; padding: 24px var(--gut) 80px; }
+.creditos-cab { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin: 8px 0 34px; }
+.saldo-grande { margin: 0; display: grid; justify-items: end; line-height: 1; }
+.saldo-grande span { font-family: var(--f-disp); font-size: clamp(3.4rem, 2rem + 5vw, 5.6rem); color: var(--y); letter-spacing: .01em; }
+.saldo-grande small { font-family: var(--f-mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--fraco); margin-top: 6px; }
+.centro .saldo-grande { justify-items: start; margin-top: 22px; }
+.pacotes-bloco, .extrato-bloco { margin-top: 10px; }
+.pacotes-bloco h2, .extrato-bloco h2 { margin: 0 0 16px; }
+.extrato-bloco { margin-top: 44px; }
+.pacotes { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 18px; }
+/* o pacote e um ingresso de cinema: canhoto picotado e furos laterais */
+.ingresso {
+  position: relative; display: grid; grid-template-rows: auto auto 1fr auto; gap: 6px;
+  padding: 22px 22px 18px; border-radius: 14px; background: linear-gradient(180deg, var(--painel2), var(--painel));
+  border: 1px solid var(--linha2); animation: entra .35s ease-out both;
+  -webkit-mask: radial-gradient(circle 11px at 0 64%, transparent 98%, #000) left / 51% 100% no-repeat,
+                radial-gradient(circle 11px at 100% 64%, transparent 98%, #000) right / 51% 100% no-repeat;
+          mask: radial-gradient(circle 11px at 0 64%, transparent 98%, #000) left / 51% 100% no-repeat,
+                radial-gradient(circle 11px at 100% 64%, transparent 98%, #000) right / 51% 100% no-repeat;
+}
+.ingresso-nome { margin: 0; font-family: var(--f-mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--fraco); }
+.ingresso-min { margin: 0; font-family: var(--f-disp); font-size: 3rem; line-height: 1; color: var(--tx); }
+.ingresso-min small { font-family: var(--f-ui); font-size: 15px; color: var(--fraco); margin-left: 6px; }
+.ingresso-preco { margin: 10px 0 0; padding-top: 14px; border-top: 2px dashed var(--linha2); font-size: 22px; font-weight: 800; color: var(--y); }
+.ingresso-preco small { display: block; font-size: 12.5px; font-weight: 400; color: var(--fraco); }
+.ingresso .btn { margin-top: 12px; width: 100%; }
+.aviso-loja { margin: 0; padding: 18px 20px; border-radius: 14px; border: 1.5px dashed var(--linha2); color: var(--tx2); }
+.extrato { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--linha); }
+.extrato li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 16px; padding: 12px 4px; border-bottom: 1px solid var(--linha); }
+.extrato-motivo { color: var(--tx); font-weight: 600; }
+.extrato-quando { font-family: var(--f-mono); font-size: 12px; color: var(--fraco); }
+.extrato-delta { grid-row: 1 / span 2; grid-column: 2; align-self: center; font-family: var(--f-mono); font-weight: 700; font-variant-numeric: tabular-nums; }
+.extrato-delta.mais { color: var(--ok); }
+.extrato-delta.menos { color: var(--fraco); }
+.acoes-linha { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+.acoes-linha .btn { margin-top: 0 !important; }
+
 /* ------------------------------------------------------------ responsivo */
 @media (max-width: 960px) {
   .entrar { grid-template-columns: 1fr; }
@@ -351,6 +390,9 @@ a.rolo:hover { border-color: var(--linha2); transform: translateX(2px); }
   .mini-bold::after { font-size: 14px; }
   .visual-nome { font-size: 11.5px; }
   .saldo-rot { display: none; }
+  #link-creditos { display: none; }
+  .creditos-cab { flex-direction: column; align-items: flex-start; }
+  .saldo-grande { justify-items: start; }
   .trabalho-cab { flex-direction: column; }
   .marca-nome { display: none; }
 }

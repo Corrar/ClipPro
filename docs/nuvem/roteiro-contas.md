@@ -192,3 +192,62 @@ clippro → Settings → CORS Policy**, use (troque pelo endereço do passo 7.6)
 
 Mande o que viu em cada passo. Se algo falhar, mande também a mensagem que
 apareceu.
+
+---
+
+## 8. N-3: vender créditos (Mercado Pago)
+
+Só quando for vender. Antes, as pendências V1–V6 do
+`docs/lote-clip-f6/relatorio-n3.md` (preço, Vercel Pro, termos, sandbox,
+nota fiscal).
+
+### 8.1 Aplicação no Mercado Pago
+
+1. Em https://www.mercadopago.com.br/developers, abra **Suas integrações →
+   Criar aplicação** e escolha **Checkout Pro**.
+2. Em **Credenciais de produção**, copie o **Access Token** (`APP_USR-…`). Ele
+   vira `MP_ACCESS_TOKEN`.
+3. Use primeiro as **credenciais de teste**, com contas de comprador de
+   teste, e só depois as de produção.
+
+### 8.2 Webhook
+
+1. Na aplicação, abra **Webhooks → Configurar notificações**.
+2. Em **URL de produção**, use `https://<endereço do app>/api/mp_webhook` e
+   marque o evento **Pagamentos**.
+3. Copie a **assinatura secreta**. Ela vira `MP_WEBHOOK_SECRET`.
+
+### 8.3 Banco
+
+No SQL Editor, rode `nuvem/supabase/003_compras.sql` (depois do 002).
+
+Os pacotes são seus: **o preço é decisão sua**. Um insert por pacote, com o
+preço **em centavos**:
+
+```
+insert into pacotes (id, nome, minutos, preco_centavos, ativo, ordem)
+values ('p60', 'Pacote 60', 60, <PREÇO_EM_CENTAVOS>, true, 1);
+```
+
+Para tirar um pacote da loja, troque `ativo` para `false`. Para mudar o
+preço, edite `preco_centavos`: quem já abriu uma compra paga o preço daquele
+momento.
+
+### 8.4 Variáveis na Vercel (projeto `clippro-app`)
+
+- `MP_ACCESS_TOKEN`;
+- `MP_WEBHOOK_SECRET`;
+- `SUPABASE_SECRET_KEY` — **só agora** ela entra na Vercel, para o webhook
+  confirmar as compras;
+- `APP_URL` = o endereço do app, por exemplo `https://clippro-app.vercel.app`;
+- `COMPRAS_ATIVAS` = `1` **só no dia de abrir as vendas**. Sem ela, a loja
+  aparece fechada.
+
+### 8.5 Conferir
+
+1. Compre o menor pacote com uma conta de teste do Mercado Pago.
+2. O app deve voltar com "Pronto: N minutos entraram no seu saldo".
+3. O extrato deve mostrar a compra.
+
+Se não entrar, veja em **Vercel → clippro-app → Logs** as linhas
+`[mp_webhook]`: elas dizem o motivo (assinatura, valor ou estorno).

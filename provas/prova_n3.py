@@ -127,8 +127,44 @@ def f_banco_das_compras(raiz: Path) -> None:
             "no máximo 5 compras abertas por hora (clique repetido)", _erro(p))
 
 
+def f_compra_no_navegador(raiz: Path) -> None:
+    """N3-F2: comprar minutos num Chromium real, com o Mercado Pago falso."""
+    from provas.nuvem_falsa import MercadoPagoFalso
+    from provas.prova_n2 import _node_com_playwright, _servidor_do_app
+
+    node, env_node = _node_com_playwright()
+    saida = _pasta(raiz, "n3-f2")
+    for modo in ("aberta", "fechada"):
+        sb, mp = _loja(), MercadoPagoFalso()
+        sb.pacotes.append({"id": "p300", "nome": "300 minutos", "minutos": 300,
+                           "preco_centavos": 7990, "ativo": True, "ordem": 3})
+        with sb.servir() as url_sb, mp.servir() as url_mp:
+            amb = _amb(url_sb, url_mp, COMPRAS_ATIVAS="1" if modo == "aberta" else "")
+            with _servidor_do_app(amb) as url_app:
+                amb["APP_URL"] = url_app
+                proc = subprocess.run(
+                    [node, str(RAIZ / "provas" / "n3_interface.cjs")],
+                    env={**env_node, "APP_URL": url_app, "MODO": modo, "SAIDA": str(saida)},
+                    capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=240)
+        checks = [json.loads(l[6:]) for l in proc.stdout.splitlines() if l.startswith("CHECK ")]
+        if not checks:
+            raise Falhou(f"o script de compra não relatou nada: {(proc.stderr or proc.stdout)[-300:]}")
+        print(f"    — loja {modo}")
+        for c in checks:
+            confere(c["ok"], c["descricao"], c["detalhe"] if not c["ok"] else "")
+        if modo == "aberta":
+            aprovadas = [c for c in sb.compras if c["status"] == "aprovada"]
+            confere(len(aprovadas) == 1 and aprovadas[0]["preco_centavos"] == 1990
+                    and mp.avisos and all(s == 200 for _, s in mp.avisos),
+                    "uma compra aprovada, pelo webhook assinado, no preço do pacote")
+        else:
+            confere(not mp.preferencias, "com a loja fechada, nada foi ao Mercado Pago")
+    print(f"    prints  {saida}")
+
+
 FISICAS: dict[str, tuple[str, Callable[[Path], None]]] = {
     "N3-F1": ("banco das compras num Postgres real", f_banco_das_compras),
+    "N3-F2": ("compra num Chromium real (Mercado Pago falso)", f_compra_no_navegador),
 }
 
 

@@ -21,10 +21,11 @@
     <span class="marca-nome">Clip<b>Pro</b></span>
   </a>
   <div class="topo-conta" id="topo-conta" hidden>
-    <div class="saldo" id="saldo" aria-live="polite">
+    <a class="saldo" id="saldo" href="#/creditos" title="Ver créditos e extrato">
       <span class="saldo-rot">Saldo</span>
       <span class="saldo-tc" id="saldo-tc">—</span>
-    </div>
+    </a>
+    <a class="btn fantasma pequeno" href="#/creditos" id="link-creditos">Créditos</a>
     <button class="btn fantasma pequeno" type="button" id="sair">Sair</button>
   </div>
 </header>
@@ -206,6 +207,50 @@
       <span class="chip" id="tr-status"></span>
     </div>
     <div class="trabalho-corpo" id="tr-corpo"></div>
+  </section>
+</template>
+
+<!-- ============================== CRÉDITOS ============================== -->
+<template id="t-creditos">
+  <section class="creditos">
+    <a class="voltar" href="#/">← todos os rolos</a>
+    <div class="creditos-cab">
+      <div>
+        <p class="slate">Créditos</p>
+        <h1>Seu saldo</h1>
+        <p class="sub">1 crédito = 1 minuto de vídeo enviado. Cada pedido reserva o necessário e devolve o que sobrar.</p>
+      </div>
+      <p class="saldo-grande"><span id="cr-saldo">—</span><small>minutos de vídeo</small></p>
+    </div>
+
+    <section class="pacotes-bloco" aria-labelledby="pacotes-t">
+      <h2 id="pacotes-t">Comprar minutos</h2>
+      <div class="pacotes" id="pacotes"></div>
+      <p class="aviso-loja" id="pacotes-fechado" hidden>A compra de créditos abre no lançamento do ClipPro. No beta, os minutos do convite são por nossa conta.</p>
+      <p class="dica" id="pacotes-nota" hidden>Pagamento pelo Mercado Pago, com Pix ou cartão. Os minutos entram assim que o pagamento é aprovado.</p>
+      <p class="msg" id="msg-pacotes" role="alert" hidden></p>
+    </section>
+
+    <section class="extrato-bloco" aria-labelledby="extrato-t">
+      <h2 id="extrato-t">Extrato</h2>
+      <ol class="extrato" id="extrato"></ol>
+    </section>
+  </section>
+</template>
+
+<!-- ========================= VOLTA DO PAGAMENTO ========================= -->
+<template id="t-compra">
+  <section class="centro">
+    <div class="cartao estreito">
+      <p class="slate" id="cp-slate">Pagamento</p>
+      <h1 id="cp-titulo"></h1>
+      <p class="sub" id="cp-texto" aria-live="polite"></p>
+      <p class="saldo-grande" id="cp-saldo-caixa" hidden><span id="cp-saldo"></span><small>minutos de vídeo</small></p>
+      <div class="acoes-linha">
+        <a class="btn primario" href="#/">Voltar aos rolos</a>
+        <a class="btn fantasma" href="#/creditos">Ver extrato</a>
+      </div>
+    </div>
   </section>
 </template>
 

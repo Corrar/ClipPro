@@ -35,6 +35,9 @@ F1–F4 → F9 "paridade". F7 (narração) guardada.
 > (Auth, Google, convites, CORS do R2, projeto Vercel `clippro-app` com
 > produção pública e no branch de trabalho). Próximo: N-3 (Mercado Pago),
 > com o preço dos pacotes decidido pelo Bruno.
+> **N-3 (compra de créditos) feita, provada e DESLIGADA** (`relatorio-n3.md`).
+> Ligar as vendas exige V1–V6 do relatório (preço, Vercel Pro, termos,
+> credenciais, sandbox, nota fiscal). Próximo: N-4 (termos, privacidade, site).
 
 ---
 
