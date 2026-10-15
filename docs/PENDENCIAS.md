@@ -14,6 +14,11 @@ CLIP-F6.1 (feito, aguarda Windows + merge) → **site** (no ar, decisões
 pendentes) → **F8a** (pausado, perguntas pendentes) → F8b → F8c → provas
 F1–F4 → F9 "paridade". F7 (narração) guardada.
 
+> **⚠ Em aberto desde o §24: ClipPro na nuvem** (conta, créditos, geração no
+> servidor). Revoga o §17 Q3 = B. Perguntas **N1–N10** em
+> `docs/lote-clip-f6/relatorio-pedido-nuvem.md`; a **N8** redefine esta fila.
+> Até a resposta: PARE, e as perguntas do F8a ficam em espera.
+
 ---
 
 ## 1. Site na Vercel — decisões do Bruno

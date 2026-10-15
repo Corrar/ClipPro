@@ -1191,3 +1191,37 @@ siga de onde parou
   harness, editar a legenda não refaz os clipes, **regressão E-R1/E-R2 que
   não morde**, F-G1 sobrescrevendo o vídeo da F5, divergências D1–D6).
 - **PARE** até a resposta.
+
+---
+
+## 24. Pedido de 15/10 — ClipPro operacional na nuvem
+
+Recebido em 15/10/2026, em três mensagens seguidas. Transcrição verbatim.
+
+```
+o clippro ja esta na vercel? ja tem um painel moderno estilo cutpro ou opusclip?
+```
+
+```
+o clippro ja vai ser operacional na nuvem, assim como é o cutpro e o opusclip.
+```
+
+```
+a pessoa deve abrir o clippro, fazer seu login ou criar sua conta, deve abrir o
+site com as opções a opçao de gerar clip a pessoa cola o link e o site faz a
+parte de cortar o video e gerar os clips editados, e funciona com creditos e
+compra de creditos....
+```
+
+### 24.1 Leitura do executor (declarada, não decisão)
+
+- A primeira mensagem é pergunta; a resposta está no §1 de
+  `docs/lote-clip-f6/relatorio-pedido-nuvem.md`.
+- A segunda e a terceira são **decisão de produto**: o ClipPro passa a ser um
+  serviço na nuvem com conta, geração de clipes no servidor e cobrança por
+  créditos. Isso **revoga o §17 Q3 = B** ("o modo padrão continua 100%
+  local"), contraria o README e o site publicado ("nenhum vídeo sai do seu
+  computador") e o §21.1 ("o painel NÃO vai para a Vercel").
+- Pelo CLAUDE.md §1, a arquitetura volta como pergunta: N1–N9 em
+  `relatorio-pedido-nuvem.md`. **PARE** até a resposta; nenhum código escrito.
+- As perguntas do F8a (§23) ficam em espera: a N8 decide a ordem.
