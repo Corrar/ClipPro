@@ -1516,3 +1516,21 @@ O restante faça com oq achar recomendado
   versão na nuvem. Depende do preço e da data, que são do Bruno.
 - Placar final: N-1 16/1 pendente (N-F4, contas reais)/0; N-2 7/0/0; N-3
   6/0/0; F6.1 13/0/0; F6 44/0/0.
+
+## 30. Diretiva do Bruno (16/10/2026): design mais profissional
+
+Texto, na íntegra:
+
+> "Melhore o design e layout, ao escolher o modelo do clipe, deixe mais
+> profissional, o app esta muito com cara de IA"
+
+Leitura do executor, decidida pela delegação do §29 (escolhas de design são
+do executor; preço, contas e merge continuam com o Bruno):
+
+- Vale para o **app** (`app/`). O site público segue pela N9 = B (muda no
+  lançamento).
+- **Escolha do modelo do clipe** é a prioridade nomeada: a prévia de cada
+  modelo deve mostrar o que o motor de fato entrega, e não uma ilustração.
+- O comportamento provado (créditos, upload, rotas, segurança, CSP sem
+  terceiros) **não muda**; as provas de interface se ajustam ao novo layout,
+  conferindo as mesmas coisas.
