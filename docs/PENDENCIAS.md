@@ -1,4 +1,70 @@
-# Pendências do ClipPro — estado em 15/10/2026
+# Pendências do ClipPro — estado em 16/10/2026
+
+## Retomada (pausa de 16/10, RULINGS §31)
+
+Antes de qualquer ação, ler esta seção e o `RULINGS.md` do §29 em diante.
+Depois, conferir a paridade: o `master` deve estar em `b85d323` e o branch
+`claude/loving-newton-bykd21` igual ao `origin`. Se algum dos dois tiver
+andado, PARE e reporte.
+
+**Onde estamos**
+
+- **No `master`** (merge do PR #1 pelo Bruno, §30.2):
+  - o motor local com o F6.1;
+  - a nuvem N-1 a N-4: worker, app, créditos, compra pelo Mercado Pago
+    desligada, termos e privacidade em rascunho.
+- **Só no branch:** a N-5, o design novo do app (`relatorio-n5.md`, telas
+  em `docs/nuvem/telas/` 1–8).
+- **O app não está no ar.** Na Vercel só existe o projeto `clippro`, que é o
+  site. Não há projeto `clippro-app` (conferido em 16/10).
+- **Placar no Linux:**
+
+  | Suíte | Passaram | Pularam | Falharam |
+  |---|---|---|---|
+  | N-5 | 3 | 0 | 0 |
+  | N-2 | 7 | 0 | 0 |
+  | N-3 | 6 | 0 | 0 |
+  | N-1 | 16 | 1 (N-F4, contas reais) | 0 |
+  | F6.1 | 13 | 0 | 0 |
+  | F6 | 44 | 0 | 0 |
+
+**O que espera o Bruno, por ordem de impacto**
+
+1. **PR da N-5 para o `master`?** O executor não abre PR sem pedido.
+2. **Q-N5-1:** mostrar a miniatura do YouTube nas prévias de pedido por
+   link? Exige pedir a `i.ytimg.com` e mudar a Política de privacidade.
+   Recomendação: não.
+3. **Contas da nuvem**, pelo `docs/nuvem/roteiro-contas.md` §1–§9:
+   - teto de gasto na Anthropic;
+   - Supabase com as migrações 001, 002 e 003;
+   - R2 com CORS e prazos de guarda;
+   - projeto `clippro-app` na Vercel, com produção no `master`;
+   - convites;
+   - depois, rodar a N-F4 no Windows.
+4. **Para vender:** V1–V6 do `relatorio-n3.md` (preço dos pacotes, Vercel
+   Pro, revisão jurídica, credenciais do Mercado Pago, sandbox, nota fiscal).
+5. **Conferência pós-merge do F6.1 no Windows:** W1–W3 e W5 (§2 abaixo).
+6. **Site público e licença:** a reescrita do site fica para o lançamento
+   (N9 = B); a licença é a S5.
+
+**O que o executor faz ao voltar**
+
+- Responde ao que o Bruno decidir sobre os itens 1 e 2.
+- Se o projeto `clippro-app` já existir, confere o deploy pela Vercel.
+- Sem pedido, não começa código novo. O F8a vem depois do núcleo da nuvem
+  (§29.2), começando pela Q17.
+
+**Ambiente da sessão (para o executor), que o container novo perde:**
+
+- **Postgres 16 de teste** para N-F3, N2-F1 e N3-F1. Suba com
+  `pg_ctlcluster 16 main start` e use
+  `CLIPPRO_PROVA_PG=postgresql://prova:prova@127.0.0.1:5432/clippro_prova`.
+- **Node com `playwright` global** para N2-F2, N3-F2 e N5-F1.
+- **Venv das provas** com as versões do lockfile.
+
+---
+
+## Histórico desta lista (15/10)
 
 > Gravado a pedido do Bruno ("salve na memória as pendências e continuamos
 > depois"). Ponto de retomada da próxima sessão: **ler este arquivo e o

@@ -1571,3 +1571,18 @@ do executor; preço, contas e merge continuam com o Bruno):
   `master`, que já tem o app. A N-5 só aparece lá depois do merge dela.
 - **Pendências do F6.1 que o merge não resolveu:** W1–W3 e W5 (provas no
   Windows), que agora valem como conferência pós-merge.
+
+## 31. Diretiva do Bruno (16/10/2026): pausa
+
+Texto, na íntegra:
+
+> "salve na memoria e continuamos amanha"
+
+Feito: este registro e o ponto de retomada no topo do `docs/PENDENCIAS.md`
+("Retomada"). Nenhum código novo. O estado na pausa:
+
+- `master` em `b85d323`, o merge do PR #1 feito pelo Bruno (§30.2);
+- o branch de trabalho é o `master` mais a N-5;
+- o app ainda não está no ar: não há projeto `clippro-app` na Vercel,
+  conferido em 16/10;
+- duas perguntas abertas ao Bruno: o PR da N-5 e a Q-N5-1.
