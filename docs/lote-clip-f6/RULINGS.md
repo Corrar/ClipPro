@@ -1586,3 +1586,13 @@ Feito: este registro e o ponto de retomada no topo do `docs/PENDENCIAS.md`
 - o app ainda não está no ar: não há projeto `clippro-app` na Vercel,
   conferido em 16/10;
 - duas perguntas abertas ao Bruno: o PR da N-5 e a Q-N5-1.
+
+### 31.1 Reforço do Bruno (16/10/2026)
+
+> "salve a pendencia no repo"
+
+As pendências já estavam no repositório desde `17c834b`:
+`docs/PENDENCIAS.md`, seção "Retomada". Com este registro, foram conferidas
+no GitHub, no branch `claude/loving-newton-bykd21`. No `master` o arquivo é a
+versão de 15/10, porque a retomada foi escrita depois do merge do PR #1. Para
+ela ir ao `master` é preciso um PR, que fica a pedido do Bruno.
