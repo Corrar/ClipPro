@@ -22,7 +22,7 @@ function confere(ok, descricao, detalhe = "") {
 // Print so depois das animacoes de entrada (0,35 s) e com a pagina no topo:
 // o print de pagina inteira desenha o cabecalho fixo onde a rolagem estiver.
 async function foto(page, nome, inteira = false) {
-  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.evaluate(() => { window.scrollTo(0, 0); document.querySelector("#aviso").hidden = true; });
   await page.waitForTimeout(700);
   await page.screenshot({ path: path.join(SAIDA, nome), fullPage: inteira });
 }
@@ -50,7 +50,7 @@ async function texto(page, seletor) {
   try {
     // 1. Entrar
     await page.goto(APP + "/");
-    await page.waitForSelector("text=Do vídeo longo aos cortes que viralizam.");
+    await page.waitForSelector("text=Do vídeo longo aos clipes prontos para postar.");
     confere(true, "a tela de entrada abre (título e formulário)");
     await foto(page, "1-entrar.png");
 
@@ -95,7 +95,7 @@ async function texto(page, seletor) {
     confere((await texto(page, "#aviso")).startsWith("Vídeo na fila"), "pedido aceito: aviso de fila",
       await texto(page, "#aviso"));
     await page.waitForSelector(".rolo[data-status='pendente']");
-    confere((await texto(page, ".rolo .chip")) === "Na fila", "o rolo aparece como “Na fila”");
+    confere((await texto(page, ".rolo .chip")) === "Na fila", "o projeto aparece como “Na fila”");
     await page.waitForFunction(() => document.querySelector("#saldo-tc")?.textContent === "0 min");
     confere(true, "a reserva baixa o saldo para 0 min");
     confere(!(await page.$("#rolos-auto[hidden]")), "a lista avisa que está atualizando sozinha");
@@ -107,7 +107,7 @@ async function texto(page, seletor) {
     await fetch(SB + "/__prova/concluir", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }) });
     await page.waitForSelector(".rolo[data-status='concluido']", { timeout: 15000 });
-    confere(true, "sem recarregar, o rolo vira “Pronto” (atualização automática)");
+    confere(true, "sem recarregar, o projeto vira “Pronto” (atualização automática)");
     await page.waitForFunction(() => document.querySelector("#saldo-tc")?.textContent === "298 min", null, { timeout: 15000 });
     confere(true, "o saldo volta para 298 min (devolução do que sobrou)");
 
@@ -130,10 +130,10 @@ async function texto(page, seletor) {
     await page.waitForFunction(() => document.querySelector("#aviso")?.textContent === "Gancho copiado.");
     const area = await page.evaluate(() => navigator.clipboard.readText());
     confere(area === "Ninguém esperava essa resposta", "Copiar gancho põe o gancho na área de transferência", area);
-    await page.click("button:has-text('Copiar legenda do post')");
+    await page.click("button:has-text('Copiar legenda')");
     await page.waitForFunction(() => /Texto de publicação copiado|Não consegui/.test(document.querySelector("#aviso")?.textContent || ""));
     confere((await page.evaluate(() => navigator.clipboard.readText())).startsWith("Texto do post"),
-      "Copiar legenda do post busca o texto no R2 e copia");
+      "Copiar legenda busca o texto do post no R2 e copia");
     await foto(page, "3-clipes.png", true);
 
     // 5. Pedido por arquivo (envio direto ao R2 pela URL assinada)
@@ -160,6 +160,9 @@ async function texto(page, seletor) {
     await page.setViewportSize({ width: 1366, height: 900 });
 
     // 7. Sair; conta sem convite cai na tela do beta
+    await page.click("#conta-btn");
+    await page.waitForSelector("#conta-menu:not([hidden])");
+    confere((await texto(page, "#menu-email")) === "ana@exemplo.com", "o menu da conta mostra o e-mail de quem entrou");
     await page.click("#sair");
     await page.waitForSelector("#form-conta");
     confere(true, "Sair volta para a tela de entrada");

@@ -44,17 +44,17 @@ async function texto(page, sel) {
       "o extrato mostra o bônus de boas-vindas", await texto(page, "#extrato li"));
 
     if (MODO === "fechada") {
-      confere(!(await page.$(".ingresso")) && !(await page.$("#pacotes-fechado[hidden]")),
+      confere(!(await page.$(".pacote")) && !(await page.$("#pacotes-fechado[hidden]")),
         "com as vendas desligadas: nenhum pacote, e o aviso de que a loja abre no lançamento");
     } else {
-      const ingressos = await page.$$eval(".ingresso", (els) => els.map((e) => e.textContent.replace(/\s+/g, " ").trim()));
-      confere(ingressos.length === 2 && ingressos[0].includes("R$ 19,90") && ingressos[1].includes("R$ 79,90"),
-        "só os 2 pacotes ativos aparecem, com o preço em reais", ingressos.join(" | "));
-      confere(ingressos[0].includes("R$ 0,33 por minuto"), "cada pacote mostra o preço por minuto", ingressos[0]);
+      const pacotes = await page.$$eval(".pacote", (els) => els.map((e) => e.textContent.replace(/\s+/g, " ").trim()));
+      confere(pacotes.length === 2 && pacotes[0].includes("R$ 19,90") && pacotes[1].includes("R$ 79,90"),
+        "só os 2 pacotes ativos aparecem, com o preço em reais", pacotes.join(" | "));
+      confere(pacotes[0].includes("R$ 0,33 por minuto"), "cada pacote mostra o preço por minuto", pacotes[0]);
       await page.waitForTimeout(500);
       await page.screenshot({ path: path.join(SAIDA, "5-creditos.png"), fullPage: true });
 
-      await page.click(".ingresso button[data-pacote='p60']");
+      await page.click(".pacote button[data-pacote='p60']");
       await page.waitForURL(/#\/compra\/aprovada/, { timeout: 20000 });
       confere(true, "Comprar leva ao Mercado Pago e volta para o app depois de pagar");
       await page.waitForSelector("text=Pronto: 60 minutos entraram no seu saldo.", { timeout: 20000 });

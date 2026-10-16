@@ -235,9 +235,27 @@ def _node_com_playwright() -> tuple[str, dict[str, str]]:
     return node, env
 
 
+def _csp_de_producao(amb: dict[str, str]) -> str:
+    """A CSP do vercel.json, com os hosts da nuvem trocados pelos falsos.
+
+    So os hosts mudam: Supabase e R2 de verdade viram os servidores locais da
+    prova. Todo o resto (script-src, style-src, img-src data:...) vai igual,
+    e e isso que se quer provar -- que o app roda sob a CSP de producao.
+    """
+    conf = json.loads((RAIZ / "vercel.json").read_text(encoding="utf-8"))
+    csp = next(h["value"] for bloco in conf["headers"] for h in bloco["headers"]
+               if h["key"] == "Content-Security-Policy")
+    sb, r2 = amb["SUPABASE_URL"].rstrip("/"), amb["R2_ENDPOINT"].rstrip("/")
+    return (csp.replace("https://*.supabase.co", sb).replace("wss://*.supabase.co", sb.replace("http", "ws", 1))
+               .replace("https://*.r2.cloudflarestorage.com", r2))
+
+
 @contextlib.contextmanager
-def _servidor_do_app(amb: dict[str, str]) -> Iterator[str]:
-    """Serve app/ e as rotas /api/* como a Vercel: estatico + funcoes."""
+def _servidor_do_app(amb: dict[str, str], *, csp: bool = False) -> Iterator[str]:
+    """Serve app/ e as rotas /api/* como a Vercel: estatico + funcoes.
+
+    Com csp=True, cada resposta leva a CSP de producao (vercel.json).
+    """
     import mimetypes
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
     from threading import Thread
@@ -247,6 +265,7 @@ def _servidor_do_app(amb: dict[str, str]) -> Iterator[str]:
     from nuvem.web import ler_json, responder, token_de
 
     pasta = (RAIZ / "app").resolve()
+    politica = _csp_de_producao(amb) if csp else ""
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *_: Any) -> None:
@@ -266,6 +285,8 @@ def _servidor_do_app(amb: dict[str, str]) -> Iterator[str]:
                 return
             corpo = alvo.read_bytes()
             self.send_response(200)
+            if csp:
+                self.send_header("Content-Security-Policy", politica)
             self.send_header("Content-Type", mimetypes.guess_type(alvo.name)[0] or "text/plain")
             self.send_header("Content-Length", str(len(corpo)))
             self.end_headers()

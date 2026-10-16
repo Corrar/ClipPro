@@ -3,12 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ClipPro — ilha de edição</title>
-<meta name="description" content="Cole o link do vídeo longo e o ClipPro entrega os cortes verticais 9:16, legendados e prontos para publicar.">
+<title>ClipPro</title>
+<meta name="description" content="Cole o link do vídeo longo e o ClipPro entrega os clipes verticais 9:16, legendados e prontos para publicar.">
 <meta name="robots" content="noindex">
-<meta name="theme-color" content="#0a0b0d">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230a0b0d'/%3E%3Crect x='30' y='16' width='40' height='68' rx='8' fill='%23ffe500'/%3E%3C/svg%3E">
-<link rel="preload" href="/fontes/anton-latin.woff2" as="font" type="font/woff2" crossorigin>
+<meta name="theme-color" content="#0b0c0e">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230b0c0e'/%3E%3Crect x='30' y='16' width='40' height='68' rx='8' fill='%23ffe500'/%3E%3C/svg%3E">
 <link rel="preload" href="/fontes/archivo-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/estilos.css">
 </head>
@@ -17,24 +16,38 @@
 
 <header class="topo">
   <a class="marca" href="#/" aria-label="ClipPro, início">
-    <span class="marca-quadro" aria-hidden="true"></span>
-    <span class="marca-nome">Clip<b>Pro</b></span>
+    <span class="marca-sinal" aria-hidden="true"></span>
+    <span class="marca-nome">ClipPro</span>
   </a>
+  <nav class="topo-nav" id="topo-nav" aria-label="Seções" hidden>
+    <a href="#/" id="nav-projetos">Projetos</a>
+    <a href="#/creditos" id="link-creditos">Créditos</a>
+  </nav>
   <div class="topo-conta" id="topo-conta" hidden>
     <a class="saldo" id="saldo" href="#/creditos" title="Ver créditos e extrato">
-      <span class="saldo-rot">Saldo</span>
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
       <span class="saldo-tc" id="saldo-tc">—</span>
     </a>
-    <a class="btn fantasma pequeno" href="#/creditos" id="link-creditos">Créditos</a>
-    <button class="btn fantasma pequeno" type="button" id="sair">Sair</button>
+    <div class="conta">
+      <button class="avatar" type="button" id="conta-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="conta-menu" aria-label="Sua conta">
+        <span id="avatar-letra" aria-hidden="true">·</span>
+      </button>
+      <div class="menu" id="conta-menu" role="menu" hidden>
+        <p class="menu-email" id="menu-email"></p>
+        <a role="menuitem" href="#/creditos">Créditos e extrato</a>
+        <a role="menuitem" href="/termos">Termos de uso</a>
+        <button role="menuitem" type="button" id="sair">Sair</button>
+      </div>
+    </div>
   </div>
 </header>
 
 <main id="tela" tabindex="-1">
-  <div class="carregando" aria-busy="true"><span class="playhead" aria-hidden="true"></span>Abrindo a ilha de edição…</div>
+  <div class="carregando" aria-busy="true"><span class="giro" aria-hidden="true"></span>Carregando…</div>
 </main>
 
 <footer class="rodape">
+  <span>© ClipPro</span>
   <a href="/termos">Termos de uso</a>
   <a href="/privacidade">Privacidade</a>
 </footer>
@@ -44,21 +57,12 @@
 <!-- ============================== ENTRAR ============================== -->
 <template id="t-entrar">
   <section class="entrar">
-    <div class="entrar-arte" aria-hidden="true">
-      <div class="quadro-916">
-        <div class="quadro-cena"></div>
-        <p class="karaoke"><span>Cola</span> <span>o</span> <span>link</span> <span>e</span> <span>corta</span></p>
-        <div class="quadro-tc">REC <b>●</b> 00:00:31:12</div>
-      </div>
-      <p class="entrar-legenda">Vídeo longo entra. Clipes verticais saem.</p>
-    </div>
+    <div class="entrar-form">
+      <p class="selo">Beta fechado · 300 minutos grátis</p>
+      <h1>Do vídeo longo aos clipes prontos para postar.</h1>
+      <p class="sub">Cole um link. O ClipPro encontra os melhores trechos, enquadra em 9:16 e legenda palavra por palavra.</p>
 
-    <div class="entrar-cartao">
-      <p class="slate"><span class="rec" aria-hidden="true"></span>Beta fechado · 300 minutos grátis</p>
-      <h1>Do vídeo longo aos cortes que viralizam.</h1>
-      <p class="sub">Cole o link. O ClipPro acha os melhores momentos, enquadra em 9:16, legenda palavra a palavra e entrega pronto para publicar.</p>
-
-      <div class="abas" role="tablist" aria-label="Entrar ou criar conta">
+      <div class="segmento" role="tablist" aria-label="Entrar ou criar conta">
         <button role="tab" type="button" id="aba-entrar" aria-selected="true" aria-controls="form-conta">Entrar</button>
         <button role="tab" type="button" id="aba-criar" aria-selected="false" aria-controls="form-conta">Criar conta</button>
       </div>
@@ -80,11 +84,20 @@
           <p class="dica" id="dica-senha" hidden>Pelo menos 8 caracteres.</p>
         </div>
         <p class="consentimento" id="consentimento" hidden>Ao criar a conta, você concorda com os <a href="/termos" target="_blank" rel="noopener">Termos de uso</a> e a <a href="/privacidade" target="_blank" rel="noopener">Política de privacidade</a>.</p>
-        <button class="btn primario" type="submit" id="enviar-conta">Entrar</button>
+        <button class="btn primario largo" type="submit" id="enviar-conta">Entrar</button>
         <button class="link" type="button" id="esqueci">Esqueci minha senha</button>
       </form>
       <p class="msg" id="msg-conta" role="alert" hidden></p>
     </div>
+
+    <aside class="entrar-vitrine">
+      <div class="vitrine" id="vitrine" aria-hidden="true"></div>
+      <ul class="vitrine-itens">
+        <li><b>Os melhores trechos</b> escolhidos pela fala, com nota de 0 a 10.</li>
+        <li><b>Quatro modelos de legenda</b>, sincronizados palavra por palavra.</li>
+        <li><b>Pronto para postar</b>: vídeo, capa e texto da publicação.</li>
+      </ul>
+    </aside>
   </section>
 </template>
 
@@ -92,14 +105,13 @@
 <template id="t-nova-senha">
   <section class="centro">
     <form class="cartao estreito" id="form-nova-senha" novalidate>
-      <p class="slate">Recuperar acesso</p>
       <h1>Escolha uma senha nova</h1>
       <div class="campo">
         <label for="nova-senha">Senha nova</label>
         <input id="nova-senha" type="password" autocomplete="new-password" minlength="8" required>
         <p class="dica">Pelo menos 8 caracteres.</p>
       </div>
-      <button class="btn primario" type="submit">Salvar senha</button>
+      <button class="btn primario largo" type="submit">Salvar senha</button>
       <p class="msg" id="msg-nova-senha" role="alert" hidden></p>
     </form>
   </section>
@@ -109,10 +121,10 @@
 <template id="t-beta">
   <section class="centro">
     <div class="cartao estreito">
-      <p class="slate"><span class="rec" aria-hidden="true"></span>Beta fechado</p>
+      <p class="selo">Beta fechado</p>
       <h1>Sua conta está criada.</h1>
       <p class="sub">O ClipPro está em beta fechado. Assim que o seu e-mail <b id="beta-email"></b> for convidado, os 300 minutos grátis aparecem aqui.</p>
-      <button class="btn primario" type="button" id="beta-atualizar">Já fui convidado — atualizar</button>
+      <button class="btn primario largo" type="button" id="beta-atualizar">Já fui convidado — atualizar</button>
     </div>
   </section>
 </template>
@@ -121,7 +133,6 @@
 <template id="t-config">
   <section class="centro">
     <div class="cartao estreito">
-      <p class="slate">Em montagem</p>
       <h1>O ClipPro ainda não foi ligado aqui.</h1>
       <p class="sub" id="config-msg">Volte em instantes.</p>
     </div>
@@ -131,70 +142,81 @@
 <!-- =============================== PAINEL =============================== -->
 <template id="t-painel">
   <section class="painel">
-    <form class="claquete" id="form-novo" novalidate>
-      <div class="claquete-topo" aria-hidden="true"></div>
-      <div class="claquete-cab">
-        <span class="slate">Novo corte</span>
-        <span class="claquete-cena" aria-hidden="true">CENA <b id="cena-n">01</b></span>
+    <form class="compositor" id="form-novo" novalidate>
+      <div class="compositor-cab">
+        <h1>Novo projeto</h1>
+        <p class="sub">Cole o link de um vídeo ou envie o arquivo. Os clipes aparecem em Projetos.</p>
       </div>
 
-      <div class="entrada-abas" role="tablist" aria-label="De onde vem o vídeo">
-        <button role="tab" type="button" id="via-link" aria-selected="true" aria-controls="painel-link">Link</button>
-        <button role="tab" type="button" id="via-arquivo" aria-selected="false" aria-controls="painel-arquivo">Arquivo</button>
-      </div>
+      <div class="bloco">
+        <div class="segmento compacto" role="tablist" aria-label="De onde vem o vídeo">
+          <button role="tab" type="button" id="via-link" aria-selected="true" aria-controls="painel-link">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            Link
+          </button>
+          <button role="tab" type="button" id="via-arquivo" aria-selected="false" aria-controls="painel-arquivo">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Arquivo
+          </button>
+        </div>
 
-      <div class="campo" id="painel-link" role="tabpanel" aria-labelledby="via-link">
-        <label for="link">Link do vídeo</label>
-        <input id="link" name="link" type="url" inputmode="url" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off">
-        <p class="dica">Use vídeo seu ou com autorização de quem gravou.</p>
-      </div>
+        <div class="campo" id="painel-link" role="tabpanel" aria-labelledby="via-link">
+          <label class="oculto" for="link">Link do vídeo</label>
+          <input id="link" name="link" type="url" inputmode="url" placeholder="Cole o link do vídeo — YouTube, Vimeo, Google Drive…" autocomplete="off">
+          <p class="dica">Use vídeo seu ou com autorização de quem gravou.</p>
+        </div>
 
-      <div class="campo" id="painel-arquivo" role="tabpanel" aria-labelledby="via-arquivo" hidden>
-        <label class="soltar" for="arquivo" id="soltar">
-          <input id="arquivo" type="file" accept="video/*,.mkv">
-          <strong>Arraste o vídeo aqui</strong>
-          <span>ou clique para escolher · até 2 GB</span>
-        </label>
-        <p class="arquivo-info" id="arquivo-info" hidden></p>
-        <div class="progresso" id="progresso" hidden>
-          <div class="progresso-trilho"><div class="progresso-barra" id="progresso-barra"></div></div>
-          <span id="progresso-txt">0%</span>
+        <div class="campo" id="painel-arquivo" role="tabpanel" aria-labelledby="via-arquivo" hidden>
+          <label class="soltar" for="arquivo" id="soltar">
+            <input id="arquivo" type="file" accept="video/*,.mkv">
+            <strong>Arraste o vídeo aqui ou clique para escolher</strong>
+            <span>MP4, MOV, MKV ou WEBM · até 2 GB</span>
+          </label>
+          <p class="arquivo-info" id="arquivo-info" hidden></p>
+          <div class="progresso" id="progresso" hidden>
+            <div class="progresso-trilho"><div class="progresso-barra" id="progresso-barra"></div></div>
+            <span id="progresso-txt">0%</span>
+          </div>
         </div>
       </div>
 
-      <fieldset class="visuais">
-        <legend>Visual da legenda</legend>
-        <div class="visuais-grade" id="visuais"></div>
+      <fieldset class="bloco modelos">
+        <legend>Modelo</legend>
+        <p class="modelos-nota" id="modelos-nota">Prévias com as medidas reais de cada modelo. Escolha um arquivo para vê-las com o seu vídeo.</p>
+        <div class="modelos-grade" id="visuais"></div>
       </fieldset>
 
-      <div class="campo campo-linha">
-        <label for="n">Quantos cortes</label>
-        <div class="contador">
-          <button type="button" class="contador-btn" data-passo="-1" aria-label="Menos um corte">−</button>
-          <input id="n" name="n" type="number" min="1" max="10" value="5" inputmode="numeric">
-          <button type="button" class="contador-btn" data-passo="1" aria-label="Mais um corte">+</button>
+      <div class="bloco opcoes">
+        <div class="opcao">
+          <label for="n">Clipes</label>
+          <div class="contador">
+            <button type="button" class="contador-btn" data-passo="-1" aria-label="Menos um clipe">−</button>
+            <input id="n" name="n" type="number" min="1" max="10" value="5" inputmode="numeric">
+            <button type="button" class="contador-btn" data-passo="1" aria-label="Mais um clipe">+</button>
+          </div>
+        </div>
+        <div class="opcao larga">
+          <label for="estrategia">O que priorizar <span>(opcional)</span></label>
+          <input id="estrategia" name="estrategia" type="text" maxlength="500" placeholder="Ex.: frases de impacto, momentos engraçados, explicações curtas" autocomplete="off">
         </div>
       </div>
 
-      <details class="estrategia">
-        <summary>O que procurar nos cortes <span>(opcional)</span></summary>
-        <textarea id="estrategia" name="estrategia" maxlength="500" rows="3" placeholder="Ex.: momentos engraçados, frases de impacto, explicações curtas"></textarea>
-      </details>
-
-      <button class="btn primario grande" type="submit" id="gerar">Gerar cortes</button>
-      <p class="custo">1 crédito = 1 minuto de vídeo. Reservamos o necessário e devolvemos o que sobrar.</p>
+      <div class="compositor-pe">
+        <p class="custo">1 crédito = 1 minuto de vídeo. Reservamos o necessário e devolvemos o que sobrar.</p>
+        <button class="btn primario" type="submit" id="gerar">Gerar clipes</button>
+      </div>
       <p class="msg" id="msg-novo" role="alert" hidden></p>
     </form>
 
-    <section class="rolos" aria-labelledby="rolos-t">
-      <div class="rolos-cab">
-        <h2 id="rolos-t">Seus rolos</h2>
-        <span class="rolos-auto" id="rolos-auto" hidden>atualizando sozinho</span>
+    <section class="projetos" aria-labelledby="rolos-t">
+      <div class="secao-cab">
+        <h2 id="rolos-t">Projetos</h2>
+        <span class="rolos-auto" id="rolos-auto" hidden>Atualizando automaticamente</span>
       </div>
       <ol class="lista-rolos" id="lista-rolos"></ol>
       <div class="vazio" id="rolos-vazio" hidden>
-        <p class="vazio-t">Nenhum rolo ainda.</p>
-        <p>O primeiro corte começa na claquete. Em poucos minutos os clipes aparecem aqui.</p>
+        <p class="vazio-t">Nenhum projeto ainda</p>
+        <p>Cole um link acima. Os clipes aparecem aqui assim que ficarem prontos.</p>
       </div>
     </section>
   </section>
@@ -203,12 +225,14 @@
 <!-- ============================== TRABALHO ============================== -->
 <template id="t-trabalho">
   <section class="trabalho">
-    <a class="voltar" href="#/">← todos os rolos</a>
+    <a class="voltar" href="#/">
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Projetos
+    </a>
     <div class="trabalho-cab">
-      <div>
-        <p class="slate" id="tr-quando"></p>
-        <h1 id="tr-titulo">Rolo</h1>
-        <p class="sub" id="tr-origem"></p>
+      <div class="trabalho-tit">
+        <h1 id="tr-titulo">Projeto</h1>
+        <p class="trabalho-meta"><span id="tr-quando"></span><span id="tr-origem"></span></p>
       </div>
       <span class="chip" id="tr-status"></span>
     </div>
@@ -219,17 +243,17 @@
 <!-- ============================== CRÉDITOS ============================== -->
 <template id="t-creditos">
   <section class="creditos">
-    <a class="voltar" href="#/">← todos os rolos</a>
-    <div class="creditos-cab">
-      <div>
-        <p class="slate">Créditos</p>
-        <h1>Seu saldo</h1>
-        <p class="sub">1 crédito = 1 minuto de vídeo enviado. Cada pedido reserva o necessário e devolve o que sobrar.</p>
-      </div>
+    <div class="pagina-cab">
+      <h1>Créditos</h1>
+      <p class="sub">1 crédito = 1 minuto de vídeo enviado. Cada pedido reserva o necessário e devolve o que sobrar.</p>
+    </div>
+
+    <div class="saldo-cartao">
+      <p class="saldo-rot">Saldo disponível</p>
       <p class="saldo-grande"><span id="cr-saldo">—</span><small>minutos de vídeo</small></p>
     </div>
 
-    <section class="pacotes-bloco" aria-labelledby="pacotes-t">
+    <section class="secao" aria-labelledby="pacotes-t">
       <h2 id="pacotes-t">Comprar minutos</h2>
       <div class="pacotes" id="pacotes"></div>
       <p class="aviso-loja" id="pacotes-fechado" hidden>A compra de créditos abre no lançamento do ClipPro. No beta, os minutos do convite são por nossa conta.</p>
@@ -237,7 +261,7 @@
       <p class="msg" id="msg-pacotes" role="alert" hidden></p>
     </section>
 
-    <section class="extrato-bloco" aria-labelledby="extrato-t">
+    <section class="secao" aria-labelledby="extrato-t">
       <h2 id="extrato-t">Extrato</h2>
       <ol class="extrato" id="extrato"></ol>
     </section>
@@ -248,13 +272,13 @@
 <template id="t-compra">
   <section class="centro">
     <div class="cartao estreito">
-      <p class="slate" id="cp-slate">Pagamento</p>
+      <p class="selo" id="cp-slate">Pagamento</p>
       <h1 id="cp-titulo"></h1>
       <p class="sub" id="cp-texto" aria-live="polite"></p>
       <p class="saldo-grande" id="cp-saldo-caixa" hidden><span id="cp-saldo"></span><small>minutos de vídeo</small></p>
       <div class="acoes-linha">
-        <a class="btn primario" href="#/">Voltar aos rolos</a>
-        <a class="btn fantasma" href="#/creditos">Ver extrato</a>
+        <a class="btn primario" href="#/">Voltar aos projetos</a>
+        <a class="btn secundario" href="#/creditos">Ver extrato</a>
       </div>
     </div>
   </section>

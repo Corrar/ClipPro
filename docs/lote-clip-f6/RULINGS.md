@@ -1534,3 +1534,23 @@ do executor; preço, contas e merge continuam com o Bruno):
 - O comportamento provado (créditos, upload, rotas, segurança, CSP sem
   terceiros) **não muda**; as provas de interface se ajustam ao novo layout,
   conferindo as mesmas coisas.
+
+### 30.1 Resultado da N-5 (decidida por delegação, §29)
+
+- **App redesenhado como ferramenta.**
+  - Saíram claquete, película, ingresso, REC, brilhos, rótulos mono e o
+    jargão "rolos"/"ilha de edição".
+  - Entraram compositor em seções, lista de projetos, menu da conta e clipe
+    deitado (vídeo + decisão).
+- **Galeria de modelos fiel ao motor.**
+  - A tabela `PREVIAS` é gerada dos presets e conferida pela N5-E1.
+  - O karaokê segue a regra de cores de `legendas._bloco_palavra`.
+  - O quadro do vídeo do usuário entra nas prévias, sem sair do aparelho.
+- **Pergunta ao Bruno (Q-N5-1):** mostrar a miniatura do YouTube nas prévias
+  quando o pedido é por link? Exige pedir a `i.ytimg.com`, um terceiro, e
+  mudar a Política de privacidade. Recomendação do executor: **não**, manter
+  o fundo neutro.
+- A N5-F1 roda sob a CSP de produção do `vercel.json`.
+- Placar: N-5 3/0/0 (11 de 11 mutantes mordem); N-2 7/0/0; N-3 6/0/0; N-1
+  16/1 pendente/0; F6.1 13/0/0; F6 44/0/0. Relatório:
+  `docs/lote-clip-f6/relatorio-n5.md`.

@@ -41,6 +41,9 @@ F1–F4 → F9 "paridade". F7 (narração) guardada.
 > **N-4:** termos e privacidade redigidos como rascunho (preencher os colchetes
 > e passar por revisão jurídica; roteiro §9); site público muda no lançamento.
 > **Tudo o que resta da nuvem depende das contas do Bruno** (roteiro §1–§9).
+> **§30: N-5 (design do app) feita e provada** (`relatorio-n5.md`): visual de
+> ferramenta e galeria de modelos fiel aos presets. Aberta: **Q-N5-1**
+> (miniatura do YouTube nas prévias; recomendação: não).
 
 ---
 
