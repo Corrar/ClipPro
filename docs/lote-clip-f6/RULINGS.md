@@ -1554,3 +1554,20 @@ do executor; preço, contas e merge continuam com o Bruno):
 - Placar: N-5 3/0/0 (11 de 11 mutantes mordem); N-2 7/0/0; N-3 6/0/0; N-1
   16/1 pendente/0; F6.1 13/0/0; F6 44/0/0. Relatório:
   `docs/lote-clip-f6/relatorio-n5.md`.
+
+### 30.2 O Bruno fez o merge do PR #1 no `master` (registro, 16/10/2026)
+
+- **Fato, sem diretiva no chat.** O próprio Bruno abriu o PR #1
+  (`claude/loving-newton-bykd21` → `master`) e fez o merge às 21:30 de 15/10
+  (−03:00). O `master` foi de `aa958d0` para `b85d323` e passou a ter tudo até
+  `c1d15b2`: o F6.1, a nuvem N-1 a N-4 e o §30. É a palavra de merge dele
+  (CLAUDE.md §2). O executor não tocou no `master`.
+- **Ficou de fora:** a N-5 (`b1c171c`, design do app), commitada depois do
+  merge.
+- **O que o executor fez:** um merge do `master` no branch de trabalho, sem
+  reescrever histórico (`e93c697`). O branch agora é o `master` mais a N-5.
+  Levar a N-5 ao `master` exige um PR novo; o executor não abre PR sem pedido.
+- **Consequência para a Vercel** (roteiro §7.6): a produção do app pode ser o
+  `master`, que já tem o app. A N-5 só aparece lá depois do merge dela.
+- **Pendências do F6.1 que o merge não resolveu:** W1–W3 e W5 (provas no
+  Windows), que agora valem como conferência pós-merge.

@@ -5,8 +5,9 @@
 > `docs/lote-clip-f6/RULINGS.md` (§16 em diante) antes de qualquer ação.**
 > Branch de trabalho: `claude/loving-newton-bykd21` desde o RULINGS §23
 > (fast-forward do `claude/charming-euler-02p9cf`, que fica congelado em
-> `0295359` com o mesmo código). `master` em `aa958d0` (pouso do CLIP-F6),
-> intocado desde então.
+> `0295359` com o mesmo código). **`master` em `b85d323`**: o Bruno fez o
+> merge do PR #1 em 15/10 (RULINGS §30.2), com tudo até `c1d15b2`. A N-5
+> (design) está só no branch.
 
 ## Fila (RULINGS §17, §19, §21)
 
@@ -74,7 +75,7 @@ Placar no Linux: `prova_f61.py --fisicas` 13/13; `prova_f6.py --fisicas`
 | W1 | Rodar no Windows: `git fetch`, `git checkout claude/loving-newton-bykd21`, `.venv\Scripts\python provas\prova_f61.py --fisicas` e `.venv\Scripts\python provas\prova_f6.py --fisicas` | Bruno |
 | W2 | Lockfile num venv novo: `py -3.13 -m venv _teste\venv-lock`, `_teste\venv-lock\Scripts\pip install -r requirements.lock.txt`, `_teste\venv-lock\Scripts\python -c "import fastapi, uvicorn, multipart; print('ok')"` | Bruno |
 | W3 | Item 2 no painel real: play, pausar, re-renderizar o mesmo clipe → tem de terminar sem `WinError 5` | Bruno |
-| W4 | Palavra explícita para o merge do F6.1 em `master` | Bruno |
+| W4 | ~~Palavra explícita para o merge do F6.1 em `master`~~ — o Bruno fez o merge do PR #1 (§30.2); W1–W3 e W5 viram conferência pós-merge | ✅ Bruno |
 | W5 | D7 passos 3–5 (cópia do painel, aviso VERSAO 3, smoke pelo painel real): resultado nunca relatado | Bruno |
 
 ## 3. F8a — perguntas antes de qualquer código

@@ -155,9 +155,10 @@ Em **Authentication → URL Configuration**:
      R2**, só para o app, com Object Read & Write no bucket `clippro`. Assim dá
      para revogar uma sem derrubar a outra;
    - `R2_BUCKET` = `clippro`.
-3. Em **Settings → Git → Production Branch**, coloque
-   `claude/loving-newton-bykd21`. O `master` não tem o app, e continua
-   intocado até o seu "pode fazer o merge".
+3. Em **Settings → Git → Production Branch**, deixe o **`master`**: ele já
+   tem o app desde o merge do PR #1 (RULINGS §30.2). O design novo (N-5)
+   entra no `master` com o próximo merge. Para ver antes, abra o deploy de
+   prévia do branch `claude/loving-newton-bykd21`.
 4. Em **Settings → Deployment Protection**, o app precisa de **produção
    pública**: as pessoas entram nele. Deixe a proteção só nos previews. É uma
    decisão sua.
