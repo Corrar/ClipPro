@@ -1,0 +1,10 @@
+# Projeto Vercel do APP (clippro-app, RULINGS §29.3), com raiz na raiz do
+# repositorio. Lista de PERMISSAO: so sobe o que o app usa. O requirements.txt
+# do motor (whisper, mediapipe...) fica de fora -- as funcoes em api/ usam so
+# a biblioteca padrao. O site publico (projeto 'clippro') tem raiz em site/ e
+# nao le este arquivo.
+/*
+!api
+!app
+!nuvem
+!vercel.json

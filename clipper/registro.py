@@ -61,6 +61,46 @@ def configurar(arquivo_log: Path | None = None, verboso: bool = False) -> loggin
     return log
 
 
+@contextmanager
+def em_arquivo(arquivo_log: Path):
+    """Liga o clipper.log de UM job e desliga na saida.
+
+    O CLI e um processo por video: configurar() pendura o FileHandler e o
+    processo morre com ele. O painel roda video atras de video no mesmo
+    worker -- um handler que ficasse pendurado mandaria o log do job seguinte
+    para a pasta do anterior. Sem handler nenhum, o erro inesperado mandava o
+    usuario procurar o traceback num clipper.log que nao existia (CLIP-F6.1
+    item 4).
+    """
+    # configurar() de novo zeraria o --verboso que o 'clipper ui' ligou.
+    log = obter() if _CONFIGURADO else configurar()
+    alvo = Path(arquivo_log).resolve()
+    if any(
+        isinstance(h, logging.FileHandler)
+        and Path(getattr(h, "baseFilename", "")) == alvo
+        for h in log.handlers
+    ):
+        yield log
+        return
+    try:
+        alvo.parent.mkdir(parents=True, exist_ok=True)
+        arq = logging.FileHandler(alvo, encoding="utf-8")
+    except OSError:
+        # Log que nao abre nao derruba o job: segue so com o console.
+        yield log
+        return
+    arq.setLevel(logging.DEBUG)
+    arq.setFormatter(
+        logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", "%H:%M:%S")
+    )
+    log.addHandler(arq)
+    try:
+        yield log
+    finally:
+        log.removeHandler(arq)
+        arq.close()
+
+
 def obter() -> logging.Logger:
     return logging.getLogger(_NOME)
 

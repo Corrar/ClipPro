@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClipPro — ilha de edição</title>
+<meta name="description" content="Cole o link do vídeo longo e o ClipPro entrega os cortes verticais 9:16, legendados e prontos para publicar.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0a0b0d">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230a0b0d'/%3E%3Crect x='30' y='16' width='40' height='68' rx='8' fill='%23ffe500'/%3E%3C/svg%3E">
+<link rel="preload" href="/fontes/anton-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fontes/archivo-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/estilos.css">
+</head>
+<body>
+<a class="pular" href="#tela">Pular para o conteúdo</a>
+
+<header class="topo">
+  <a class="marca" href="#/" aria-label="ClipPro, início">
+    <span class="marca-quadro" aria-hidden="true"></span>
+    <span class="marca-nome">Clip<b>Pro</b></span>
+  </a>
+  <div class="topo-conta" id="topo-conta" hidden>
+    <a class="saldo" id="saldo" href="#/creditos" title="Ver créditos e extrato">
+      <span class="saldo-rot">Saldo</span>
+      <span class="saldo-tc" id="saldo-tc">—</span>
+    </a>
+    <a class="btn fantasma pequeno" href="#/creditos" id="link-creditos">Créditos</a>
+    <button class="btn fantasma pequeno" type="button" id="sair">Sair</button>
+  </div>
+</header>
+
+<main id="tela" tabindex="-1">
+  <div class="carregando" aria-busy="true"><span class="playhead" aria-hidden="true"></span>Abrindo a ilha de edição…</div>
+</main>
+
+<footer class="rodape">
+  <a href="/termos">Termos de uso</a>
+  <a href="/privacidade">Privacidade</a>
+</footer>
+
+<div class="aviso" id="aviso" role="status" aria-live="polite" hidden></div>
+
+<!-- ============================== ENTRAR ============================== -->
+<template id="t-entrar">
+  <section class="entrar">
+    <div class="entrar-arte" aria-hidden="true">
+      <div class="quadro-916">
+        <div class="quadro-cena"></div>
+        <p class="karaoke"><span>Cola</span> <span>o</span> <span>link</span> <span>e</span> <span>corta</span></p>
+        <div class="quadro-tc">REC <b>●</b> 00:00:31:12</div>
+      </div>
+      <p class="entrar-legenda">Vídeo longo entra. Clipes verticais saem.</p>
+    </div>
+
+    <div class="entrar-cartao">
+      <p class="slate"><span class="rec" aria-hidden="true"></span>Beta fechado · 300 minutos grátis</p>
+      <h1>Do vídeo longo aos cortes que viralizam.</h1>
+      <p class="sub">Cole o link. O ClipPro acha os melhores momentos, enquadra em 9:16, legenda palavra a palavra e entrega pronto para publicar.</p>
+
+      <div class="abas" role="tablist" aria-label="Entrar ou criar conta">
+        <button role="tab" type="button" id="aba-entrar" aria-selected="true" aria-controls="form-conta">Entrar</button>
+        <button role="tab" type="button" id="aba-criar" aria-selected="false" aria-controls="form-conta">Criar conta</button>
+      </div>
+
+      <button class="btn google" type="button" id="google">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.3-1.6 3.8-5.5 3.8-3.3 0-6-2.7-6-6.1s2.7-6.1 6-6.1c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.8 3.2 14.6 2.2 12 2.2 6.6 2.2 2.3 6.6 2.3 12s4.3 9.8 9.7 9.8c5.6 0 9.3-3.9 9.3-9.5 0-.6-.1-1.1-.2-1.6H12z"/></svg>
+        Continuar com Google
+      </button>
+      <div class="ou"><span>ou com e-mail</span></div>
+
+      <form id="form-conta" novalidate>
+        <div class="campo">
+          <label for="email">E-mail</label>
+          <input id="email" name="email" type="email" autocomplete="email" required>
+        </div>
+        <div class="campo">
+          <label for="senha">Senha</label>
+          <input id="senha" name="senha" type="password" autocomplete="current-password" minlength="8" required>
+          <p class="dica" id="dica-senha" hidden>Pelo menos 8 caracteres.</p>
+        </div>
+        <p class="consentimento" id="consentimento" hidden>Ao criar a conta, você concorda com os <a href="/termos" target="_blank" rel="noopener">Termos de uso</a> e a <a href="/privacidade" target="_blank" rel="noopener">Política de privacidade</a>.</p>
+        <button class="btn primario" type="submit" id="enviar-conta">Entrar</button>
+        <button class="link" type="button" id="esqueci">Esqueci minha senha</button>
+      </form>
+      <p class="msg" id="msg-conta" role="alert" hidden></p>
+    </div>
+  </section>
+</template>
+
+<!-- ============================ NOVA SENHA ============================ -->
+<template id="t-nova-senha">
+  <section class="centro">
+    <form class="cartao estreito" id="form-nova-senha" novalidate>
+      <p class="slate">Recuperar acesso</p>
+      <h1>Escolha uma senha nova</h1>
+      <div class="campo">
+        <label for="nova-senha">Senha nova</label>
+        <input id="nova-senha" type="password" autocomplete="new-password" minlength="8" required>
+        <p class="dica">Pelo menos 8 caracteres.</p>
+      </div>
+      <button class="btn primario" type="submit">Salvar senha</button>
+      <p class="msg" id="msg-nova-senha" role="alert" hidden></p>
+    </form>
+  </section>
+</template>
+
+<!-- =============================== BETA =============================== -->
+<template id="t-beta">
+  <section class="centro">
+    <div class="cartao estreito">
+      <p class="slate"><span class="rec" aria-hidden="true"></span>Beta fechado</p>
+      <h1>Sua conta está criada.</h1>
+      <p class="sub">O ClipPro está em beta fechado. Assim que o seu e-mail <b id="beta-email"></b> for convidado, os 300 minutos grátis aparecem aqui.</p>
+      <button class="btn primario" type="button" id="beta-atualizar">Já fui convidado — atualizar</button>
+    </div>
+  </section>
+</template>
+
+<!-- ============================ NÃO CONFIGURADO ============================ -->
+<template id="t-config">
+  <section class="centro">
+    <div class="cartao estreito">
+      <p class="slate">Em montagem</p>
+      <h1>O ClipPro ainda não foi ligado aqui.</h1>
+      <p class="sub" id="config-msg">Volte em instantes.</p>
+    </div>
+  </section>
+</template>
+
+<!-- =============================== PAINEL =============================== -->
+<template id="t-painel">
+  <section class="painel">
+    <form class="claquete" id="form-novo" novalidate>
+      <div class="claquete-topo" aria-hidden="true"></div>
+      <div class="claquete-cab">
+        <span class="slate">Novo corte</span>
+        <span class="claquete-cena" aria-hidden="true">CENA <b id="cena-n">01</b></span>
+      </div>
+
+      <div class="entrada-abas" role="tablist" aria-label="De onde vem o vídeo">
+        <button role="tab" type="button" id="via-link" aria-selected="true" aria-controls="painel-link">Link</button>
+        <button role="tab" type="button" id="via-arquivo" aria-selected="false" aria-controls="painel-arquivo">Arquivo</button>
+      </div>
+
+      <div class="campo" id="painel-link" role="tabpanel" aria-labelledby="via-link">
+        <label for="link">Link do vídeo</label>
+        <input id="link" name="link" type="url" inputmode="url" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off">
+        <p class="dica">Use vídeo seu ou com autorização de quem gravou.</p>
+      </div>
+
+      <div class="campo" id="painel-arquivo" role="tabpanel" aria-labelledby="via-arquivo" hidden>
+        <label class="soltar" for="arquivo" id="soltar">
+          <input id="arquivo" type="file" accept="video/*,.mkv">
+          <strong>Arraste o vídeo aqui</strong>
+          <span>ou clique para escolher · até 2 GB</span>
+        </label>
+        <p class="arquivo-info" id="arquivo-info" hidden></p>
+        <div class="progresso" id="progresso" hidden>
+          <div class="progresso-trilho"><div class="progresso-barra" id="progresso-barra"></div></div>
+          <span id="progresso-txt">0%</span>
+        </div>
+      </div>
+
+      <fieldset class="visuais">
+        <legend>Visual da legenda</legend>
+        <div class="visuais-grade" id="visuais"></div>
+      </fieldset>
+
+      <div class="campo campo-linha">
+        <label for="n">Quantos cortes</label>
+        <div class="contador">
+          <button type="button" class="contador-btn" data-passo="-1" aria-label="Menos um corte">−</button>
+          <input id="n" name="n" type="number" min="1" max="10" value="5" inputmode="numeric">
+          <button type="button" class="contador-btn" data-passo="1" aria-label="Mais um corte">+</button>
+        </div>
+      </div>
+
+      <details class="estrategia">
+        <summary>O que procurar nos cortes <span>(opcional)</span></summary>
+        <textarea id="estrategia" name="estrategia" maxlength="500" rows="3" placeholder="Ex.: momentos engraçados, frases de impacto, explicações curtas"></textarea>
+      </details>
+
+      <button class="btn primario grande" type="submit" id="gerar">Gerar cortes</button>
+      <p class="custo">1 crédito = 1 minuto de vídeo. Reservamos o necessário e devolvemos o que sobrar.</p>
+      <p class="msg" id="msg-novo" role="alert" hidden></p>
+    </form>
+
+    <section class="rolos" aria-labelledby="rolos-t">
+      <div class="rolos-cab">
+        <h2 id="rolos-t">Seus rolos</h2>
+        <span class="rolos-auto" id="rolos-auto" hidden>atualizando sozinho</span>
+      </div>
+      <ol class="lista-rolos" id="lista-rolos"></ol>
+      <div class="vazio" id="rolos-vazio" hidden>
+        <p class="vazio-t">Nenhum rolo ainda.</p>
+        <p>O primeiro corte começa na claquete. Em poucos minutos os clipes aparecem aqui.</p>
+      </div>
+    </section>
+  </section>
+</template>
+
+<!-- ============================== TRABALHO ============================== -->
+<template id="t-trabalho">
+  <section class="trabalho">
+    <a class="voltar" href="#/">← todos os rolos</a>
+    <div class="trabalho-cab">
+      <div>
+        <p class="slate" id="tr-quando"></p>
+        <h1 id="tr-titulo">Rolo</h1>
+        <p class="sub" id="tr-origem"></p>
+      </div>
+      <span class="chip" id="tr-status"></span>
+    </div>
+    <div class="trabalho-corpo" id="tr-corpo"></div>
+  </section>
+</template>
+
+<!-- ============================== CRÉDITOS ============================== -->
+<template id="t-creditos">
+  <section class="creditos">
+    <a class="voltar" href="#/">← todos os rolos</a>
+    <div class="creditos-cab">
+      <div>
+        <p class="slate">Créditos</p>
+        <h1>Seu saldo</h1>
+        <p class="sub">1 crédito = 1 minuto de vídeo enviado. Cada pedido reserva o necessário e devolve o que sobrar.</p>
+      </div>
+      <p class="saldo-grande"><span id="cr-saldo">—</span><small>minutos de vídeo</small></p>
+    </div>
+
+    <section class="pacotes-bloco" aria-labelledby="pacotes-t">
+      <h2 id="pacotes-t">Comprar minutos</h2>
+      <div class="pacotes" id="pacotes"></div>
+      <p class="aviso-loja" id="pacotes-fechado" hidden>A compra de créditos abre no lançamento do ClipPro. No beta, os minutos do convite são por nossa conta.</p>
+      <p class="dica" id="pacotes-nota" hidden>Pagamento pelo Mercado Pago, com Pix ou cartão. Os minutos entram assim que o pagamento é aprovado.</p>
+      <p class="msg" id="msg-pacotes" role="alert" hidden></p>
+    </section>
+
+    <section class="extrato-bloco" aria-labelledby="extrato-t">
+      <h2 id="extrato-t">Extrato</h2>
+      <ol class="extrato" id="extrato"></ol>
+    </section>
+  </section>
+</template>
+
+<!-- ========================= VOLTA DO PAGAMENTO ========================= -->
+<template id="t-compra">
+  <section class="centro">
+    <div class="cartao estreito">
+      <p class="slate" id="cp-slate">Pagamento</p>
+      <h1 id="cp-titulo"></h1>
+      <p class="sub" id="cp-texto" aria-live="polite"></p>
+      <p class="saldo-grande" id="cp-saldo-caixa" hidden><span id="cp-saldo"></span><small>minutos de vídeo</small></p>
+      <div class="acoes-linha">
+        <a class="btn primario" href="#/">Voltar aos rolos</a>
+        <a class="btn fantasma" href="#/creditos">Ver extrato</a>
+      </div>
+    </div>
+  </section>
+</template>
+
+<script src="/vendor/supabase-2.117.2.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

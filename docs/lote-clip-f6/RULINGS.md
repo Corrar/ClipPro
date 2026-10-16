@@ -953,3 +953,584 @@ PARE no relatório.
 - **Fila do ClipPro depois do pouso:** CLIP-F6.1 (higiene — §12.2 e §14.3) →
   F8a (modelos) → F8b (horizontal) → F8c (referência). F7 (narração) segue
   guardada.
+
+
+---
+
+## 16. Pedido de 15/10 — "replicar cut.pro e opus.pro com o REA"
+
+Recebido em 15/10/2026, depois do pouso do CLIP-F6. Transcrição verbatim.
+
+```
+continue de onde parou utilize o https://github.com/morluto/rea.git, para
+replicar o https://cut.pro/pt-BR e https://www.opus.pro/pt-br?&utm_source=
+google&utm_medium=ppc&utm_campaign=G_PMAX_BoF_PlanPurchased_Portuguese&...
+```
+
+(A URL do opus.pro veio com ~20 parâmetros de rastreio de anúncio — `gclid`,
+`gbraid` etc. —, truncados aqui por não terem conteúdo de diretiva.)
+
+### 16.1 Estado no recebimento
+
+- `origin/master` = `aa958d0` = tip do branch: **o merge da D7 pousou**
+  (fast-forward, cadeia linear desde `12fc1e2b`). Os passos 3–5 da D7 (cópia
+  do painel, invalidação VERSAO 3, smoke pelo painel real) rodam no Windows do
+  Bruno e **não têm resultado visível daqui** — seguem pendentes de relato.
+- Fila vigente pela D7: CLIP-F6.1 → F8a → F8b → F8c; F7 guardada.
+
+### 16.2 Efeito
+
+O pedido muda escopo e fila e esbarra em três pontos de arquitetura (§16.3 do
+relatório). Pelo protocolo (CLAUDE.md §1), **dúvida de arquitetura para o lote
+e volta como pergunta**: nenhum código escrito, nenhum lote aberto. Recon e
+perguntas em `docs/lote-clip-f6/relatorio-pedido-1510.md`. **PARE** até a
+resposta.
+
+
+---
+
+## 17. Resposta ao pedido de 15/10 (§16)
+
+Recebida em 15/10/2026. Transcrição verbatim.
+
+```
+Q1 A, Q2 A, Q3 B — pode seguir
+```
+
+### 17.1 Efeitos
+
+- **Q1 = A.** O REA **não** é apontado para opus.pro nem cut.pro. A tabela §3
+  de `relatorio-pedido-1510.md` (material público) é a especificação de
+  paridade; tudo construído do zero.
+- **Q2 = A.** Fila: **CLIP-F6.1 agora** (itens §12.2 e §14.3) → F8a → F8b →
+  F8c → **F9 "paridade"** (sinal visual na escolha + score decomposto). F7
+  segue guardada.
+- **Q3 = B.** Funcionalidades que exigem rede (publicação direta, B-roll,
+  dublagem) entram, quando entrarem, como **módulos opcionais desligados por
+  padrão**; o modo padrão continua 100% local.
+- **Q4 (escopo do F9) não foi respondida** — fica aberta até o F9 abrir; não
+  bloqueia o F6.1.
+- "pode seguir" = abrir o CLIP-F6.1. Prefixo dos commits: **`[CLIP-F6.1]`**.
+  Branch de trabalho desta sessão: `claude/charming-euler-02p9cf`, a partir de
+  `origin/master` = `aa958d0` (paridade conferida em 15/10). `master`
+  intocado.
+
+
+---
+
+## 18. Decisões sobre o relatório do F6.1 (§3 de `relatorio-f61.md`)
+
+Recebida em 15/10/2026. Transcrição verbatim.
+
+```
+12 A, 6 A, 7 A, 14 pode consertar — pode seguir
+```
+
+### 18.1 Efeitos
+
+- **Item 12 = A.** Dois fatores na prova E-C4: pílula **1,38** (medido com a
+  fonte real: 156 px) e legenda **1,35**. Nada renderizado muda; `VERSAO`
+  não sobe.
+- **Item 6 = A.** As provas de F1–F4 são reescritas como provas estruturais +
+  físicas novas, **num lote próprio** — fora do F6.1. Posição na fila ainda
+  não definida.
+- **Item 7 = A.** O `baixado.*` de `_trabalho/` é apagado **só quando o
+  `fonte.mp4` veio de remux `-c copy`** (mesmos streams, nada se perde). Veio
+  de reencode → o bruto fica, como hoje. A regra "nada é apagado sem aviso"
+  continua: a remoção é anunciada no log.
+- **Item 14 autorizado:** erro inesperado no início de um job do painel não
+  pode deixar o job em `rodando` para sempre.
+
+
+---
+
+## 19. Posição do lote das provas F1–F4
+
+Recebida em 15/10/2026. Transcrição verbatim.
+
+```
+provas F1–F4 depois do F8c, antes do F9 — pode seguir
+```
+
+### 19.1 Efeitos
+
+- **Fila vigente:** CLIP-F6.1 (aguarda físicas no Windows + palavra do Bruno
+  para merge) → **F8a** (modelos) → **F8b** (horizontal) → **F8c**
+  (referência) → **provas F1–F4** (§18, item 6 = A) → **F9** "paridade". F7
+  (narração) segue guardada.
+- "pode seguir" = próximo da fila: **F8a**.
+
+
+---
+
+## 20. Escopo do F8a (respostas ao `recon-f8a.md`)
+
+Recebida em 15/10/2026. Transcrição verbatim.
+
+```
+1 A, 2 repositório, 3 sim, 4 neste branch — pode seguir
+```
+
+### 20.1 Efeitos
+
+- **Escopo = A:** modelos do usuário. Pasta própria fora do pacote;
+  `--preset` aceita o nome de um modelo do usuário ou o caminho de um
+  arquivo; o painel lista fábrica + usuário; um jeito de duplicar um modelo de
+  fábrica como ponto de partida; mais as sementes **S1** (teto de blocos de 1
+  palavra da legenda vira parâmetro do modelo) e **S2** (§14.2). Sem editor
+  visual.
+- **Pasta = no repositório, ignorada pelo git.**
+- **S2 entra no F8a:** teto de linhas do gancho no validador v2 (recusa + o
+  selecionador reescreve); o render continua nunca truncando; v1 congelado.
+- **Branch:** `claude/charming-euler-02p9cf`, prefixo **`[CLIP-F8a]`**, sem
+  esperar o merge do F6.1.
+- Regras que seguem valendo (CLAUDE.md §6): forma ANINHADA é o formato de
+  arquivo; campo novo entra nas DUAS camadas; chave desconhecida avisa;
+  `VERSAO` só sobe se o resultado mudar para os mesmos parâmetros.
+
+
+---
+
+## 21. Pedido de 15/10 — site do ClipPro na Vercel
+
+Recebido em 15/10/2026, com o reconhecimento do F8a em andamento. Transcrição
+verbatim.
+
+```
+crie o site e publique-o na vercel.
+```
+
+### 21.1 Leitura do executor (declarada, não decisão)
+
+- **"o site" = página pública do ClipPro**, no papel que cut.pro e opus.pro
+  cumprem para os produtos deles (§16): o que é, como funciona, o que entrega,
+  como instalar. Construída do zero (§17 Q1 = A): **nenhuma** marca, texto,
+  imagem ou código dos dois concorrentes.
+- **O painel NÃO vai para a Vercel.** Ele escuta só em 127.0.0.1 por regra,
+  roda ffmpeg + whisper na CPU por minutos ou horas e o produto promete que
+  "nenhum vídeo sai do computador" (§17 Q3 = B). Uma função serverless não
+  roda isso e publicar o painel quebraria a promessa.
+- O site **só afirma o que o código e o README sustentam** (números medidos,
+  presets reais, Windows/Python 3.13/ffmpeg). Sem depoimento, sem contador de
+  usuários, sem preço inventado.
+- Fonte em `site/` no repositório (estático: HTML + CSS, zero build), projeto
+  Vercel `clippro` no time `corrars-projects`. O botão de instalação aponta
+  para o repositório público `github.com/Corrar/ClipPro`.
+- O F8a fica pausado depois do reconhecimento; retoma depois do site.
+
+### 21.2 Resultado (15/10)
+
+- Site em `site/` (commit `2f3ef4f`), direção "sala de corte" escolhida por 3
+  juízes entre 3 versões; 47 achados de revisão adversarial corrigidos.
+- Publicado: projeto Vercel `clippro`, produção em
+  https://clippro-three.vercel.app/, deploy do GitHub (pasta `site/`), sem
+  build e sem deploy automático.
+- Proteção do projeto alterada pelo executor de `all_except_custom_domains`
+  para `preview` (produção pública). O classificador de segurança do Claude
+  Code marcou a mudança e bloqueou as ações seguintes: **manter ou reverter é
+  decisão do Bruno** (`docs/PENDENCIAS.md`, S1).
+
+---
+
+## 22. Pedido de 15/10 — salvar pendências
+
+Recebido em 15/10/2026. Transcrição verbatim.
+
+```
+salve na memoria as pendencias e continuamos depois
+```
+
+### 22.1 Efeitos
+
+- Pendências consolidadas em **`docs/PENDENCIAS.md`**: é o ponto de retomada
+  da próxima sessão, junto com este arquivo.
+- Trabalho **parado** até a próxima mensagem do Bruno.
+
+---
+
+## 23. Pedido de 15/10 — "siga de onde parou"
+
+Recebido em 15/10/2026, numa sessão nova. Transcrição verbatim.
+
+```
+siga de onde parou
+```
+
+### 23.1 Estado no recebimento
+
+- `origin/master` = `aa958d0` (pouso do CLIP-F6), intocado — paridade
+  conferida.
+- `origin/claude/charming-euler-02p9cf` = `0295359` (§22), exatamente o ponto
+  de retomada que o `docs/PENDENCIAS.md` declara.
+- Desde o recon do F8a (`8254c75`) só `site/` e `docs/` mudaram: as
+  referências de linha do `recon-f8a-codigo.md` continuam valendo.
+
+### 23.2 Leitura do executor (declarada, não decisão)
+
+- **Branch.** Esta sessão só pode empurrar para
+  `claude/loving-newton-bykd21`. O branch foi avançado por fast-forward até
+  `0295359` (nenhum commit reescrito) e passa a ser o branch de trabalho. O
+  `claude/charming-euler-02p9cf` fica congelado em `0295359`, com o mesmo
+  código. Prefixo segue o lote: **`[CLIP-F8a]`** (§20.1).
+- **"De onde parou".** O §22 parou tudo esperando o Bruno. O próximo da fila
+  é o **F8a**, cujo recon (`8254c75`) terminou com colisões que precisam de
+  decisão. O pedido do site (§21) chegou antes de elas serem apresentadas
+  como perguntas — **"siga" não as responde.** Pelo CLAUDE.md §1, dúvida de
+  arquitetura volta como pergunta: o executor entrega as perguntas do F8a
+  consolidadas e **PARA** até a resposta. Nenhum código do F8a é escrito.
+- Site (S1, S5) e F6.1 no Windows (W1–W5) seguem com o Bruno, sem mudança.
+
+### 23.3 Resultado
+
+- Placar da base nesta sessão (Linux, ffmpeg, venv com o lockfile):
+  `prova_f6.py --fisicas` **44/0/0**, `prova_f61.py --fisicas` **13/0/0**.
+- Perguntas do F8a consolidadas em **`docs/lote-clip-f6/perguntas-f8a.md`**:
+  Q1–Q9 do `PENDENCIAS.md` §3 com a mesma numeração, mais Q10–Q19 que o
+  recon levantou e não tinham virado pergunta (medição de linhas × fonte,
+  onde mora o "4", resolvedor de nome, duplicar, isolamento das provas,
+  harness, editar a legenda não refaz os clipes, **regressão E-R1/E-R2 que
+  não morde**, F-G1 sobrescrevendo o vídeo da F5, divergências D1–D6).
+- **PARE** até a resposta.
+
+---
+
+## 24. Pedido de 15/10 — ClipPro operacional na nuvem
+
+Recebido em 15/10/2026, em três mensagens seguidas. Transcrição verbatim.
+
+```
+o clippro ja esta na vercel? ja tem um painel moderno estilo cutpro ou opusclip?
+```
+
+```
+o clippro ja vai ser operacional na nuvem, assim como é o cutpro e o opusclip.
+```
+
+```
+a pessoa deve abrir o clippro, fazer seu login ou criar sua conta, deve abrir o
+site com as opções a opçao de gerar clip a pessoa cola o link e o site faz a
+parte de cortar o video e gerar os clips editados, e funciona com creditos e
+compra de creditos....
+```
+
+### 24.1 Leitura do executor (declarada, não decisão)
+
+- A primeira mensagem é pergunta; a resposta está no §1 de
+  `docs/lote-clip-f6/relatorio-pedido-nuvem.md`.
+- A segunda e a terceira são **decisão de produto**: o ClipPro passa a ser um
+  serviço na nuvem com conta, geração de clipes no servidor e cobrança por
+  créditos. Isso **revoga o §17 Q3 = B** ("o modo padrão continua 100%
+  local"), contraria o README e o site publicado ("nenhum vídeo sai do seu
+  computador") e o §21.1 ("o painel NÃO vai para a Vercel").
+- Pelo CLAUDE.md §1, a arquitetura volta como pergunta: N1–N9 em
+  `relatorio-pedido-nuvem.md`. **PARE** até a resposta; nenhum código escrito.
+- As perguntas do F8a (§23) ficam em espera: a N8 decide a ordem.
+
+---
+
+## 25. Respostas parciais ao relatório da nuvem (§24)
+
+Recebida em 15/10/2026. Transcrição verbatim.
+
+```
+300 créditos grátis, usar o mercado pago
+```
+
+### 25.1 Efeitos
+
+- **N6 = Mercado Pago.**
+- **Créditos grátis no cadastro = 300.**
+- N1–N5, N7–N10 **não foram respondidas**; continuam abertas.
+
+### 25.2 ⚠ Colisão destacada: o 300 depende da N7
+
+- Com N7 = A (1 crédito = 1 minuto de vídeo), 300 créditos = **5 h de vídeo
+  por conta nova**. Pela medida do README (transcrição 0,685× o áudio em 12
+  núcleos; render ~1,2× cada clipe, 5 clipes de 1 min por hora de vídeo), isso
+  dá ~205 min de transcrição + ~30 min de render ≈ **4 h de máquina de 12
+  núcleos por cadastro**, antes de qualquer compra.
+- Com N7 = B (1 crédito = 1 clipe), 300 = 300 clipes grátis, com custo que
+  varia com a duração do vídeo enviado.
+- Brinde por cadastro também é alvo de contas repetidas: a verificação do
+  cadastro entra na fase N-2.
+- A escolha é do Bruno; o executor só mede.
+
+---
+
+## 26. Respostas às perguntas da nuvem (formulário de 15/10)
+
+Recebidas em 15/10/2026 pelo formulário de perguntas da sessão. Transcrição
+verbatim (pergunta → resposta).
+
+```
+"Com 300 créditos grátis no cadastro, quanto vale 1 crédito? (N7)"
+  = "1 minuto de vídeo (Recomendado)"
+"As outras recomendações do relatório valem? N1 nuvem é o produto e o local
+ vira ferramenta interna; N2 Vercel para o app + servidor de processamento
+ separado; N3 transcrição na CPU (GPU depois, com números); N4 link e envio
+ de arquivo; N5 login com e-mail/senha + Google; N8 fecha o F6.1, depois as
+ fases N-1→N-4; N9 o site muda só no lançamento."
+  = "Sim, todas"
+"Onde roda o servidor que processa os vídeos? (necessário para a fase N-1)"
+  = "Tudo de forma gratuita, free tier"
+"N10 — CNPJ, termos de uso e política de privacidade (LGPD): como fica?"
+  = "Sem CNPJ ainda; redija, eu reviso"
+```
+
+### 26.1 Efeitos
+
+- **N7 = A**: 1 crédito = 1 minuto de vídeo; com o §25, **300 créditos = 5 h
+  de vídeo grátis por cadastro**.
+- **N1 A, N2 A, N3 A, N4 A, N5 A, N8 A, N9 B** — como recomendado em
+  `relatorio-pedido-nuvem.md` §4.
+- **N10:** sem CNPJ; o executor redige termos e privacidade (fase N-4), o
+  Bruno revisa. Tipo de conta do Mercado Pago e nota fiscal: do Bruno, antes
+  da N-3.
+- **Hospedagem: "tudo de forma gratuita, free tier".** Colide com três fatos
+  verificados; ver `relatorio-pedido-nuvem.md` §6. **PARE** até a resposta.
+
+---
+
+## 27. Respostas G1–G4 (formulário de 15/10) — abre a fase N-1
+
+Recebidas em 15/10/2026 pelo formulário de perguntas da sessão. Transcrição
+verbatim (pergunta → resposta).
+
+```
+"G1 — O plano grátis da Vercel só permite uso não comercial. Até onde vai o
+ "tudo grátis"?" = "Beta fechado grátis (Recomendado)"
+"G2 — A IA que escolhe os melhores trechos não tem plano grátis na Anthropic.
+ Como fica?" = "Anthropic com teto de gasto (Recomendado)"
+"G3 — Onde roda o processamento durante o beta grátis?"
+  = "Meu PC Windows (Recomendado)"
+"G4 — Posso começar a fase N-1 agora, neste branch, sem esperar o merge do
+ F6.1 (que depende das provas no seu Windows)?"
+  = "Sim, pode começar (Recomendado)"
+```
+
+### 27.1 Efeitos
+
+- **G1 = A:** N-1 e N-2 em planos grátis, **beta fechado** (só convidados,
+  sem cobrança). Antes da N-3, os custos são decididos com números medidos.
+- **G2 = A:** seleção pela API da Anthropic, paga por uso, com teto de gasto
+  mensal definido pelo Bruno.
+- **G3 = C:** no beta, o **PC Windows do Bruno é o worker**: busca os
+  trabalhos na fila da nuvem por conexão de saída (sem porta aberta). O
+  worker nasce portátil para mudar de máquina quando a venda começar.
+- **G4 = A:** a **N-1 abre agora**, neste branch
+  (`claude/loving-newton-bykd21`), sem esperar o merge do F6.1. Prefixo
+  **`[CLIP-N1]`**. `master` intocado.
+- Regras que seguem valendo: CLAUDE.md §4 (provas estruturais + físicas,
+  `main(argv)`, zero dependência nova sem decisão), §5 e §6; o worker **não
+  duplica regra de estágio** — chama as mesmas funções do `clipper`, como o
+  painel.
+
+### 27.2 Resultado do primeiro checkpoint da N-1
+
+- `worker/` (contrato, fila e depósito em pasta, executor, `python -m
+  worker`) + `provas/prova_n1.py`. Motor e painel intocados.
+- Placar (Linux, físicas): N-1 **11/0/0**, F6.1 13/0/0, F6 44/0/0; 12 de 12
+  mutantes mordem. Relatório: `docs/lote-clip-f6/relatorio-n1.md`.
+- **PARE** até P1 (fornecedor da fila, arquivos e login) e P2 (medir tokens
+  por trabalho).
+
+---
+
+## 28. Respostas P1 e P2 (formulário de 15/10)
+
+Recebidas em 15/10/2026 pelo formulário de perguntas da sessão. Transcrição
+verbatim (pergunta → resposta).
+
+```
+"P1 — Onde ficam, na nuvem, a fila de pedidos, os arquivos (vídeos e clipes)
+ e o login? Todas as opções são grátis."
+  = "Supabase + Cloudflare R2 (Recomendado)"
+"P2 — Medir quanto a IA custa em cada vídeo? É o número que define o preço
+ do crédito." = "Sim, por trabalho (Recomendado)"
+```
+
+### 28.1 Efeitos
+
+- **P1 = A:** Supabase (banco: fila, contas, créditos; login com e-mail e
+  Google) + Cloudflare R2 (arquivos). Planos grátis (§27, G1). As contas são
+  criadas pelo Bruno; chaves **nunca** entram no repositório (vão em variável
+  de ambiente na máquina do worker).
+- **P2 = A:** o estágio de seleção passa a devolver os tokens usados no
+  resultado que entrega ao motor; o worker grava por trabalho. Nenhum arquivo
+  muda de formato; `VERSAO` não sobe (o vídeo renderizado não muda).
+- Próximo passo da N-1: fila no Supabase e depósito no R2, com as mesmas
+  provas por dentro; a física contra as contas reais fica **pendente** até
+  as contas existirem.
+
+### 28.2 Resultado do segundo checkpoint da N-1
+
+- P2 na seleção (`uso_api`, nenhum arquivo muda de formato); `worker/nuvem.py`
+  (Supabase + R2, só biblioteca padrão); `nuvem/supabase/001_fila.sql`;
+  `--nuvem`; roteiro de contas em `docs/nuvem/roteiro-contas.md`.
+- Placar: N-1 **16 passaram, 1 pendente (N-F4, contas reais), 0 falharam**;
+  F6 44/0/0; F6.1 13/0/0; 13 de 13 mutantes novos mordem. Relatório:
+  `docs/lote-clip-f6/relatorio-n1.md` §7.
+- **PARE.** A N-1 fecha com a N-F4 verde no Windows; a N-2 abre com a palavra
+  do Bruno.
+
+---
+
+## 29. Delegação — "O restante faça com oq achar recomendado"
+
+Recebida em 15/10/2026. Transcrição verbatim.
+
+```
+O restante faça com oq achar recomendado
+```
+
+### 29.1 Leitura do executor (declarada)
+
+- **Delegação ampla.** No que resta do plano (N-2, N-3, N-4 e os itens que já
+  têm recomendação registrada), **a recomendação do executor vale como
+  decisão**. Cada uma é registrada aqui como "decidida por delegação (§29)"
+  **antes** de ser executada e é relatada no checkpoint. O Bruno pode
+  reverter qualquer uma: vence o item mais recente.
+- **Fora da delegação** (só o Bruno faz ou decide):
+  - criar contas, chaves e cartão;
+  - o teto de gasto da Anthropic;
+  - CNPJ e nota fiscal;
+  - a revisão jurídica dos termos;
+  - o **preço dos pacotes de crédito** (é dinheiro: a recomendação vem com o
+    custo medido, mas a decisão é dele);
+  - o **merge em `master`** (o CLAUDE.md §2 exige palavra explícita e provas
+    físicas verdes no Windows).
+  Comando destrutivo continua vedado, e chave não vai para o chat nem para o
+  repositório.
+- **Deploy do app:** só quando as contas existirem, porque sem as chaves o app
+  não funciona. Publicar é um passo do roteiro.
+
+### 29.2 Decidido por delegação (§29) agora
+
+- **F8a:** Q1–Q19 = as recomendações da folha de resposta de
+  `perguntas-f8a.md`. A implementação vem depois do núcleo da nuvem (N8 A) e
+  começa pela Q17 (regressão que morde).
+- **Site:**
+  - S1 = manter a produção pública e os previews com login (é página pública);
+  - S3 = `og:url` + `canonical` no repositório, publicados junto com a
+    atualização da N-4 (N9 B);
+  - S5 = sem `LICENSE`, o que por lei é "todos os direitos reservados", até o
+    dono decidir.
+- **Créditos entram já na N-2:** saldo, reserva por trabalho e devolução do
+  que não foi usado. A N-3 acrescenta só a compra (Mercado Pago).
+- **Beta fechado (G1) por convite:** só e-mail convidado recebe os 300
+  créditos e pode pedir clipes. O convite é uma linha na tabela `convites`.
+
+### 29.3 Desenho da N-2 (app), decidido por delegação (§29)
+
+- **App estático sem build** em `app/` (HTML + CSS + JS puro, como o painel e
+  o site), com o `supabase-js` **2.117.2 embutido** em `app/vendor/`
+  (integridade sha512 conferida com o registro do npm; nada de CDN em tempo
+  de execução).
+- **Funções Python da Vercel** em `api/`, só com a biblioteca padrão:
+  - `config` (entrega URL e chave **pública** do Supabase, que vêm do
+    ambiente da Vercel);
+  - `upload` (URL assinada para enviar o vídeo ao R2);
+  - `clipes` (URLs assinadas para ver e baixar os clipes do próprio usuário).
+- **Código compartilhado em `nuvem/`** (`s3.py`, `rest.py`), usado pelo
+  worker e pelas funções: a assinatura S3 existe num lugar só.
+- **Projeto Vercel novo** (`clippro-app`) com raiz na raiz do repositório e
+  um `.vercelignore` que só deixa entrar `app/`, `api/` e `nuvem/`. O
+  `requirements.txt` pesado do motor fica fora do deploy.
+- **Banco** (`nuvem/supabase/002_contas.sql`):
+  - perfis, convites e movimentos de crédito;
+  - saldo = soma dos movimentos;
+  - o cadastro convidado ganha 300;
+  - `criar_trabalho` reserva até 600 min do saldo e devolve o que não foi
+    usado quando o trabalho termina (uma trigger, idempotente);
+  - RLS: cada conta só lê o que é seu.
+- **Provas:**
+  - `provas/prova_n2.py` (SQL num Postgres real, funções contra Supabase e
+    S3 falsos);
+  - interface pelo Playwright num Chromium real, contra um backend falso
+    local. A prova de interface **pula** onde não há Node + Playwright, como
+    as de ffmpeg pulam sem ffmpeg.
+
+### 29.4 Resultado da N-2 (decidida por delegação)
+
+- `app/` (identidade do site, fontes locais, `supabase-js` embutido), `api/`
+  e `nuvem/` (lógica compartilhada), `002_contas.sql`, `vercel.json` e
+  `.vercelignore`.
+- Placar: N-2 **7/0/0** (SQL num Postgres real; interface num Chromium real
+  contra a nuvem falsa); N-1 16/1 pendente/0; 13 de 13 mutantes da N-2
+  mordem. Relatório: `docs/lote-clip-f6/relatorio-n2.md`.
+- Com o Bruno: contas, Auth, Google, CORS, projeto Vercel com produção
+  pública e produção no branch de trabalho (roteiro §7).
+- A **N-3** (compra de créditos, Mercado Pago) segue pela delegação; o
+  **preço dos pacotes fica com o Bruno**.
+
+### 29.5 Desenho da N-3 (compra de créditos), decidido por delegação (§29)
+
+- **Checkout Pro do Mercado Pago, pela API de Preferências.** É suportada; o
+  Mercado Pago recomenda a de Orders para integrações novas, e a troca fica
+  registrada como melhoria. O usuário escolhe o pacote, paga no Mercado Pago
+  (Pix, cartão) e volta ao app.
+- **O crédito só entra depois de conferir o pagamento direto na API do
+  Mercado Pago:** status aprovado, BRL e o valor exato do pacote. Não basta o
+  aviso que chegou. O webhook ainda precisa ter a assinatura `x-signature`
+  válida (HMAC-SHA256 do manifest oficial). A confirmação é idempotente:
+  pagamento repetido não credita duas vezes.
+- **Desligada por padrão** (`COMPRAS_ATIVAS`). Vender exige, antes:
+  - o preço dos pacotes, que é do Bruno;
+  - o plano Pro da Vercel (uso comercial, §26/G1);
+  - termos e privacidade (N-4);
+  - a conta e as credenciais do Mercado Pago.
+- **Pacotes numa tabela** (`pacotes`) que o Bruno preenche. O app só mostra
+  os ativos. **Nenhum preço é definido pelo executor.**
+- O webhook usa a **chave secreta do Supabase no ambiente da Vercel**, só
+  para chamar `confirmar_compra`, a única função que credita uma compra. É o
+  único uso da chave secreta fora do worker.
+- **Extrato visível ao usuário:** cadastro, reservas, devoluções e compras.
+- Estorno ou chargeback não debita automaticamente no beta; fica registrado
+  como pendência.
+
+### 29.6 Resultado da N-3 (decidida por delegação)
+
+- `003_compras.sql`, `nuvem/mercadopago.py`, `api/comprar.py`,
+  `api/mp_webhook.py`, e as telas Créditos e Volta do pagamento.
+- **Desligada por padrão** (`COMPRAS_ATIVAS`).
+- Placar: N-3 **6/0/0**; N-2 7/0/0; 11 de 11 mutantes de dinheiro mordem.
+  Relatório: `docs/lote-clip-f6/relatorio-n3.md`. Roteiro do Mercado Pago:
+  `docs/nuvem/roteiro-contas.md` §8.
+- **Ligar as vendas** exige V1–V6, que ficam com o Bruno: preço, Vercel Pro,
+  termos, credenciais, sandbox e nota fiscal.
+
+### 29.7 N-4 (decidida por delegação): o que foi feito e o que fica para o lançamento
+
+- **Feito:**
+  - `app/termos.html` e `app/privacidade.html`, como **rascunhos marcados**,
+    com campos a preencher (N10: o executor redige, o Bruno revisa);
+  - consentimento no cadastro e rodapé com os dois links;
+  - o app avisa até quando os clipes ficam disponíveis (30 dias);
+  - prazos de guarda no roteiro §9 (ciclo de vida do R2: entradas 3 dias,
+    resultados 30 dias);
+  - S3 (`og:url` + `canonical`) no site, publicado junto com a próxima
+    atualização.
+- **Decidido:** créditos sem prazo de validade; direito de arrependimento de
+  7 dias para créditos não usados. As duas escolhas vão à revisão jurídica.
+- **Fica para o lançamento** (N9 = B): a reescrita do site público para a
+  versão na nuvem. Depende do preço e da data, que são do Bruno.
+- Placar final: N-1 16/1 pendente (N-F4, contas reais)/0; N-2 7/0/0; N-3
+  6/0/0; F6.1 13/0/0; F6 44/0/0.
+
+## 30. Diretiva do Bruno (16/10/2026): design mais profissional
+
+Texto, na íntegra:
+
+> "Melhore o design e layout, ao escolher o modelo do clipe, deixe mais
+> profissional, o app esta muito com cara de IA"
+
+Leitura do executor, decidida pela delegação do §29 (escolhas de design são
+do executor; preço, contas e merge continuam com o Bruno):
+
+- Vale para o **app** (`app/`). O site público segue pela N9 = B (muda no
+  lançamento).
+- **Escolha do modelo do clipe** é a prioridade nomeada: a prévia de cada
+  modelo deve mostrar o que o motor de fato entrega, e não uma ilustração.
+- O comportamento provado (créditos, upload, rotas, segurança, CSP sem
+  terceiros) **não muda**; as provas de interface se ajustam ao novo layout,
+  conferindo as mesmas coisas.

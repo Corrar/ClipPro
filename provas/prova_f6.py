@@ -1415,12 +1415,19 @@ def f_conclusao_no_frame(raiz: Path) -> None:
 # usam (Impact, Segoe UI Black), e errar para cima e o lado seguro -- superestimar
 # a altura ENCOLHE o vao calculado, entao a prova reprova antes de o pixel
 # encostar, nunca depois.
+#
+# Dois fatores (RULINGS §18, item 12 = A): 1,35 subestimava a PILULA -- com a
+# fonte real a de 2 linhas do `cortes` mede 156 px e a estimativa dava 152. A
+# pilula passa a usar o medido (1,38 -> 156 px); a legenda segue em 1,35.
+# Um fator so de 1,38 tambem inflava a legenda e levava o vao estimado do
+# `cortes` a 20 px, abaixo do real (26 px).
 _FATOR_ALTURA_LINHA = 1.35
+_FATOR_ALTURA_LINHA_PILULA = 1.38
 
 
 def _altura_pilula(comp: Any, linhas: int) -> int:
     """Altura da pílula com `linhas` linhas, pela fórmula de composicao.py:902."""
-    altura_linha = int(comp.titulo_tamanho * _FATOR_ALTURA_LINHA)
+    altura_linha = int(comp.titulo_tamanho * _FATOR_ALTURA_LINHA_PILULA)
     respiro = max(16, int(altura_linha * 0.30))
     bruto = max(int(comp.titulo_altura), altura_linha * linhas + 2 * respiro)
     return bruto - (bruto % 2)  # _par(): o H.264 4:2:0 exige par

@@ -827,8 +827,11 @@ def validar(
 
     if not isinstance(dados, list):
         tipo = type(dados).__name__
+        # As duas formas (CLIP-F6.1 item 11): um v2 solto nao tem inicio/fim
+        # e caia na mensagem generica, que nao diz o que fazer.
         um_clipe_solto = isinstance(dados, dict) and all(
-            dados.get(campo) is not None for campo in _CAMPOS_OBRIGATORIOS
+            dados.get(campo) is not None
+            for campo in (_CAMPOS_OBRIGATORIOS_V2 if e_v2(dados) else _CAMPOS_OBRIGATORIOS)
         )
         if um_clipe_solto:
             # Nao acuse o usuario de nao ter mandado uma lista: o mais provavel
@@ -860,8 +863,9 @@ def validar(
         if not isinstance(item, dict):
             problemas.append(
                 f"{rotulo}: cada item do array tem que ser um objeto JSON com os "
-                f"campos {', '.join(_CAMPOS_OBRIGATORIOS)} (veio um "
-                f"{type(item).__name__})."
+                f"campos {', '.join(_CAMPOS_COMUNS)} e o trecho — `inicio` e `fim` "
+                f"para um trecho contínuo, ou `segmentos` para 1 a "
+                f"{MAX_SEGMENTOS} trechos separados (veio um {type(item).__name__})."
             )
             continue
 
@@ -1220,13 +1224,23 @@ def validar(
         conflito = _primeiro_conflito(resultado, clipe)
         if conflito is not None:
             outro, comum = conflito
+            # O conserto acima ja mexeu no inicio. Sem dizer isso, a faixa
+            # citada nao bate com a que o modelo mandou e o usuario procura um
+            # erro que nao esta na resposta dele (CLIP-F6.1 item 10).
+            nota_deslocamento = (
+                f" (o início do {clipe['rotulo']} já tinha sido movido de "
+                f"{mmss(clipe['inicio_pedido'])} para {mmss(clipe['inicio'])} "
+                f"para não encostar no {anterior['rotulo']})"
+                if desfeita and anterior is not None
+                else ""
+            )
             problemas.append(
                 f"{outro['rotulo']} e {clipe['rotulo']} compartilham material "
                 f"({mmss(comum[0])}–{mmss(comum[1])}): "
                 f"{_faixas(intervalos_do_clipe(outro))} contra "
-                f"{_faixas(intervalos_do_clipe(clipe))}. Dois clipes não podem "
-                "ter nenhum segundo em comum — escolha outro trecho para um dos "
-                "dois."
+                f"{_faixas(intervalos_do_clipe(clipe))}{nota_deslocamento}. Dois "
+                "clipes não podem ter nenhum segundo em comum — escolha outro "
+                "trecho para um dos dois."
             )
             continue
         if desfeita:
@@ -1531,7 +1545,32 @@ def _logar_estimativa(client: Any, modelo_id: str, prompt: str) -> None:
     )
 
 
-def _enviar(client: Any, anthropic: Any, mensagens: list[dict[str, Any]], modelo_id: str) -> str:
+def _somar_uso(uso: dict[str, Any] | None, resposta: Any) -> None:
+    """Acumula os tokens que a API DIZ ter cobrado (RULINGS §28, P2).
+
+    E o numero real da fatura, nao a ESTIMATIVA de _logar_estimativa: e ele
+    que define o preco do credito antes da N-3. Campo ausente conta zero.
+    """
+    if uso is None:
+        return
+    consumo = getattr(resposta, "usage", None)
+    uso["chamadas"] = int(uso.get("chamadas", 0)) + 1
+    for campo, chave in (
+        ("input_tokens", "tokens_entrada"),
+        ("output_tokens", "tokens_saida"),
+        ("cache_creation_input_tokens", "tokens_cache_escrita"),
+        ("cache_read_input_tokens", "tokens_cache_leitura"),
+    ):
+        uso[chave] = int(uso.get(chave, 0)) + int(getattr(consumo, campo, 0) or 0)
+
+
+def _enviar(
+    client: Any,
+    anthropic: Any,
+    mensagens: list[dict[str, Any]],
+    modelo_id: str,
+    uso: dict[str, Any] | None = None,
+) -> str:
     """Uma ida a API, com 3 tentativas para falhas que valem retentar.
 
     4xx nao repete (exceto 429): tentar de novo uma chave invalida so gasta
@@ -1550,6 +1589,7 @@ def _enviar(client: Any, anthropic: Any, mensagens: list[dict[str, Any]], modelo
                     "format": {"type": "json_schema", "schema": ESQUEMA_JSON}
                 },
             )
+            _somar_uso(uso, resposta)
             return _texto_da_resposta(resposta)
         except anthropic.AuthenticationError as exc:
             raise ErroSelecao(
@@ -1631,8 +1671,13 @@ def _selecao_via_api(
     fronteiras: Fronteiras,
     energia: dict[str, Any],
     n: int,
+    uso: dict[str, Any] | None = None,
 ) -> tuple[str, list[dict[str, Any]], list[str]]:
-    """Conversa com a API e faz UMA rodada de conserto se precisar."""
+    """Conversa com a API e faz UMA rodada de conserto se precisar.
+
+    'uso', quando vem, acumula os tokens das DUAS idas (a do conserto tambem
+    e cobrada).
+    """
     log = obter()
     _exigir_chave()
     anthropic = _carregar_sdk()
@@ -1640,7 +1685,7 @@ def _selecao_via_api(
     _logar_estimativa(client, modelo_id, prompt)
 
     mensagens: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
-    texto = _enviar(client, anthropic, mensagens, modelo_id)
+    texto = _enviar(client, anthropic, mensagens, modelo_id, uso)
     clipes, problemas = validar(
         extrair_json(texto), fronteiras, energia, n=n
     )
@@ -1657,7 +1702,7 @@ def _selecao_via_api(
         {"role": "assistant", "content": texto},
         {"role": "user", "content": conserto},
     ]
-    texto = _enviar(client, anthropic, mensagens, modelo_id)
+    texto = _enviar(client, anthropic, mensagens, modelo_id, uso)
     clipes, problemas = validar(extrair_json(texto), fronteiras, energia, n=n)
     return texto, clipes, problemas
 
@@ -1675,6 +1720,9 @@ class _Preparado:
     payload: dict[str, Any] = field(default_factory=dict)
     assinatura: dict[str, Any] = field(default_factory=dict)
     resumo: dict[str, Any] = field(default_factory=dict)
+    # Tokens da API nesta execucao (P2). NAO entra no resumo: o resumo vai
+    # para o .estado.json, e nenhum arquivo muda de formato por causa disto.
+    uso: dict[str, Any] | None = None
 
 
 def selecionar(
@@ -1720,6 +1768,8 @@ def selecionar(
         f"{pronto.resumo['duracao_total']:.0f}s no total, score médio "
         f"{pronto.resumo['score_medio']:.1f} — {saida.selecao_json.name} gravado."
     )
+    if pronto.uso is not None:
+        return {**pronto.resumo, "reaproveitado": False, "uso_api": pronto.uso}
     return {**pronto.resumo, "reaproveitado": False}
 
 
@@ -1846,17 +1896,20 @@ def _preparar(
             }
         )
 
+    uso: dict[str, Any] | None = None
     if resposta is not None:
         clipes, problemas = validar(
             extrair_json(resposta), fronteiras, energia, n=n
         )
     else:
+        uso = {"modelo": str(modelo_id), "chamadas": 0}
         resposta, clipes, problemas = _selecao_via_api(
             prompt=prompt,
             modelo_id=str(modelo_id),
             fronteiras=fronteiras,
             energia=energia,
             n=n,
+            uso=uso,
         )
         digest = _digest_resposta(resposta)
 
@@ -1894,7 +1947,7 @@ def _preparar(
         # que o mesmo arquivo agora tem outro conteudo.
         "resposta_digest": digest,
     }
-    return _Preparado(payload=payload, assinatura=assinatura, resumo=resumo)
+    return _Preparado(payload=payload, assinatura=assinatura, resumo=resumo, uso=uso)
 
 
 def _para_esquema(indice: int, clipe: dict[str, Any]) -> dict[str, Any]:

@@ -63,6 +63,7 @@ import json
 import os
 import re
 import statistics
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime
@@ -968,6 +969,46 @@ def _apagar_silencioso(caminho: Path) -> None:
         pass
 
 
+# Esperas entre tentativas do replace(). Somam ~3 s: o bastante para um handle
+# de leitura curto (antivirus, indexador, um pedaco do stream do painel) soltar
+# o arquivo, curto o bastante para um player aberto de verdade virar erro
+# acionavel sem o usuario achar que travou.
+_ESPERAS_REPLACE_S = (0.2, 0.4, 0.8, 1.6)
+
+
+def _substituir(origem: Path, destino: Path) -> None:
+    """replace() que tolera handle transitorio no Windows (CLIP-F6.1 item 2).
+
+    Sem FILE_SHARE_DELETE, qualquer leitor com o destino aberto faz o
+    replace() falhar com PermissionError [WinError 5] -- inclusive um leitor
+    que solta o arquivo 100 ms depois. So PermissionError e repetida: disco
+    cheio ou caminho invalido nao melhoram esperando.
+    """
+    for espera in _ESPERAS_REPLACE_S:
+        try:
+            origem.replace(destino)
+            return
+        except PermissionError:
+            time.sleep(espera)
+    origem.replace(destino)
+
+
+def _atual(caminho: Path, referencia: Path) -> bool:
+    """O arquivo existe, tem conteudo e nao e mais velho que a referencia.
+
+    Capa e publicacao.md sao derivados do mp4. Se o replace() de um deles
+    falhar (arquivo aberto em outro processo), o velho fica no disco com
+    tamanho > 0 -- e sem esta comparacao o atalho de estagio o selava como
+    pronto para sempre (CLIP-F6.1 item 8). Mais velho que o mp4 = refazer.
+    """
+    if not _arquivo_cheio(caminho):
+        return False
+    try:
+        return caminho.stat().st_mtime_ns >= referencia.stat().st_mtime_ns
+    except OSError:
+        return False
+
+
 def _erro_de_escrita(
     caminho: Path, exc: OSError, *, o_que: str, sugestao: str
 ) -> ErroRender:
@@ -995,8 +1036,13 @@ def _escrever_texto(caminho: Path, texto: str) -> Path:
     """
     tmp = caminho.with_name(caminho.name + ".tmp")
     caminho.parent.mkdir(parents=True, exist_ok=True)
-    tmp.write_text(texto, encoding="utf-8", newline="\n")
-    tmp.replace(caminho)
+    try:
+        tmp.write_text(texto, encoding="utf-8", newline="\n")
+        _substituir(tmp, caminho)
+    except OSError:
+        # O .tmp orfao ficava na pasta de entrega do usuario (item 8).
+        _apagar_silencioso(tmp)
+        raise
     return caminho
 
 
@@ -1082,21 +1128,29 @@ def _gravar_capa(clipe_mp4: Path, instante: float, destino: Path) -> Path | None
     parcial = destino.with_name(destino.name + ".parcial")
     try:
         _apagar_silencioso(parcial)
-        ffmpeg_utils.rodar(
-            [
-                "-ss", f"{instante:.3f}",
-                "-i", str(clipe_mp4),
-                "-frames:v", "1",
-                "-q:v", "3",
-                "-f", "image2",
-                "-y", str(parcial),
-            ],
-            descricao=f"capa de {clipe_mp4.name}",
-            timeout=120.0,
-        )
+        # Segunda tentativa 0,5 s antes: um instante dentro do ULTIMO intervalo
+        # de quadro (fonte abaixo de 20 fps, onde o limite duracao - 0,05 s nao
+        # basta) faz o ffmpeg sair com rc 0 e nenhum quadro -- a capa nunca
+        # nascia e o estagio deixava de pular (CLIP-F6.1 item 9). 0,5 s cobre
+        # qualquer fonte de 2 fps para cima.
+        for tentativa in dict.fromkeys((instante, max(0.0, instante - 0.5))):
+            ffmpeg_utils.rodar(
+                [
+                    "-ss", f"{tentativa:.3f}",
+                    "-i", str(clipe_mp4),
+                    "-frames:v", "1",
+                    "-q:v", "3",
+                    "-f", "image2",
+                    "-y", str(parcial),
+                ],
+                descricao=f"capa de {clipe_mp4.name}",
+                timeout=120.0,
+            )
+            if _arquivo_cheio(parcial):
+                break
         if not _arquivo_cheio(parcial):
             raise ErroRender("a extração do quadro da capa terminou sem gerar arquivo.")
-        parcial.replace(destino)
+        _substituir(parcial, destino)
     except (ErroClipper, OSError) as exc:
         _apagar_silencioso(parcial)
         obter().warning(
@@ -1135,19 +1189,21 @@ def _pacote_publicacao(
     lado de um mp4 novo e quadro de um video que nao existe mais; se a
     extracao falhar, a velha sai do disco -- sem capa e melhor que capa errada.
 
-    regenerar=False -- o mp4 foi reaproveitado: so o que faltar e gerado, sem
-    reencodar nada. E o que faz uma capa apagada voltar na proxima rodada.
+    regenerar=False -- o mp4 foi reaproveitado: so o que faltar, ou estiver
+    mais velho que o mp4, e gerado, sem reencodar nada. E o que faz uma capa
+    apagada -- ou que ficou presa num replace() falho -- voltar na proxima
+    rodada.
     """
     log = obter()
     capa, publicacao = _caminhos_publicacao(destino)
-    capa_faltava = not _arquivo_cheio(capa)
+    capa_faltava = not _atual(capa, destino)
     if regenerar or capa_faltava:
         gravada = _gravar_capa(destino, _instante_da_capa(clipe, segmentos, duracao), capa)
         if gravada is None and regenerar:
             _apagar_silencioso(capa)
     capa_rel = f"clips/{capa.name}" if _arquivo_cheio(capa) else None
 
-    if regenerar or capa_faltava or not _arquivo_cheio(publicacao):
+    if regenerar or capa_faltava or not _atual(publicacao, destino):
         try:
             _escrever_texto(
                 publicacao,
@@ -1824,7 +1880,7 @@ def _renderizar_clipe(
                     ),
                 )
             try:
-                parcial.replace(destino)
+                _substituir(parcial, destino)
             except OSError as exc:
                 raise _erro_de_escrita(
                     destino,
@@ -2255,7 +2311,7 @@ def _arquivos_no_lugar(saida: Saida, preset: str, ids: list[int]) -> bool:
         alvo = saida.base / str(item.get("arquivo") or "")
         if not _arquivo_cheio(alvo):
             return False
-        if not all(_arquivo_cheio(p) for p in _caminhos_publicacao(alvo)):
+        if not all(_atual(p, alvo) for p in _caminhos_publicacao(alvo)):
             return False
     return True
 

@@ -295,7 +295,7 @@ def criar_app(raiz_saida: Path | None = None) -> FastAPI:
     @app.delete("/jobs/{job_id}")
     def apagar(job_id: str) -> JSONResponse:
         """Remove o job da listagem. NAO apaga vídeo nem clipe do disco."""
-        saida, _ = _exigir_job(raiz, job_id)
+        saida, job = _exigir_job(raiz, job_id)
         if fila.em_execucao == job_id:
             raise HTTPException(
                 status_code=409,
@@ -583,7 +583,11 @@ def _servir_com_range(alvo: Path, request: Request) -> Response:
     }
 
     if not cabecalho:
-        return FileResponse(alvo, media_type="video/mp4", headers={"Accept-Ranges": "bytes"})
+        return StreamingResponse(
+            _ler_em_pedacos(alvo, 0, tamanho - 1),
+            status_code=200,
+            headers={**comuns, "Content-Length": str(tamanho)},
+        )
 
     achado = _PADRAO_RANGE.match(cabecalho.strip())
     if not achado:
@@ -602,19 +606,8 @@ def _servir_com_range(alvo: Path, request: Request) -> Response:
     if inicio > fim or inicio >= tamanho:
         return Response(status_code=416, headers={**comuns, "Content-Range": f"bytes */{tamanho}"})
 
-    def ler() -> Iterator[bytes]:
-        restante = fim - inicio + 1
-        with alvo.open("rb") as f:
-            f.seek(inicio)
-            while restante > 0:
-                pedaco = f.read(min(_PEDACO, restante))
-                if not pedaco:
-                    break
-                restante -= len(pedaco)
-                yield pedaco
-
     return StreamingResponse(
-        ler(),
+        _ler_em_pedacos(alvo, inicio, fim),
         status_code=206,
         headers={
             **comuns,
@@ -622,6 +615,43 @@ def _servir_com_range(alvo: Path, request: Request) -> Response:
             "Content-Length": str(fim - inicio + 1),
         },
     )
+
+
+def _assinatura(alvo: Path) -> tuple[int, int] | None:
+    try:
+        st = alvo.stat()
+    except OSError:
+        return None
+    return st.st_size, st.st_mtime_ns
+
+
+def _ler_em_pedacos(alvo: Path, inicio: int, fim: int) -> Iterator[bytes]:
+    """Le [inicio, fim] abrindo e FECHANDO o arquivo a cada pedaco.
+
+    O <video> do navegador deixa a resposta aberta enquanto o player esta
+    pausado -- minutos. Com o arquivo aberto durante o stream inteiro, o
+    replace() do re-render falhava no Windows com WinError 5 (CLIP-F6.1 item
+    2): o handle do proprio painel bastava para travar o clipe. Aberto so
+    durante cada read, o handle vive milissegundos.
+
+    Se o arquivo mudar no meio (re-render terminou), o stream PARA em vez de
+    emendar bytes do mp4 novo nos do velho; o player pede de novo.
+    """
+    original = _assinatura(alvo)
+    posicao = inicio
+    while posicao <= fim:
+        if _assinatura(alvo) != original:
+            return
+        try:
+            with alvo.open("rb") as f:
+                f.seek(posicao)
+                pedaco = f.read(min(_PEDACO, fim - posicao + 1))
+        except OSError:
+            return
+        if not pedaco:
+            return
+        posicao += len(pedaco)
+        yield pedaco
 
 
 def _retomar_interrompidos(raiz: Path, fila: filas.Fila) -> None:
@@ -635,6 +665,12 @@ def _retomar_interrompidos(raiz: Path, fila: filas.Fila) -> None:
     log = registro.obter()
     for job in filas.listar_jobs(raiz):
         if job.get("status") not in (filas.RODANDO, filas.NA_FILA):
+            continue
+        if job.get("do_terminal"):
+            # Pasta feita no terminal: nao ha job.json, so um job deduzido do
+            # disco, com as opcoes PADRAO no lugar das que o terminal usou.
+            # Reenfileirar re-transcrevia com o whisper padrao e invalidava o
+            # prompt ja levado ao chat (CLIP-F6.1 item 1).
             continue
         slug = str(job.get("slug") or job.get("id") or "")
         entrada = str(job.get("entrada") or "")
